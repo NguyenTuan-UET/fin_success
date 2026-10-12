@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FCCExpected file="inv02_fpt_dieuchinh">
+  <!-- Đáp án nhập tay từ ảnh hóa đơn. Thẻ rỗng = trường để trống trên hóa đơn. -->
+  <KyHieu>1C26MHC</KyHieu>
+  <So></So>
+  <NgayLap>2026-02-13</NgayLap>
+  <NBan_Ten>Chi nhánh Công ty Cổ phần Bán lẻ Kỹ thuật số FPT tại Hà Nội</NBan_Ten>
+  <NBan_MST>0311609355-001</NBan_MST>
+  <NMua_Ten>CÔNG TY TNHH TIN HỌC VÀ CÔNG NGHỆ HOÀNG MINH</NMua_Ten>
+  <NMua_MST>0109193141</NMua_MST>
+  <TgTCThue>0</TgTCThue>
+  <TgTThue>0</TgTThue>
+  <TgTTTBSo>0</TgTTTBSo>
+  <TgTTTBChu>Không đồng</TgTTTBChu>
+  <Flags>NHAP,MAU,DIEUCHINH</Flags>
+  <GhiChu>Hóa đơn điều chỉnh, có dấu NHÁP và MẪU, số hóa đơn trống, số tiền 0.</GhiChu>
+</FCCExpected>

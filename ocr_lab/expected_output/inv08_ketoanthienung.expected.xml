@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FCCExpected file="inv08_ketoanthienung">
+  <!-- Đáp án nhập tay từ ảnh hóa đơn. Thẻ rỗng = trường để trống trên hóa đơn. -->
+  <KyHieu>1K24THA</KyHieu>
+  <So>3501134</So>
+  <NgayLap>2024-07-02</NgayLap>
+  <NBan_Ten>Trung tâm Kinh doanh VNPT - Hà Nội - Chi nhánh Tổng công ty Dịch vụ Viễn thông</NBan_Ten>
+  <NBan_MST>0106869738-002</NBan_MST>
+  <NMua_Ten>CÔNG TY TNHH ĐÀO TẠO THIÊN ƯNG</NMua_Ten>
+  <NMua_MST>0110329220</NMua_MST>
+  <TgTCThue>672727</TgTCThue>
+  <TgTThue>67273</TgTThue>
+  <TgTTTBSo>740000</TgTTTBSo>
+  <TgTTTBChu>Bảy trăm bốn mươi nghìn đồng</TgTTTBChu>
+  <Flags></Flags>
+  <GhiChu>Hóa đơn có dữ liệu (VNPT), một dòng hàng, watermark chữ đỏ "Kế Toán Thiên Ưng" đè lên bảng.</GhiChu>
+</FCCExpected>

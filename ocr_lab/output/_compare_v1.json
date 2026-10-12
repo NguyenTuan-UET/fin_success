@@ -1,0 +1,778 @@
+{
+ "summary": {
+  "total_fields": 110,
+  "PASS": 92,
+  "CLOSE": 2,
+  "FAIL": 9,
+  "FP": 7,
+  "in_ocr": "70/71",
+  "flags_ok": 7,
+  "invoices": 10
+ },
+ "invoices": {
+  "inv01_goldengate": {
+   "fields": {
+    "KyHieu": {
+     "expected": "1C24MGG",
+     "got": "1C24MGG",
+     "verdict": "PASS",
+     "in_ocr": true
+    },
+    "So": {
+     "expected": "3126818",
+     "got": "3126818",
+     "verdict": "PASS",
+     "in_ocr": true
+    },
+    "NgayLap": {
+     "expected": "2024-12-28",
+     "got": "",
+     "verdict": "FAIL",
+     "in_ocr": true
+    },
+    "NBan_Ten": {
+     "expected": "CÔNG TY CỔ PHẦN TẬP ĐOÀN GOLDEN GATE - CHI NHÁNH MIỀN BẮC",
+     "got": "CONG TY CO PHAN TAP DOAN GOLDEN GATE - CHI NHANH MIEN BAC",
+     "verdict": "PASS",
+     "in_ocr": true
+    },
+    "NBan_MST": {
+     "expected": "0102721191-068",
+     "got": "0102721191068",
+     "verdict": "PASS",
+     "in_ocr": true
+    },
+    "NMua_Ten": {
+     "expected": "",
+     "got": "Ten don vi (Company).",
+     "verdict": "FP",
+     "in_ocr": null
+    },
+    "NMua_MST": {
+     "expected": "",
+     "got": "",
+     "verdict": "PASS",
+     "in_ocr": null
+    },
+    "TgTCThue": {
+     "expected": "3458000",
+     "got": "3458000",
+     "verdict": "PASS",
+     "in_ocr": true
+    },
+    "TgTThue": {
+     "expected": "276640",
+     "got": "276640",
+     "verdict": "PASS",
+     "in_ocr": true
+    },
+    "TgTTTBSo": {
+     "expected": "3734640",
+     "got": "3734640",
+     "verdict": "PASS",
+     "in_ocr": true
+    },
+    "TgTTTBChu": {
+     "expected": "Ba triệu bảy trăm ba mươi bốn nghìn sáu trăm bốn mươi đồng",
+     "got": "Ba trieu bay tram ba muoi bon nghin sau tram bon muoi dong",
+     "verdict": "PASS",
+     "in_ocr": true
+    }
+   },
+   "flags_expected": [],
+   "flags_detected": [],
+   "flags_ok": true
+  },
+  "inv02_fpt_dieuchinh": {
+   "fields": {
+    "KyHieu": {
+     "expected": "1C26MHC",
+     "got": "1C26MHC",
+     "verdict": "PASS",
+     "in_ocr": true
+    },
+    "So": {
+     "expected": "",
+     "got": "125",
+     "verdict": "FP",
+     "in_ocr": null
+    },
+    "NgayLap": {
+     "expected": "2026-02-13",
+     "got": "2026-02-13",
+     "verdict": "PASS",
+     "in_ocr": true
+    },
+    "NBan_Ten": {
+     "expected": "Chi nhánh Công ty Cổ phần Bán lẻ Kỹ thuật số FPT tại Hà Nội",
+     "got": "Chi nhanh Cong ty Co phan Ban le Ky thuat so FPT tai Ha Noi",
+     "verdict": "PASS",
+     "in_ocr": true
+    },
+    "NBan_MST": {
+     "expected": "0311609355-001",
+     "got": "0311609355001",
+     "verdict": "PASS",
+     "in_ocr": true
+    },
+    "NMua_Ten": {
+     "expected": "CÔNG TY TNHH TIN HỌC VÀ CÔNG NGHỆ HOÀNG MINH",
+     "got": "CONG TY TNHH TIN HOC VA CONG NGHE HOANG CHIEU",
+     "verdict": "CLOSE",
+     "in_ocr": true
+    },
+    "NMua_MST": {
+     "expected": "0109193141",
+     "got": "0109193141",
+     "verdict": "PASS",
+     "in_ocr": true
+    },
+    "TgTCThue": {
+     "expected": "0",
+     "got": "0",
+     "verdict": "PASS",
+     "in_ocr": true
+    },
+    "TgTThue": {
+     "expected": "0",
+     "got": "0",
+     "verdict": "PASS",
+     "in_ocr": true
+    },
+    "TgTTTBSo": {
+     "expected": "0",
+     "got": "",
+     "verdict": "FAIL",
+     "in_ocr": true
+    },
+    "TgTTTBChu": {
+     "expected": "Không đồng",
+     "got": "",
+     "verdict": "FAIL",
+     "in_ocr": true
+    }
+   },
+   "flags_expected": [
+    "DIEUCHINH",
+    "MAU",
+    "NHAP"
+   ],
+   "flags_detected": [
+    "DIEUCHINH",
+    "MAU"
+   ],
+   "flags_ok": false
+  },
+  "inv03_ubot_1c21taa": {
+   "fields": {
+    "KyHieu": {
+     "expected": "1C21TAA",
+     "got": "1C21TAA",
+     "verdict": "PASS",
+     "in_ocr": true
+    },
+    "So": {
+     "expected": "000123",
+     "got": "000123",
+     "verdict": "PASS",
+     "in_ocr": true
+    },
+    "NgayLap": {
+     "expected": "2021-01-02",
+     "got": "2021-01-02",
+     "verdict": "PASS",
+     "in_ocr": true
+    },
+    "NBan_Ten": {
+     "expected": "CÔNG TY KẾ TOÁN THIÊN ƯNG",
+     "got": "cong ty ke toan thien UNG",
+     "verdict": "PASS",
+     "in_ocr": true
+    },
+    "NBan_MST": {
+     "expected": "",
+     "got": "",
+     "verdict": "PASS",
+     "in_ocr": null
+    },
+    "NMua_Ten": {
+     "expected": "",
+     "got": "Ten nguoi mua:",
+     "verdict": "FP",
+     "in_ocr": null
+    },
+    "NMua_MST": {
+     "expected": "",
+     "got": "",
+     "verdict": "PASS",
+     "in_ocr": null
+    },
+    "TgTCThue": {
+     "expected": "",
+     "got": "",
+     "verdict": "PASS",
+     "in_ocr": null
+    },
+    "TgTThue": {
+     "expected": "",
+     "got": "",
+     "verdict": "PASS",
+     "in_ocr": null
+    },
+    "TgTTTBSo": {
+     "expected": "",
+     "got": "",
+     "verdict": "PASS",
+     "in_ocr": null
+    },
+    "TgTTTBChu": {
+     "expected": "",
+     "got": "",
+     "verdict": "PASS",
+     "in_ocr": null
+    }
+   },
+   "flags_expected": [
+    "TRANG"
+   ],
+   "flags_detected": [
+    "TRANG"
+   ],
+   "flags_ok": true
+  },
+  "inv04_tvpl_2022": {
+   "fields": {
+    "KyHieu": {
+     "expected": "1K22DAA",
+     "got": "1K22DAA",
+     "verdict": "PASS",
+     "in_ocr": true
+    },
+    "So": {
+     "expected": "9852",
+     "got": "9852",
+     "verdict": "PASS",
+     "in_ocr": true
+    },
+    "NgayLap": {
+     "expected": "2022-10-22",
+     "got": "2022-10-22",
+     "verdict": "PASS",
+     "in_ocr": true
+    },
+    "NBan_Ten": {
+     "expected": "Công ty TNHH Bảo hiểm nhân thọ A",
+     "got": "Cong ty TNHH Bao hiem nhan tho A",
+     "verdict": "PASS",
+     "in_ocr": true
+    },
+    "NBan_MST": {
+     "expected": "",
+     "got": "",
+     "verdict": "PASS",
+     "in_ocr": null
+    },
+    "NMua_Ten": {
+     "expected": "",
+     "got": "",
+     "verdict": "PASS",
+     "in_ocr": null
+    },
+    "NMua_MST": {
+     "expected": "",
+     "got": "",
+     "verdict": "PASS",
+     "in_ocr": null
+    },
+    "TgTCThue": {
+     "expected": "",
+     "got": "",
+     "verdict": "PASS",
+     "in_ocr": null
+    },
+    "TgTThue": {
+     "expected": "",
+     "got": "",
+     "verdict": "PASS",
+     "in_ocr": null
+    },
+    "TgTTTBSo": {
+     "expected": "",
+     "got": "",
+     "verdict": "PASS",
+     "in_ocr": null
+    },
+    "TgTTTBChu": {
+     "expected": "",
+     "got": "NGUOI MUA HANG",
+     "verdict": "FP",
+     "in_ocr": null
+    }
+   },
+   "flags_expected": [
+    "TRANG"
+   ],
+   "flags_detected": [
+    "TRANG"
+   ],
+   "flags_ok": true
+  },
+  "inv05_luatminhkhue": {
+   "fields": {
+    "KyHieu": {
+     "expected": "1K22DAA",
+     "got": "1K22DAA",
+     "verdict": "PASS",
+     "in_ocr": true
+    },
+    "So": {
+     "expected": "006830",
+     "got": "006830",
+     "verdict": "PASS",
+     "in_ocr": true
+    },
+    "NgayLap": {
+     "expected": "2022-10-04",
+     "got": "2022-10-04",
+     "verdict": "PASS",
+     "in_ocr": true
+    },
+    "NBan_Ten": {
+     "expected": "",
+     "got": "",
+     "verdict": "PASS",
+     "in_ocr": null
+    },
+    "NBan_MST": {
+     "expected": "",
+     "got": "",
+     "verdict": "PASS",
+     "in_ocr": null
+    },
+    "NMua_Ten": {
+     "expected": "",
+     "got": "",
+     "verdict": "PASS",
+     "in_ocr": null
+    },
+    "NMua_MST": {
+     "expected": "",
+     "got": "",
+     "verdict": "PASS",
+     "in_ocr": null
+    },
+    "TgTCThue": {
+     "expected": "",
+     "got": "",
+     "verdict": "PASS",
+     "in_ocr": null
+    },
+    "TgTThue": {
+     "expected": "",
+     "got": "",
+     "verdict": "PASS",
+     "in_ocr": null
+    },
+    "TgTTTBSo": {
+     "expected": "",
+     "got": "",
+     "verdict": "PASS",
+     "in_ocr": null
+    },
+    "TgTTTBChu": {
+     "expected": "",
+     "got": "",
+     "verdict": "PASS",
+     "in_ocr": null
+    }
+   },
+   "flags_expected": [
+    "TRANG"
+   ],
+   "flags_detected": [
+    "TRANG"
+   ],
+   "flags_ok": true
+  },
+  "inv06_easyinvoice_songngu": {
+   "fields": {
+    "KyHieu": {
+     "expected": "AA/19E",
+     "got": "AA/19E",
+     "verdict": "PASS",
+     "in_ocr": true
+    },
+    "So": {
+     "expected": "0000000",
+     "got": "00000000",
+     "verdict": "FAIL",
+     "in_ocr": true
+    },
+    "NgayLap": {
+     "expected": "",
+     "got": "",
+     "verdict": "PASS",
+     "in_ocr": null
+    },
+    "NBan_Ten": {
+     "expected": "CÔNG TY CP ĐẦU TƯ CÔNG NGHỆ VÀ THƯƠNG MẠI SOFTDREAMS",
+     "got": "CONG TY CP DAU TU CONG NGHE VA THUONG MAI SOF TDREAMS",
+     "verdict": "PASS",
+     "in_ocr": true
+    },
+    "NBan_MST": {
+     "expected": "0105987432-999",
+     "got": "0105987432",
+     "verdict": "FAIL",
+     "in_ocr": true
+    },
+    "NMua_Ten": {
+     "expected": "",
+     "got": "Dia chi (Address):",
+     "verdict": "FP",
+     "in_ocr": null
+    },
+    "NMua_MST": {
+     "expected": "",
+     "got": "",
+     "verdict": "PASS",
+     "in_ocr": null
+    },
+    "TgTCThue": {
+     "expected": "",
+     "got": "",
+     "verdict": "PASS",
+     "in_ocr": null
+    },
+    "TgTThue": {
+     "expected": "",
+     "got": "",
+     "verdict": "PASS",
+     "in_ocr": null
+    },
+    "TgTTTBSo": {
+     "expected": "",
+     "got": "",
+     "verdict": "PASS",
+     "in_ocr": null
+    },
+    "TgTTTBChu": {
+     "expected": "",
+     "got": "Nguoi mua hang (Buyer);",
+     "verdict": "FP",
+     "in_ocr": null
+    }
+   },
+   "flags_expected": [
+    "MAU",
+    "TRANG"
+   ],
+   "flags_detected": [
+    "MAU"
+   ],
+   "flags_ok": false
+  },
+  "inv07_mobifone": {
+   "fields": {
+    "KyHieu": {
+     "expected": "1C21TAA",
+     "got": "1C21TAA",
+     "verdict": "PASS",
+     "in_ocr": true
+    },
+    "So": {
+     "expected": "123",
+     "got": "123",
+     "verdict": "PASS",
+     "in_ocr": true
+    },
+    "NgayLap": {
+     "expected": "2021-01-02",
+     "got": "2021-01-02",
+     "verdict": "PASS",
+     "in_ocr": true
+    },
+    "NBan_Ten": {
+     "expected": "CÔNG TY TNHH A",
+     "got": "CONG TY TNH A",
+     "verdict": "CLOSE",
+     "in_ocr": false
+    },
+    "NBan_MST": {
+     "expected": "",
+     "got": "",
+     "verdict": "PASS",
+     "in_ocr": null
+    },
+    "NMua_Ten": {
+     "expected": "",
+     "got": "Ten nguoi mua",
+     "verdict": "FP",
+     "in_ocr": null
+    },
+    "NMua_MST": {
+     "expected": "",
+     "got": "",
+     "verdict": "PASS",
+     "in_ocr": null
+    },
+    "TgTCThue": {
+     "expected": "",
+     "got": "",
+     "verdict": "PASS",
+     "in_ocr": null
+    },
+    "TgTThue": {
+     "expected": "",
+     "got": "",
+     "verdict": "PASS",
+     "in_ocr": null
+    },
+    "TgTTTBSo": {
+     "expected": "",
+     "got": "",
+     "verdict": "PASS",
+     "in_ocr": null
+    },
+    "TgTTTBChu": {
+     "expected": "",
+     "got": "",
+     "verdict": "PASS",
+     "in_ocr": null
+    }
+   },
+   "flags_expected": [
+    "TRANG"
+   ],
+   "flags_detected": [
+    "TRANG"
+   ],
+   "flags_ok": true
+  },
+  "inv08_ketoanthienung": {
+   "fields": {
+    "KyHieu": {
+     "expected": "1K24THA",
+     "got": "1K24THA",
+     "verdict": "PASS",
+     "in_ocr": true
+    },
+    "So": {
+     "expected": "3501134",
+     "got": "3501134",
+     "verdict": "PASS",
+     "in_ocr": true
+    },
+    "NgayLap": {
+     "expected": "2024-07-02",
+     "got": "2024-07-02",
+     "verdict": "PASS",
+     "in_ocr": true
+    },
+    "NBan_Ten": {
+     "expected": "Trung tâm Kinh doanh VNPT - Hà Nội - Chi nhánh Tổng công ty Dịch vụ Viễn thông",
+     "got": "Trung tam Kinh doanh VNPT - Ha Noi - Chi nhanh Tong cong ty Dich vu Vien thong",
+     "verdict": "PASS",
+     "in_ocr": true
+    },
+    "NBan_MST": {
+     "expected": "0106869738-002",
+     "got": "0106869738002",
+     "verdict": "PASS",
+     "in_ocr": true
+    },
+    "NMua_Ten": {
+     "expected": "CÔNG TY TNHH ĐÀO TẠO THIÊN ƯNG",
+     "got": "Cong TY TNHH Dao Tao THien UNG",
+     "verdict": "PASS",
+     "in_ocr": true
+    },
+    "NMua_MST": {
+     "expected": "0110329220",
+     "got": "0110329220",
+     "verdict": "PASS",
+     "in_ocr": true
+    },
+    "TgTCThue": {
+     "expected": "672727",
+     "got": "672727",
+     "verdict": "PASS",
+     "in_ocr": true
+    },
+    "TgTThue": {
+     "expected": "67273",
+     "got": "67273",
+     "verdict": "PASS",
+     "in_ocr": true
+    },
+    "TgTTTBSo": {
+     "expected": "740000",
+     "got": "740000",
+     "verdict": "PASS",
+     "in_ocr": true
+    },
+    "TgTTTBChu": {
+     "expected": "Bảy trăm bốn mươi nghìn đồng",
+     "got": "Bay tram bon muoi nghin dong",
+     "verdict": "PASS",
+     "in_ocr": true
+    }
+   },
+   "flags_expected": [],
+   "flags_detected": [],
+   "flags_ok": true
+  },
+  "inv09_viettel_068W023": {
+   "fields": {
+    "KyHieu": {
+     "expected": "AA/21E",
+     "got": "AA/21E",
+     "verdict": "PASS",
+     "in_ocr": true
+    },
+    "So": {
+     "expected": "0000000",
+     "got": "1",
+     "verdict": "FAIL",
+     "in_ocr": true
+    },
+    "NgayLap": {
+     "expected": "2021-03-18",
+     "got": "2021-03-18",
+     "verdict": "PASS",
+     "in_ocr": true
+    },
+    "NBan_Ten": {
+     "expected": "TẬP ĐOÀN CÔNG NGHIỆP - VIỄN THÔNG QUÂN ĐỘI",
+     "got": "Tap doan cong NGHIep - vien THoNG QUAN Doi",
+     "verdict": "PASS",
+     "in_ocr": true
+    },
+    "NBan_MST": {
+     "expected": "0100109106",
+     "got": "0100109106",
+     "verdict": "PASS",
+     "in_ocr": true
+    },
+    "NMua_Ten": {
+     "expected": "Công ty TNHH Đo đạc - Thiết kế - Xây dựng Phúc Khang",
+     "got": "Le Van Tai",
+     "verdict": "FAIL",
+     "in_ocr": true
+    },
+    "NMua_MST": {
+     "expected": "3603462095",
+     "got": "3603462095",
+     "verdict": "PASS",
+     "in_ocr": true
+    },
+    "TgTCThue": {
+     "expected": "186900000",
+     "got": "186900000",
+     "verdict": "PASS",
+     "in_ocr": true
+    },
+    "TgTThue": {
+     "expected": "18690000",
+     "got": "18690000",
+     "verdict": "PASS",
+     "in_ocr": true
+    },
+    "TgTTTBSo": {
+     "expected": "205590000",
+     "got": "205590000",
+     "verdict": "PASS",
+     "in_ocr": true
+    },
+    "TgTTTBChu": {
+     "expected": "Hai trăm lẻ năm triệu năm trăm chín mươi nghìn đồng chẵn",
+     "got": "Hai tram le nam trieu nam tram chin muoi nghin dong chan",
+     "verdict": "PASS",
+     "in_ocr": true
+    }
+   },
+   "flags_expected": [
+    "MAU"
+   ],
+   "flags_detected": [],
+   "flags_ok": false
+  },
+  "inv10_viettel_051W000": {
+   "fields": {
+    "KyHieu": {
+     "expected": "AA/21E",
+     "got": "AA/21E",
+     "verdict": "PASS",
+     "in_ocr": true
+    },
+    "So": {
+     "expected": "0000000",
+     "got": "1",
+     "verdict": "FAIL",
+     "in_ocr": true
+    },
+    "NgayLap": {
+     "expected": "2021-03-18",
+     "got": "2021-03-18",
+     "verdict": "PASS",
+     "in_ocr": true
+    },
+    "NBan_Ten": {
+     "expected": "TẬP ĐOÀN CÔNG NGHIỆP - VIỄN THÔNG QUÂN ĐỘI",
+     "got": "Tap doan cong NGHiep - vien THoNg Quan doi",
+     "verdict": "PASS",
+     "in_ocr": true
+    },
+    "NBan_MST": {
+     "expected": "0100109106",
+     "got": "0100109106",
+     "verdict": "PASS",
+     "in_ocr": true
+    },
+    "NMua_Ten": {
+     "expected": "Công ty TNHH Đo đạc - Thiết kế - Xây dựng Phúc Khang",
+     "got": "Le Van Tai",
+     "verdict": "FAIL",
+     "in_ocr": true
+    },
+    "NMua_MST": {
+     "expected": "3603462095",
+     "got": "3603462095",
+     "verdict": "PASS",
+     "in_ocr": true
+    },
+    "TgTCThue": {
+     "expected": "186900000",
+     "got": "186900000",
+     "verdict": "PASS",
+     "in_ocr": true
+    },
+    "TgTThue": {
+     "expected": "18690000",
+     "got": "18690000",
+     "verdict": "PASS",
+     "in_ocr": true
+    },
+    "TgTTTBSo": {
+     "expected": "205590000",
+     "got": "205590000",
+     "verdict": "PASS",
+     "in_ocr": true
+    },
+    "TgTTTBChu": {
+     "expected": "Hai trăm lẻ năm triệu năm trăm chín mươi nghìn đồng chẵn",
+     "got": "Hai tram le nam trieu nam tram chin muoi nghin dong chan",
+     "verdict": "PASS",
+     "in_ocr": true
+    }
+   },
+   "flags_expected": [
+    "MAU"
+   ],
+   "flags_detected": [
+    "MAU"
+   ],
+   "flags_ok": true
+  }
+ }
+}

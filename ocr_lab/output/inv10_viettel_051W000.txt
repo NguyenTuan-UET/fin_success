@@ -1,0 +1,46 @@
+HÓA ĐƠN GIÁ TRỊ GIA TĂNG | Mẫu số (Form): 01GTKT0/001
+Ký hiệu (Serial): AA/21E
+viettel | (VATINVOICE) | Số (No.): | 00000000
+Bản thể hiện của hóa đơn điện tử
+Ngày (date) 18 tháng (month) 03 năm (year) 2021
+Đơn vị bán hàng (Issued): Tập đoàn công NGHiệp - viễn THôNg Quân đội
+Mã số thuế (Tax code): 0100109106
+Địa chỉ (Address): Số 1 đường Trần Hữu Dực, Phường Mỹ Đình 2, Quận Nam Từ Liêm, Hà Nội
+Điện thoại (Phone number): 0866 531 668 | Fax:
+Số tài khoản (Account No.): 0514100062201 | Ngân hàng (Bank): Ngân Hàng TMCP Quân Đội Chi Nhánh Điện Biên
+Phủ
+Họ tên người mua hàng (Customer's name): Lê Văn Tài
+Tên đơn vị (Company's name): Công ty TNHH Đo đạc - Thiết kế - Xây dựng Phúc Khang
+Mã số thuế (Tax code): 3603462095
+Địa chỉ (Address): L8-25, Đường D1, Thị trấn Dầu Giây, Huyện Thống Nhất, Tỉnh Đồng Nai
+Hình thức thanh toán (Payment method): TM/CK
+STT | Tên hàng hóa, dịch vụ | Đơn | Số | Đơn giá | Thành tiền | Thuế | Tiền | Thành tiền
+(No.) | (Description) | (Unit | trước thuế | suất | thuế | sau thuế
+tính | Quantity) | price) | GIGT | GTGT | GTGT | GTGT
+MAU | (Amount | (VAT | (VAT | (Amount
+excluding | rate) | amount) | including
+VAT) | VAT)
+1 | SAMSUNG Galaxy Note 10 Plus | Chiếc | 4 | 18.990.000 | 75.960.000 | 10 | 0
+2 | SAMSUNG Galaxy S7 Edge | Chiếc | 6 | 18.490.000 | 110.940.000 | 10 | 0
+Tổng cộng hóa đơn (Total invoice): | 205.590.000
+Tổng hợp | Thuế suất | Trị giá chưa thuế GTGT | Tiền thuế GTGT | Trị giá thanh toán
+(In summary) | (VAT rate) | (Amount excluding VAT) | (VAT Amount) | (Amount including VAT)
+Hàng hóa không phải kê khai và tính thuế GTGT
+Hàng hóa không chịu thuế GTGT
+Hàng hóa chịu thuế | 0%
+Hàng hóa chịu thuế | 5%
+Hàng hóa chịu thuế | 10% | 186.900.000 | 18.690.000 | 205.590.000
+Tổng cộng tiền thanh toán (Total ofpayment): | 186.900.000 | 18.690.000 | 205.590.000
+Số tiền viết bằng chữ (Amount in words): Hai trăm lẻ năm triệu năm trăm chín mươi nghìn đồng chắn
+Người mua hàng | Người bán hàng
+(Ký, ghi rõ họ, tên) | (Ký, đóng dấu, ghi rõ họ, tên)
+(Signature & full name) | (Signature, stamp & full name)
+Signature valid
+KÝ BỞI TẬP ĐOÀN CÔNG NGHIỆP
+VIỄN THÔNG QUAN ĐỘI
+Ký ngày 18/03/2021
+www.sinvoice,vn
+Mẫu số: 051W000
+(Cần kiểm tra, đối chiếu lập, giao, nhận hóa đơn)
+Đơn vị cung cấp dịch vụ Hóa đơn điện tử: Tập đoàn Công nghiệp - Viền thông Quân đội (Viettel), MST: 0100109106
+Ira cứu hóa đơn điện tử tại Website: https:/sinvoice.viettel.vn/racuuhoadon. Mã số bi mật:

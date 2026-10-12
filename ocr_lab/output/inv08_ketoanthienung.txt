@@ -1,0 +1,38 @@
+Đơn vị cung cấp giải pháp hóa đơn điện tức Tập đoàn Bưu chính Viễn thông Việt Nam Diện thoại: 18001260
+HÓA ĐƠN GIÁ TRỊ GIA TĂNG | Ký hiệu (Serial): 1K24THA
+(VATINVOICE) | Số (No): 3501134
+VNPT | Ngày (Date) 02 Tháng (Month) 07 Năm (Year) 2024
+Tên người bán (Seller):
+Trung tâm Kinh doanh VNPT - Hà Nội - Chi nhánh Tống công ty Dịch vụ Viễn thông
+Mã số thuế (Tax code): 0106869738-002
+Địa chỉ (Address): Số 75 Phố Đinh Tiên Hoàng, Phường Tràng Tiền, Quận Hoàn Kiếm, Thành phố Hà Nội, Việt Nam
+Số tài khoản (Bank account);
+Ngân hàng (Bank name);
+Tên người mưa (Buyơ): Công TY TNHH Đào Tạo THiên ƯNG
+Mã số thuế (Tax code): 0110329220
+Địa chỉ (kdras): Nhà 16 BII, Số 9 A ngô 181, đường Xuân Thủy, Phường Dịch Vọng Hậu, Quận Cầu Giấy, Thành Phố Hà Nội Việt Nam
+Hình thức thanh toán (Poyment method): TM/CK
+Số tài khoản (Bank account):
+Ngân hàng (Bank name):
+Số điện thoại (Te): | Mã khách hàng (Customer Code): H2531230/HNI013893868
+Đồng tiền thanh toán (Poyment currency): VND
+STT | Tên hàng hóa, dịch vụ | Đơn vị tính | Số lượng | Đơn giá | Thành tiền
+(Na) | (Description) | (Unit) | (Quantity) | (Unit Price) | (Amount)
+2 | 3 | 4 | 5 | 6-4x5
+Tháng 06/2024
+Cước dịch vụ Viễn thông-Công nghệ thông tin tháng 06 năm 2024 | Tháng | 672.727 | 672.727
+Kể Toán Thiên Ung
+Cộng tiền hàng (Total amount): | 672.727
+Thuế suất thuế GTGT (VAT rate): 10% | Tiền thuế GTGT (VAT amount): | 67.273
+Tổng cộng tiền thanh toán (Total payment): | 740.000
+Số tiền viết bằng chữ (In words): Bảy trăm bốn mươi nghìn đồng
+NGƯỜI MUA HÀNG | NGƯỜI BÁN HÀNG
+(BUYER) | (SELLER)
+SIGNATURE VALID
+KÝ BỞI: TRUNG TÂM KINH DOANH VNPT - HÀ NỘI
+CHÍNH TỔNG CÔNG TY DỊCH VỤ VIỄN
+VIONG
+KÝ NGÀY: 02/07/2024 05:55:06
+Tra cứu hóa đơn tại (Lookup the invoice at): https:/banhangvnpt vn'traxrathocxdon
+Mã tra cứu (Lookup code):48658498202406
+(Cần kiểm tra, đổi chiếu khi lập, nhận hóa don)

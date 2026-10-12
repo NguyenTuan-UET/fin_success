@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FCCExpected file="inv01_goldengate">
+  <!-- Đáp án nhập tay từ ảnh hóa đơn. Thẻ rỗng = trường để trống trên hóa đơn. -->
+  <KyHieu>1C24MGG</KyHieu>
+  <So>3126818</So>
+  <NgayLap>2024-12-28</NgayLap>
+  <NBan_Ten>CÔNG TY CỔ PHẦN TẬP ĐOÀN GOLDEN GATE - CHI NHÁNH MIỀN BẮC</NBan_Ten>
+  <NBan_MST>0102721191-068</NBan_MST>
+  <NMua_Ten></NMua_Ten>
+  <NMua_MST></NMua_MST>
+  <TgTCThue>3458000</TgTCThue>
+  <TgTThue>276640</TgTThue>
+  <TgTTTBSo>3734640</TgTTTBSo>
+  <TgTTTBChu>Ba triệu bảy trăm ba mươi bốn nghìn sáu trăm bốn mươi đồng</TgTTTBChu>
+  <Flags></Flags>
+  <GhiChu>Hóa đơn GTGT khởi tạo từ máy tính tiền, 7 dòng hàng, chữ ký số hợp lệ. Người mua để trống.</GhiChu>
+</FCCExpected>

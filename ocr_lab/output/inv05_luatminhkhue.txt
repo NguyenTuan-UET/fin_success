@@ -1,0 +1,26 @@
+Mẫu hiển thị số 5: Hóa đơn điện tử giá trị gia tăng (dùng cho một số tổ chức;
+doanh nghiệp đặc thù thu bằng ngoại tệ )
+HÓA ĐƠN GIÁ TRỊ GIA TĂNG
+Ký hiệu: 1K22DAA
+Số.006830
+Ngày 04 tháng 10 năm 2022
+Tên người bán
+Mã số thuế
+Địa chi
+Điên thoại | Số tài khoản
+Tên người mua
+Mã số thuế
+Địa chỉ
+Hình thức thanh toán | Số tài khoản | Đồng tiền thanh toán USD
+STT | Tên hàng hóa | Đơn | Số | Đơn | Thuế | chưa có | Thành | tiên | thuế | Tiến | tiền có | Thành | Tỷ gia | CUSD
+dịch vụ | vị tính | lượng | giá | suất | thuế | GTGT | thuê | VND)
+GTGT | GTGT
+1 | 2 | 3 | 4 | 5 | 6 | 7?4x5 | 8 ?7x6 | 9 | 748 | 10
+Tổng tiền chưa có thuế GTGT
+Tổng tiền thuế giá trị gia tăng theo từng loại thuế suất:
+Tổng tiền thanh toán đã có thuế GTGT
+Số tiên viết bằng chữ
+Người mua hàng | Người bán hàng
+(Chữ ký số (nếu có)) | (Chữ ký điện tử, Chữ ký số)
+(Cần kiểm tra, đối chiếu khi lập, nhận hóa
+đơn
