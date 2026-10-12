@@ -1,0 +1,7 @@
+.venv/
+__pycache__/
+
+# khóa/biến môi trường cục bộ
+.env
+*.env
+scripts/.env

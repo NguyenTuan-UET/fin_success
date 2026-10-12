@@ -1,0 +1,4 @@
+--extra-index-url https://vnstocks.com/api/simple
+vnstock>=4.0
+vnai
+pandas

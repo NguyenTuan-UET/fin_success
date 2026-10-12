@@ -1,0 +1,68 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  --color-ink: #0f172a;
+  --color-ink-2: #334155;
+  --color-ink-3: #64748b;
+  --color-page: #f8fafc;
+  --color-line: #e2e8f0;
+  --color-muted: #eef2f6;
+  --color-brand: #0369a1;
+  --color-brand-dark: #075985;
+  --color-brand-soft: #e0f2fe;
+
+  /* Trạng thái (dataviz status palette) — luôn đi kèm icon + nhãn */
+  --color-good: #0ca30c;
+  --color-good-ink: #006300;
+  --color-good-soft: #e7f6e7;
+  --color-warn: #fab219;
+  --color-warn-ink: #8a5a00;
+  --color-warn-soft: #fff5dc;
+  --color-serious: #ec835a;
+  --color-serious-ink: #9a3d17;
+  --color-serious-soft: #fdeee7;
+  --color-critical: #d03b3b;
+  --color-critical-ink: #a62626;
+  --color-critical-soft: #fbe9e9;
+
+  /* Chuỗi dữ liệu (dataviz categorical, thứ tự cố định) */
+  --color-s1: #2a78d6;
+  --color-s2: #eb6834;
+  --color-s3: #1baf7a;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  background: var(--color-page);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
