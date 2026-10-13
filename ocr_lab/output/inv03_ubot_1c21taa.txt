@@ -1,0 +1,28 @@
+Mẫu hiển thị số 01: Hóa đơn điện tử giá trị gia tăng (dùng cho tổ chức, cá nhân
+khai thuế giá trị gia tăng theo phương pháp khẩu trừ).
+HÓA ĐƠN GIÁ TRỊ GIA TĂNG
+Ký hiệu: 1C21TAA
+Số: 000123
+Ngày 02 tháng 01 năm 2021
+Tên người bán: công ty kế toán thiên UNG
+Mã số thuế:
+Địa chỉ: Số 181 Đường Xuân Thủy, Quận Cầu Giấy, thành phố Hà Nội
+Điện thoại:.0984322539. Số tài khoản.0761100546004
+Họ tên người mua:
+Tên người mua:
+Mã số thuế:
+Đia chỉ:
+Hình thức thanh toán | Số tài khoản | Đồng tiên thanh toán: VNĐ
+Thành | Thành
+stt | Tên hàng | Đơn | Số | Đơn | Thuế | tiền chưa | Tiền thuế | tiên có
+hóa, dịch vụ | vị tính | lượng | giá | suất | có thuế | GTGT | thuế
+GTGT | GTGT
+1 | 2 | 3 | 4 | 5 | 6 | 7-4x5 | 8-7x6 | 9 ? 748
+Tổng tiền chưa có thuế GTGT
+Tông tiền thuế giá trị gia tăng theo từng loại thuế suất:
+Tổng tiền thanh toán đã có thuế GTGT
+Số tiên viết bằng chữ
+Người mua hàng | Người bán hàng
+(Chữ ký số (nếu có) | (Chữ ký điện tử, Chữ ký số)
+(Cần kiểm tra, đối chiếu khi lập, nhận hóa
+đơn

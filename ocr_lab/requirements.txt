@@ -1,0 +1,4 @@
+# torch/torchvision bản CPU: pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+vietocr==0.3.13
+rapidocr==3.10.0
+onnxruntime==1.31.0

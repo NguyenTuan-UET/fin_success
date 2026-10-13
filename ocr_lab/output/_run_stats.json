@@ -1,0 +1,82 @@
+{
+ "inv01_goldengate": {
+  "size": [
+   820,
+   1165
+  ],
+  "boxes": 203,
+  "seconds": 28.9
+ },
+ "inv02_fpt_dieuchinh": {
+  "size": [
+   1080,
+   1590
+  ],
+  "boxes": 82,
+  "seconds": 19.8
+ },
+ "inv03_ubot_1c21taa": {
+  "size": [
+   712,
+   755
+  ],
+  "boxes": 57,
+  "seconds": 9.9
+ },
+ "inv04_tvpl_2022": {
+  "size": [
+   483,
+   759
+  ],
+  "boxes": 32,
+  "seconds": 5.9
+ },
+ "inv05_luatminhkhue": {
+  "size": [
+   721,
+   748
+  ],
+  "boxes": 64,
+  "seconds": 8.5
+ },
+ "inv06_easyinvoice_songngu": {
+  "size": [
+   763,
+   1200
+  ],
+  "boxes": 66,
+  "seconds": 15.2
+ },
+ "inv07_mobifone": {
+  "size": [
+   597,
+   532
+  ],
+  "boxes": 52,
+  "seconds": 7.4
+ },
+ "inv08_ketoanthienung": {
+  "size": [
+   857,
+   1044
+  ],
+  "boxes": 65,
+  "seconds": 20.9
+ },
+ "inv09_viettel_068W023": {
+  "size": [
+   1182,
+   1660
+  ],
+  "boxes": 76,
+  "seconds": 23.7
+ },
+ "inv10_viettel_051W000": {
+  "size": [
+   1182,
+   1660
+  ],
+  "boxes": 115,
+  "seconds": 28.8
+ }
+}

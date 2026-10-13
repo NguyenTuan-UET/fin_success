@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FCCExpected file="inv06_easyinvoice_songngu">
+  <!-- Đáp án nhập tay từ ảnh hóa đơn. Thẻ rỗng = trường để trống trên hóa đơn. -->
+  <KyHieu>AA/19E</KyHieu>
+  <So>0000000</So>
+  <NgayLap></NgayLap>
+  <NBan_Ten>CÔNG TY CP ĐẦU TƯ CÔNG NGHỆ VÀ THƯƠNG MẠI SOFTDREAMS</NBan_Ten>
+  <NBan_MST>0105987432-999</NBan_MST>
+  <NMua_Ten></NMua_Ten>
+  <NMua_MST></NMua_MST>
+  <TgTCThue></TgTCThue>
+  <TgTThue></TgTThue>
+  <TgTTTBSo></TgTTTBSo>
+  <TgTTTBChu></TgTTTBChu>
+  <Flags>MAU,TRANG</Flags>
+  <GhiChu>Mẫu trống song ngữ có nền hoa văn, mã QR; MST in cách chữ số; khung Mẫu ở phần ký.</GhiChu>
+</FCCExpected>

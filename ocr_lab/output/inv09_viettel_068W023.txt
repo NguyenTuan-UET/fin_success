@@ -1,0 +1,36 @@
+HÓA ĐƠN GIÁ TRỊ GIA TĂNG | Mẫu số (Form): 01GTKTO/001
+(VATINVOICE) | Ký hiệu (Serial): AA/21E
+Invoice'vn | Bản thể hiện của hóa đơn điện tử | Số (No.): | 0000000
+(Electronic invoice display)
+Ngày (date) 18 tháng (month) 03 năm (year) 2021
+Đơn vị bán hàng (Seller): Tập đoàn công NGHIệp - viễn THôNG QUÂN Đội
+Mã số thuế (Tax code): 0100109106
+Địa chỉ (Address): Số 1 đường Trần Hữu Dực, Phường Mỹ Đình 2, Quận Nam Từ Liêm, Hà Nội
+Điện thoại (Tel): 0866 531 668 | Email: cskh Asinvoice.vn | Website: www.sinvoice.vn
+Số tài khoản (Account No): 051410062201 Ngân hàng (Bank): Ngân Hàng TMCP Quân Đội Chỉ Nhánh Điện
+Biên Phủ
+Họ tên người mua hàng (Customer's name): Lê Văn Tài
+Tên đơn vị (Company's name): Công ty TNHH Đo đạc - Thiết kế - Xây dựng Phúc Khang
+Mã số thuế (Tax code): 3603462095
+Địa chỉ (Address): L8-25, Đường D1, Thị trấn Dầu Giây, Huyện Thống Nhất, Tỉnh Đồng Nai
+Hình thức thanh toán (Payment method): TM/CK
+Ghi chú (Note).
+STT | Tên hàng hóa, dịch vụ | Đơn | Số | Đơn giá | Thành tiền
+(No.) | (Description) | MÂU; | ị tính | lượng | (Unit price) | (Amount)
+Unit) | (Quantity)
+1 | 2 | 3 | 4 | 5 | 6?4x5
+1 | SAMSUNG Galaxy Note 10 Plus | Chiếc | 4 | 18.990.000 | 75.960.000
+2 | SAMSUNG Galaxy S7 Edge | Chiếc | 6 | 18.490.000 | 110.940.000
+Cộng tiền hàng (Total amount): | 186.900.000
+Thuế suất GTGT (VATrate): 10 % | Tiền thuế GTGT (VAT amount): | 18.690.000
+TỔNG CỘNG TIỀN THANH TOÁN (TOTAL payment): | 205.590.000
+Số tiền viết bằng chữ (Amount in words): Hai trăm lẻ năm triệu năm trăm chín mươi nghìn đồng chắn
+Người mua hàng (Buyer) | Người bán hàng (Seller)
+Signature valid
+KÝ BỞI TẬP ĐOÀN CÔNG NGHIỆP
+VIỄN THÔNG QUÂN ĐỘI
+Ký ngày 18/03/2021
+sinvoice,vn
+(Cần kiểm tra, đối chiếu khi lập, giao, nhận hóa đơn) | Mẫu số: 068W023
+Đơn vị cùng cấp dịch vụ Hòa đơn điện từ. Tập đoàn Công nghiệp - Viễn thông Quân đội (Viettel), MST: 0100109106
+Tra cứu hóa đơn điện tử tại Website: https:/sinvoice.viettel.vn/tracuuhoadon. Mã số bi mật:

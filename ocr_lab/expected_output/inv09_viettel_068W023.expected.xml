@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FCCExpected file="inv09_viettel_068W023">
+  <!-- Đáp án nhập tay từ ảnh hóa đơn. Thẻ rỗng = trường để trống trên hóa đơn. -->
+  <KyHieu>AA/21E</KyHieu>
+  <So>0000000</So>
+  <NgayLap>2021-03-18</NgayLap>
+  <NBan_Ten>TẬP ĐOÀN CÔNG NGHIỆP - VIỄN THÔNG QUÂN ĐỘI</NBan_Ten>
+  <NBan_MST>0100109106</NBan_MST>
+  <NMua_Ten>Công ty TNHH Đo đạc - Thiết kế - Xây dựng Phúc Khang</NMua_Ten>
+  <NMua_MST>3603462095</NMua_MST>
+  <TgTCThue>186900000</TgTCThue>
+  <TgTThue>18690000</TgTThue>
+  <TgTTTBSo>205590000</TgTTTBSo>
+  <TgTTTBChu>Hai trăm lẻ năm triệu năm trăm chín mươi nghìn đồng chẵn</TgTTTBChu>
+  <Flags>MAU</Flags>
+  <GhiChu>Hóa đơn có dữ liệu, con dấu MẪU đè lên bảng, 2 dòng hàng, nền họa tiết, ảnh lớn.</GhiChu>
+</FCCExpected>
