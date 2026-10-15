@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { Bell, CalendarDays, FlaskConical, Menu, ShieldCheck, Sparkles, X } from "lucide-react";
-import { DEMO_TODAY, ROLE_ORDER, ROLES, type Role } from "@/lib/roles";
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { Bell, CalendarDays, Menu, ShieldCheck, Sparkles, X } from "lucide-react";
+import { ROLE_ORDER, ROLES, type Role } from "@/lib/roles";
 import { Logo, NavIcon } from "@/components/ui/basic";
 import { useAssistant } from "@/components/assistant/Assistant";
 
@@ -31,8 +31,17 @@ const NOTIFS: Record<Role, { title: string; note: string; href: string; tone: st
   ],
 };
 
+const subscribeNever = () => () => {};
+const dateFmt = new Intl.DateTimeFormat("vi-VN", { weekday: "long", day: "2-digit", month: "2-digit", year: "numeric", timeZone: "Asia/Ho_Chi_Minh" });
+/** Ngày hôm nay theo giờ Việt Nam, lấy từ đồng hồ trình duyệt (server render để trống rồi điền khi hydrate). */
+function todayVi() {
+  const d = dateFmt.format(new Date());
+  return d.charAt(0).toUpperCase() + d.slice(1);
+}
+
 export function AppShell({ role, children }: { role: Role; children: ReactNode }) {
   const meta = ROLES[role];
+  const today = useSyncExternalStore(subscribeNever, todayVi, () => "");
   const pathname = usePathname();
   const router = useRouter();
   const { open: openAssistant } = useAssistant();
@@ -124,7 +133,7 @@ export function AppShell({ role, children }: { role: Role; children: ReactNode }
         <span className="spacer" />
         <span className="muted tb-date">
           <CalendarDays size={16} aria-hidden="true" />
-          {DEMO_TODAY}
+          {today}
         </span>
 
         <div ref={bellRef} style={{ position: "relative" }}>
@@ -235,10 +244,6 @@ export function AppShell({ role, children }: { role: Role; children: ReactNode }
           <span className="side-sec">
             <ShieldCheck size={16} aria-hidden="true" />
             AES-256 · MFA đang bật
-          </span>
-          <span className="side-sec">
-            <FlaskConical size={16} aria-hidden="true" />
-            Bản mock · số liệu minh họa
           </span>
         </aside>
 

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import clsx from 'clsx'
 import { Bell, Building2, Calculator, Database, FileText, Gauge, LayoutDashboard, Leaf, LogOut, Menu, Settings, ShieldCheck, Store, X } from 'lucide-react'
-import { DEV_ROLES, useActiveOrg, useStore } from '../store'
+import { SESSION_ROLES, useActiveOrg, useStore } from '../store'
 import { dateTime } from '../lib/format'
 import type { OrgType } from '../domain/types'
 
@@ -61,7 +61,7 @@ export function Layout() {
             <Menu className="size-5" />
           </button>
           <OrgBadge />
-          <DevLinks />
+          <RoleLinks />
           <div className="ml-auto flex items-center gap-2">
             <Notifications />
             <div className="hidden items-center gap-2.5 border-l border-line pl-3 md:flex">
@@ -73,7 +73,7 @@ export function Layout() {
                 <div className="text-[11px] text-ink-3">{me?.title}</div>
               </div>
             </div>
-            <button aria-label="Đăng xuất" title="Đăng xuất" onClick={() => void logout()} className="grid size-10 cursor-pointer place-items-center rounded-lg hover:bg-muted">
+            <button aria-label="Đổi vai trò" title="Đổi vai trò" onClick={() => void logout()} className="grid size-10 cursor-pointer place-items-center rounded-lg hover:bg-muted">
               <LogOut className="size-5 text-ink-2" />
             </button>
           </div>
@@ -167,17 +167,15 @@ function ErrorBanner() {
   )
 }
 
-const DEV_LABEL = { supplier: 'Nhà cung cấp', buyer: 'Bên mua', lender: 'Tổ chức tài chính', fcc: 'FCC' } as const
+const ROLE_LINK_LABEL = { supplier: 'Nhà cung cấp', buyer: 'Bên mua', lender: 'Tổ chức tài chính', fcc: 'FCC' } as const
 
-/** Chế độ dev: mở nhanh trang của các bên khác ở tab mới. */
-function DevLinks() {
-  const dev = useStore((s) => s.dev)
-  if (!dev) return null
+/** Mở nhanh trang của các vai trò khác ở tab mới. */
+function RoleLinks() {
   return (
     <div className="hidden items-center gap-1 text-xs text-ink-3 lg:flex" aria-label="Mở trang của bên khác">
       <span>Mở tab:</span>
-      {DEV_ROLES.map((r) => (
-        <a key={r} href={`/${r}`} target="_blank" rel="noreferrer" className="rounded-md border border-line px-2 py-1 font-medium text-ink-2 hover:bg-muted">{DEV_LABEL[r]}</a>
+      {SESSION_ROLES.map((r) => (
+        <a key={r} href={`/${r}`} target="_blank" rel="noreferrer" className="rounded-md border border-line px-2 py-1 font-medium text-ink-2 hover:bg-muted">{ROLE_LINK_LABEL[r]}</a>
       ))}
     </div>
   )

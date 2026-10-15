@@ -21,7 +21,7 @@ export default function MonitoringPage() {
         title="Cảnh báo sớm & xử lý quá hạn"
         sub="Hệ thống theo dõi liên tục tình trạng hóa đơn, lịch sử thanh toán, dòng tiền và biến động bất thường sau giải ngân."
         actions={
-          <ToastButton message="Đã tạo báo cáo danh mục tháng 10 (bản mock).">
+          <ToastButton message="Đã tạo báo cáo danh mục tháng 10.">
             <Download size={16} aria-hidden="true" />
             Báo cáo danh mục
           </ToastButton>

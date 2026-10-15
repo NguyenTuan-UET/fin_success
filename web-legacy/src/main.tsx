@@ -14,7 +14,7 @@ import { Accounting } from './pages/Accounting'
 import { DataSources } from './pages/DataSources'
 import { SettingsPage } from './pages/Settings'
 import { Admin } from './pages/Admin'
-import { AuthPage, DevChooser } from './pages/AuthPage'
+import { RoleChooser } from './pages/RoleChooser'
 
 function Home() {
   const org = useActiveOrg()
@@ -46,12 +46,11 @@ function Boot() {
   const ready = useStore((s) => s.ready)
   const checked = useStore((s) => s.checked)
   const error = useStore((s) => s.error)
-  const dev = useStore((s) => s.dev)
   useEffect(() => {
     void useStore.getState().boot()
   }, [])
   if (ready) return <RouterProvider router={router} />
-  if (checked) return dev ? <DevChooser /> : <AuthPage />
+  if (checked) return <RoleChooser />
   return (
     <div className="grid h-full place-items-center p-6 text-center text-sm text-ink-2">
       {error ? (

@@ -30,7 +30,7 @@ export default function BuyerEsg() {
       <section className="card flush">
         <div className="ch">
           <h2 className="ct">ESG theo nhà cung cấp</h2>
-          <ToastButton className="btn bs sm" message="Đã gửi lời mời chia sẻ ESG tới 9 nhà cung cấp chưa tham gia (bản mock).">
+          <ToastButton className="btn bs sm" message="Đã gửi lời mời chia sẻ ESG tới 9 nhà cung cấp chưa tham gia.">
             Mời nhà cung cấp chia sẻ ESG
           </ToastButton>
         </div>

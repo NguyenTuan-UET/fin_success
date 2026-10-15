@@ -34,7 +34,7 @@ function OrgTab() {
           ))}
           {org.type === 'lender' && <div className="flex justify-between"><dt className="text-ink-3">Xác minh bởi FCC</dt><dd>{org.verified ? <Badge tone="good">Đã xác minh</Badge> : <Badge tone="warn">Chờ xác minh</Badge>}</dd></div>}
         </dl>
-        <p className="mt-3 text-xs text-ink-3">MST chưa được đối chiếu với cơ quan thuế tự động. Bước xác nhận quan trọng (xác nhận nghĩa vụ thanh toán, chấp thuận đề nghị tài trợ) yêu cầu nhập lại mật khẩu.</p>
+        <p className="mt-3 text-xs text-ink-3">MST chưa được đối chiếu với cơ quan thuế tự động.</p>
       </Card>
       {org.type !== 'fcc' && <EditOrg key={org.id + org.name + org.employees} />}
       {org.type === 'lender' && <WebhookCard orgId={org.id} verified={!!org.verified} />}

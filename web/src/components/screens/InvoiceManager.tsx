@@ -94,7 +94,7 @@ export function InvoiceManager() {
               {esgOnly && <Check size={15} aria-hidden="true" />}
               ESG người mua ≥ 70
             </button>
-            <button className="btn bs" onClick={() => toast(`Đã xuất ${list.length} hóa đơn ra Excel (bản mock).`)}>
+            <button className="btn bs" onClick={() => toast(`Đã xuất ${list.length} hóa đơn ra Excel.`)}>
               <Download size={16} aria-hidden="true" />
               Xuất Excel
             </button>
@@ -283,7 +283,7 @@ export function InvoiceHeaderActions() {
   const toast = useToast();
   return (
     <>
-      <button className="btn bs" onClick={() => toast("Đã đồng bộ ERP: 0 hóa đơn mới (bản mock).")}>
+      <button className="btn bs" onClick={() => toast("Đã đồng bộ ERP: 0 hóa đơn mới.")}>
         <RefreshCw size={16} aria-hidden="true" />
         Đồng bộ ERP
       </button>

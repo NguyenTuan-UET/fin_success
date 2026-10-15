@@ -289,7 +289,7 @@ export function buildApp(opt: AppOptions): FastifyInstance & { db: Database; swe
       }
       db.createUser({ id: uid('u'), email: opt.admin.email.toLowerCase(), passwordHash: hashPassword(opt.admin.password), orgId: fcc.id, name: 'Quản trị FCC', title: 'Thẩm định & vận hành', role: 'fcc_reviewer' })
     }
-  } else if (!state.orgs.some((o) => o.type === 'fcc')) {
+  } else if (!opt.devAutologin && !state.orgs.some((o) => o.type === 'fcc')) {
     app.log.warn('Chưa có tài khoản nhân sự FCC (đặt ADMIN_EMAIL và ADMIN_PASSWORD): chưa ai xác minh được tổ chức tài chính hay thẩm định ESG')
   }
 

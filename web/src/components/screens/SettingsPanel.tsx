@@ -117,7 +117,7 @@ export function SettingsPanel({ role }: { role: Role }) {
                   <span className="chip c-ok">Đồng bộ</span>
                 </div>
               ))}
-              <button className="btn bs" style={{ alignSelf: "flex-start" }} onClick={() => toast("Mở luồng liên kết tài khoản ngân hàng (bản mock).")}>
+              <button className="btn bs" style={{ alignSelf: "flex-start" }} onClick={() => toast("Mở luồng liên kết tài khoản ngân hàng.")}>
                 <Plus size={16} aria-hidden="true" />
                 Thêm tài khoản
               </button>
@@ -144,7 +144,7 @@ export function SettingsPanel({ role }: { role: Role }) {
                   {on ? (
                     <span className="chip c-ok">Đã kết nối</span>
                   ) : (
-                    <button className="btn bs sm" onClick={() => toast(`Đang chuyển tới trang ủy quyền ${name} (bản mock).`)}>
+                    <button className="btn bs sm" onClick={() => toast(`Đang chuyển tới trang ủy quyền ${name}.`)}>
                       Kết nối
                     </button>
                   )}
@@ -155,7 +155,7 @@ export function SettingsPanel({ role }: { role: Role }) {
                   <strong style={{ fontSize: 13.5 }}>Nhập file định kỳ</strong>
                   <div className="muted">Excel/CSV/XML theo mẫu FCC · có kiểm tra lỗi theo dòng</div>
                 </div>
-                <button className="btn bs sm" onClick={() => toast("Đã tải mẫu file nhập liệu FCC (bản mock).")}>
+                <button className="btn bs sm" onClick={() => toast("Đã tải mẫu file nhập liệu FCC.")}>
                   Tải mẫu
                 </button>
               </div>
@@ -255,7 +255,7 @@ export function SettingsPanel({ role }: { role: Role }) {
                   }}
                 />
               ))}
-              <button className="btn bs" style={{ alignSelf: "flex-start" }} onClick={() => toast("Đã tạo API key mới cho đối tác (bản mock).")}>
+              <button className="btn bs" style={{ alignSelf: "flex-start" }} onClick={() => toast("Đã tạo API key mới cho đối tác.")}>
                 <KeyRound size={16} aria-hidden="true" />
                 Quản lý API key đối tác
               </button>
@@ -292,7 +292,7 @@ export function SettingsPanel({ role }: { role: Role }) {
                 <span className={`chip ${chip}`}>{perm}</span>
               </div>
             ))}
-            <button className="btn bs" style={{ alignSelf: "flex-start" }} onClick={() => toast("Đã gửi lời mời qua email (bản mock).")}>
+            <button className="btn bs" style={{ alignSelf: "flex-start" }} onClick={() => toast("Đã gửi lời mời qua email.")}>
               Mời người dùng
             </button>
           </div>
@@ -302,7 +302,7 @@ export function SettingsPanel({ role }: { role: Role }) {
       <section className="card flush">
         <div className="ch">
           <h2 className="ct">Nhật ký truy cập (Audit Trail)</h2>
-          <button className="btn bs sm" onClick={() => toast("Đã xuất nhật ký truy cập (bản mock).")}>
+          <button className="btn bs sm" onClick={() => toast("Đã xuất nhật ký truy cập.")}>
             Xuất nhật ký
           </button>
         </div>
@@ -331,7 +331,7 @@ export function SettingsPanel({ role }: { role: Role }) {
           </table>
         </div>
         <p className="muted" style={{ padding: "10px 16px 14px" }}>
-          Đang đăng nhập: {meta.user.name} · {meta.user.title}. Địa chỉ IP trong bản mock là địa chỉ mẫu dành cho tài liệu.
+          Đang đăng nhập: {meta.user.name} · {meta.user.title}.
         </p>
       </section>
     </>

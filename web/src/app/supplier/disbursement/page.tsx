@@ -44,7 +44,7 @@ export default function Disbursement() {
         actions={
           <>
             <span className="chip c-warn lg">Đã phê duyệt · chờ giải ngân T+1</span>
-            <ToastButton message="Mở hợp đồng tài trợ TT-0418 (đã ký số) — bản mock.">
+            <ToastButton message="Mở hợp đồng tài trợ TT-0418 (đã ký số).">
               <FileSignature size={16} aria-hidden="true" />
               Hợp đồng tài trợ
             </ToastButton>

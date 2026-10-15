@@ -78,7 +78,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
             <Sparkles size={20} color="#DDF1C4" aria-hidden="true" />
             <div style={{ display: "flex", flexDirection: "column", lineHeight: 1.25 }}>
               <strong>Trợ lý FCC</strong>
-              <span style={{ fontSize: 12, color: "var(--on-forest-2)" }}>Bản mock · trả lời theo dữ liệu minh họa</span>
+              <span style={{ fontSize: 12, color: "var(--on-forest-2)" }}>Trả lời theo dữ liệu trên màn hình</span>
             </div>
             <span className="spacer" />
             <button className="ibtn" onClick={() => setOpen(false)} aria-label="Đóng trợ lý">

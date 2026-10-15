@@ -52,7 +52,7 @@ export default function AdminPage() {
         title="Vận hành nền tảng FCC"
         sub="Người dùng, phân quyền, bảo mật và báo cáo hoạt động của toàn nền tảng · tháng 10/2026"
         actions={
-          <ToastButton message="Đã tạo báo cáo vận hành tháng 10/2026 (bản mock).">
+          <ToastButton message="Đã tạo báo cáo vận hành tháng 10/2026.">
             <Download size={16} aria-hidden="true" />
             Báo cáo tháng
           </ToastButton>
@@ -122,7 +122,7 @@ export default function AdminPage() {
       <section className="card flush">
         <div className="ch">
           <h2 className="ct">Ma trận phân quyền theo vai trò (RBAC)</h2>
-          <ToastButton className="btn bs sm" message="Chỉnh ma trận quyền cần phê duyệt hai người (bản mock).">
+          <ToastButton className="btn bs sm" message="Chỉnh ma trận quyền cần phê duyệt hai người.">
             Chỉnh ma trận
           </ToastButton>
         </div>

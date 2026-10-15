@@ -129,6 +129,3 @@ export const ROLES: Record<Role, RoleMeta> = {
 };
 
 export const ROLE_ORDER: Role[] = ["supplier", "buyer", "lender", "admin"];
-
-/** Ngày "hôm nay" cố định cho bản mock để số liệu luôn khớp nhau. */
-export const DEMO_TODAY = "Thứ Năm, 15/10/2026";

@@ -95,7 +95,7 @@ export function Accounting({ role }: { role: Role }) {
             <span className="chip c-info lg">Chỉ đọc · có ghi Audit Trail</span>
           ) : (
             <>
-              <ToastButton message="Đã xuất BCTC 9 tháng 2026 (bản mock).">
+              <ToastButton message="Đã xuất BCTC 9 tháng 2026.">
                 <Download size={16} aria-hidden="true" />
                 Xuất BCTC
               </ToastButton>

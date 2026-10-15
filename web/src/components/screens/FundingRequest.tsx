@@ -139,7 +139,7 @@ export function FundingRequest() {
                   </tbody>
                 </table>
               </div>
-              <button className="btn bs" style={{ marginTop: 12 }} onClick={() => toast("Mở biểu mẫu thêm tài sản (bản mock).")}>
+              <button className="btn bs" style={{ marginTop: 12 }} onClick={() => toast("Mở biểu mẫu thêm tài sản.")}>
                 <Plus size={16} aria-hidden="true" />
                 Thêm tài sản
               </button>

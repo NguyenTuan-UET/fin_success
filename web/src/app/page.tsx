@@ -75,7 +75,7 @@ export default function Landing() {
               <span>Fast Cash Connect</span>
             </span>
           </Link>
-          <span className="chip c-neu lg">Bản mock · Fin Success · HVNH 2026</span>
+          <span className="chip c-neu lg">Fin Success · HVNH 2026</span>
         </header>
 
         <section className="hero">
@@ -122,7 +122,7 @@ export default function Landing() {
             </div>
           </div>
 
-          <div className="hero-visual" aria-label="Ví dụ minh họa">
+          <div className="hero-visual" aria-label="Ví dụ hóa đơn được tài trợ">
             <div className="between">
               <span className="d-title" style={{ display: "flex", gap: 8, alignItems: "center", color: "#fff", fontWeight: 600 }}>
                 <FileCheck2 size={18} color="#DDF1C4" aria-hidden="true" />
@@ -246,8 +246,7 @@ export default function Landing() {
             );
           })}
           <span className="muted" style={{ flexBasis: "100%" }}>
-            FCC không giữ tiền, không cho vay và không tự quyết định tín dụng. Điểm số là tham khảo; giá do tổ chức tài chính công bố. Mọi số
-            liệu trong bản mock là minh họa.
+            FCC không giữ tiền, không cho vay và không tự quyết định tín dụng. Điểm số là tham khảo; giá do tổ chức tài chính công bố.
           </span>
         </section>
       </div>

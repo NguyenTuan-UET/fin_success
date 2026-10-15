@@ -1,20 +1,15 @@
 import { resolve } from 'node:path'
 import { buildApp } from './app'
 
-const email = process.env.ADMIN_EMAIL
-const password = process.env.ADMIN_PASSWORD
-if (password && password.length < 12) throw new Error('ADMIN_PASSWORD tối thiểu 12 ký tự')
-
-const dev = process.env.DEV_AUTOLOGIN === 'true'
+// Không có đăng nhập: mỗi vai trò (/supplier, /buyer, /lender, /fcc) tự vào phiên của vai trò đó.
+// Ai truy cập được cổng này đều vào được mọi vai trò, nên chỉ cho chạy trên localhost.
 const host = process.env.HOST ?? '127.0.0.1'
-if (dev && !['127.0.0.1', 'localhost', '::1'].includes(host)) throw new Error('DEV_AUTOLOGIN chỉ được bật khi chạy trên localhost')
-if (dev) console.warn('⚠ DEV_AUTOLOGIN bật: ai truy cập được cổng này đều vào được tài khoản dev. Chỉ dùng khi phát triển.')
+if (!['127.0.0.1', 'localhost', '::1'].includes(host)) throw new Error('Máy chủ không có đăng nhập nên chỉ được chạy trên localhost')
 
 const app = buildApp({
-  devAutologin: dev,
+  devAutologin: true,
   dbPath: resolve(process.env.DB_PATH ?? 'data/fcc.db'),
   listedDir: resolve(process.env.LISTED_DIR ?? '../web-legacy/public/listed'),
-  admin: email && password ? { email, password } : undefined,
   ollamaKey: process.env.OLLAMA_API_KEY || undefined,
   ollamaBase: process.env.OLLAMA_BASE_URL || undefined,
 })

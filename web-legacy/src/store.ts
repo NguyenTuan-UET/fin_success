@@ -4,30 +4,9 @@ import { create } from 'zustand'
 import { api, ApiError, getToken, setToken } from './lib/api'
 import type {
   AppData, AuditEvent, CreditProfile, EarlyPaymentOffer, EsgAssessment, EsgDocument, EsgIndicatorResult, FinancialYear,
-  FinancingProduct, FundingApplication, IndustryGroup, LedgerItem, Org, Receivable, Rfq, RfqResponse,
+  FinancingProduct, FundingApplication, LedgerItem, Org, Receivable, Rfq, RfqResponse,
 } from './domain/types'
 import type { Me } from './lib/api'
-
-export interface RegisterInput {
-  email: string
-  password: string
-  name: string
-  title: string
-  org: {
-    name: string
-    shortName: string
-    taxCode: string
-    type: 'buyer' | 'supplier' | 'lender'
-    vsic: string
-    industryLabel: string
-    industryGroup: IndustryGroup
-    listedSymbol?: string
-    exchange?: string
-    foundedYear: number
-    employees: number
-    province: string
-  }
-}
 
 type ServerState = AppData & { audit: AuditEvent[] }
 type Snapshot = { version: number; me: Me; state: ServerState }
@@ -35,22 +14,18 @@ type Snapshot = { version: number; me: Me; state: ServerState }
 interface State extends AppData {
   audit: AuditEvent[]
   me: Me | null
-  /** đã đăng nhập và tải dữ liệu từ máy chủ */
+  /** đã có phiên và tải dữ liệu từ máy chủ */
   ready: boolean
-  /** đã kiểm tra phiên đã lưu (để biết nên hiện màn hình đăng nhập chưa) */
+  /** đã kiểm tra phiên đã lưu (để biết nên hiện trang chọn vai trò chưa) */
   checked: boolean
   error: string | null
   version: number
-  /** máy chủ đang ở chế độ dev (mỗi bên một trang tự đăng nhập) */
-  dev: boolean
 }
 
 interface Actions {
   boot: () => Promise<void>
   refresh: () => Promise<void>
   clearError: () => void
-  login: (email: string, password: string) => Promise<void>
-  register: (input: RegisterInput) => Promise<void>
   logout: () => Promise<void>
   updateOrg: (patch: Partial<Pick<Org, 'name' | 'shortName' | 'vsic' | 'industryLabel' | 'industryGroup' | 'province' | 'foundedYear' | 'employees' | 'listedSymbol' | 'exchange'>>) => Promise<void>
   markNotificationsRead: () => Promise<void>
@@ -101,7 +76,8 @@ interface Actions {
   revokeConsent: (id: string) => Promise<void>
 }
 
-export const DEV_ROLES = ['supplier', 'buyer', 'lender', 'fcc'] as const
+/** Mỗi vai trò có một trang riêng (/supplier, /buyer, /lender, /fcc) tự vào phiên của vai trò đó. */
+export const SESSION_ROLES = ['supplier', 'buyer', 'lender', 'fcc'] as const
 
 const empty = (): AppData => ({
   orgs: [], profiles: [], listed: [], receivables: [], products: [], rfqs: [], applications: [], earlyOffers: [], limits: [],
@@ -125,7 +101,7 @@ export const useStore = create<State & Actions>()((set, get) => {
       if (e instanceof ApiError && e.status === 401 && /phiên|đăng nhập/i.test(e.message)) {
         setToken(null)
         set({ ...empty(), me: null, ready: false, checked: true, audit: [] })
-        if (get().dev) void get().boot()
+        void get().boot()
       }
       throw fail(e)
     }
@@ -160,19 +136,16 @@ export const useStore = create<State & Actions>()((set, get) => {
     checked: false,
     error: null,
     version: 0,
-    dev: false,
 
     boot: async () => {
-      try {
-        const h = await api<{ dev: boolean }>('/health')
-        set({ dev: h.dev })
-        const role = DEV_ROLES.find((r) => location.pathname.split('/')[1] === r)
-        if (h.dev && role) {
+      const role = SESSION_ROLES.find((r) => location.pathname.split('/')[1] === r)
+      if (role) {
+        try {
           enter(await api('/dev/session', { method: 'POST', body: { role } }))
-          return
+        } catch (e) {
+          fail(e)
         }
-      } catch (e) {
-        return void fail(e)
+        return
       }
       if (!getToken()) return set({ checked: true })
       try {
@@ -194,25 +167,12 @@ export const useStore = create<State & Actions>()((set, get) => {
         if (e instanceof ApiError && e.status === 401) {
           setToken(null)
           set({ ...empty(), me: null, ready: false, audit: [] })
+          void get().boot()
         }
         /* mất kết nối tạm thời: giữ dữ liệu hiện có, lần sau thử lại */
       }
     },
     clearError: () => set({ error: null }),
-    login: async (email, password) => {
-      try {
-        enter(await api('/auth/login', { method: 'POST', body: { email, password } }))
-      } catch (e) {
-        throw fail(e)
-      }
-    },
-    register: async (input) => {
-      try {
-        enter(await api('/auth/register', { method: 'POST', body: input }))
-      } catch (e) {
-        throw fail(e)
-      }
-    },
     logout: async () => {
       try {
         await api('/auth/logout', { method: 'POST' })
@@ -223,7 +183,7 @@ export const useStore = create<State & Actions>()((set, get) => {
       if (polling) clearInterval(polling)
       polling = null
       set({ ...empty(), audit: [], me: null, ready: false, error: null, version: 0 })
-      if (get().dev && location.pathname !== '/') location.assign('/')
+      if (location.pathname !== '/') location.assign('/')
     },
     updateOrg: (patch) => call('updateOrg', patch).then(() => undefined),
     markNotificationsRead: () => fire('markNotificationsRead'),

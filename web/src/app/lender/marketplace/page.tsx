@@ -21,7 +21,7 @@ export default function LenderMarketplace() {
         title="Sản phẩm tài trợ & lãi suất thị trường"
         sub="Theo dõi mặt bằng lãi suất các gói đang công bố trên FCC, điều chỉnh gói chào và chính sách ưu đãi ESG. Bạn không thấy báo giá riêng mà tổ chức khác gửi cho doanh nghiệp."
         actions={
-          <ToastButton className="btn bp" message="Mở biểu mẫu tạo gói tài trợ mới (bản mock). Gói mới cần FCC kiểm tra trình bày trước khi công bố.">
+          <ToastButton className="btn bp" message="Mở biểu mẫu tạo gói tài trợ mới. Gói mới cần FCC kiểm tra trình bày trước khi công bố.">
             <Plus size={16} aria-hidden="true" />
             Tạo gói tài trợ
           </ToastButton>

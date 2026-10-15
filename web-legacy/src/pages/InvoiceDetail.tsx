@@ -33,18 +33,15 @@ export function InvoiceDetail() {
   const sc = useScores()
   const nav = useNavigate()
   const [otp, setOtp] = useState<null | 'confirm' | 'accept'>(null)
-  const dev = useStore((s) => s.dev)
-  const [pw, setPw] = useState('')
   const [otpErr, setOtpErr] = useState('')
   const openOtp = (kind: 'confirm' | 'accept') => {
     setOtpErr('')
-    setPw('')
     setOtp(kind)
   }
   const submitOtp = async () => {
     try {
-      if (otp === 'confirm') await a.buyerDecision(r!.id, true, undefined, pw)
-      else if (app) await a.acceptOffer(app.id, pw)
+      if (otp === 'confirm') await a.buyerDecision(r!.id, true)
+      else if (app) await a.acceptOffer(app.id)
       setOtp(null)
     } catch (e) {
       setOtpErr((e as Error).message)
@@ -199,7 +196,7 @@ export function InvoiceDetail() {
         </div>
       </div>
 
-      <Modal open={otp !== null} onClose={() => setOtp(null)} title={otp === 'confirm' ? 'Xác nhận nghĩa vụ thanh toán' : 'Chấp thuận đề nghị tài trợ'} footer={<><Button onClick={() => setOtp(null)}>Hủy</Button><Button variant="primary" disabled={!dev && !pw} onClick={submitOtp}>Xác thực & đồng ý</Button></>}>
+      <Modal open={otp !== null} onClose={() => setOtp(null)} title={otp === 'confirm' ? 'Xác nhận nghĩa vụ thanh toán' : 'Chấp thuận đề nghị tài trợ'} footer={<><Button onClick={() => setOtp(null)}>Hủy</Button><Button variant="primary" onClick={submitOtp}>Đồng ý</Button></>}>
         <div className="space-y-3 text-[13px]">
           {otp === 'confirm' ? (
             <p>{orgMap[r.buyerId].name} xác nhận có nghĩa vụ thanh toán <b>{vnd(r.amount, false)}</b> cho {orgMap[r.sellerId].name} theo hóa đơn {r.invoiceSeries}-{r.invoiceNumber}, hạn <b>{date(r.dueDate)}</b>, phiên bản v{r.version}; không có tranh chấp tại thời điểm xác nhận.</p>
@@ -207,8 +204,7 @@ export function InvoiceDetail() {
             <p>Chấp thuận đề nghị của {app && orgMap[app.lenderId].name}: ứng {app?.offer && vnd(app.offer.advanceVnd, false)}, {app?.offer?.ratePct}%/năm. Hợp đồng sẽ được ký trên kênh của tổ chức tài chính.</p>
           )}
           {otpErr && <Callout tone="critical">{otpErr}</Callout>}
-          {dev ? <p className="text-xs text-ink-3">Chế độ dev: bỏ bước nhập lại mật khẩu.</p> : <Field label="Nhập lại mật khẩu để xác nhận"><input type="password" autoComplete="current-password" className={inputCls} value={pw} onChange={(e) => setPw(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && pw && void submitOtp()} /></Field>}
-          <p className="text-xs text-ink-3">Hệ thống lưu snapshot nội dung, danh tính, thời điểm, phương thức xác thực. Mẫu xác nhận thực tế cần đối tác/pháp chế duyệt.</p>
+          <p className="text-xs text-ink-3">Hệ thống lưu snapshot nội dung, danh tính, thời điểm. Mẫu xác nhận thực tế cần đối tác/pháp chế duyệt.</p>
         </div>
       </Modal>
       <Modal open={dispute} onClose={() => setDispute(false)} title="Nêu tranh chấp" footer={<><Button onClick={() => setDispute(false)}>Hủy</Button><Button variant="danger" disabled={!reason.trim()} onClick={() => { a.buyerDecision(r.id, false, reason); setDispute(false) }}>Gửi tranh chấp</Button></>}>
