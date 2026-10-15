@@ -1,17 +1,28 @@
-// Dữ liệu trả về cho trình duyệt được lọc theo tổ chức đăng nhập: không gửi chứng từ, hồ sơ, sổ công nợ… của tổ chức khác
-// khi chưa có quyền chia sẻ (consent) còn hiệu lực.
-import type { Consent, Receivable } from '../../web/src/domain/types'
-import { iso } from '../../web/src/data/seed'
+// Dữ liệu trả về cho trình duyệt được lọc theo tổ chức đăng nhập: không gửi chứng từ, hồ sơ, sổ công nợ…
+// của tổ chức khác khi chưa có quyền chia sẻ (consent) còn hiệu lực.
+import type { Consent, Receivable } from '../../web-legacy/src/domain/types'
+import { iso } from '../../web-legacy/src/domain/util'
 import type { State } from './state'
 
 type Scope = Consent['scopes'][number]
 
-export function viewFor(s: State, actorId: string, now = new Date()): State & { activeOrgId: string } {
+export function viewFor(s: State, actorId: string, now = new Date()): State {
   const today = iso(now)
   const actor = s.orgs.find((o) => o.id === actorId)!
+  const isFcc = actor.type === 'fcc'
   const can = (ownerId: string, scope: Scope) =>
     ownerId === actorId || s.consents.some((c) => c.ownerId === ownerId && c.recipientId === actorId && !c.revokedAt && c.expiresAt >= today && c.scopes.includes(scope))
   const isBuyerOrg = (id: string) => s.orgs.find((o) => o.id === id)?.type === 'buyer' // thông tin bên mua là dữ liệu tham chiếu công khai
+
+  // Nhân sự FCC chỉ thấy hồ sơ cần thẩm định (ESG, sản phẩm, tổ chức), không thấy chứng từ/hồ sơ tài trợ
+  if (isFcc) {
+    return {
+      orgs: s.orgs, products: s.products, sources: s.sources, listed: [], limits: [], profiles: [], esg: s.esg, external: [], connections: [], ledger: [],
+      receivables: [], rfqs: [], applications: [], earlyOffers: [], consents: [],
+      notifications: s.notifications.filter((n) => n.orgId === actorId).slice(0, 200),
+      audit: s.audit.slice(0, 300),
+    }
+  }
 
   // Khoản phải thu được xem đầy đủ khi là bên bán/bên mua, hoặc là đối tác có hồ sơ/RFQ liên quan
   const myProducts = new Set(s.products.filter((p) => p.lenderId === actorId).map((p) => p.id))
@@ -26,9 +37,13 @@ export function viewFor(s: State, actorId: string, now = new Date()): State & { 
   const rfqs = s.rfqs
     .filter((q) => q.sellerId === actorId || q.productIds.some((p) => myProducts.has(p)))
     .map((q) => (q.sellerId === actorId ? q : { ...q, responses: q.responses.filter((x) => x.lenderId === actorId) }))
-  const appFull = (a: State['applications'][number]) => a.lenderId === actorId || fullRecv.has(a.receivableId) && (s.receivables.find((r) => r.id === a.receivableId)!.sellerId === actorId || s.receivables.find((r) => r.id === a.receivableId)!.buyerId === actorId)
+  const recvById = new Map(s.receivables.map((r) => [r.id, r]))
+  const appFull = (a: State['applications'][number]) => {
+    const r = recvById.get(a.receivableId)
+    return a.lenderId === actorId || (!!r && (r.sellerId === actorId || r.buyerId === actorId))
+  }
   const applications = s.applications.map((a) => (appFull(a) ? a : { id: a.id, receivableId: a.receivableId, lenderId: a.lenderId, productId: a.productId, state: a.state, submittedAt: a.submittedAt }))
-  const earlyOffers = s.earlyOffers.filter((o) => o.buyerId === actorId || s.receivables.find((r) => r.id === o.receivableId)?.sellerId === actorId)
+  const earlyOffers = s.earlyOffers.filter((o) => o.buyerId === actorId || recvById.get(o.receivableId)?.sellerId === actorId)
 
   const visibleEntities = new Set<string>()
   for (const r of s.receivables) if (fullRecv.has(r.id)) { visibleEntities.add(r.code); visibleEntities.add(r.id) }
@@ -37,10 +52,8 @@ export function viewFor(s: State, actorId: string, now = new Date()): State & { 
   for (const o of earlyOffers) visibleEntities.add(o.id)
 
   return {
-    activeOrgId: actor.id,
-    seededAt: s.seededAt,
     orgs: s.orgs,
-    products: s.products,
+    products: s.products.filter((p) => p.status === 'published' || p.lenderId === actorId),
     sources: s.sources,
     listed: s.listed,
     limits: s.limits.filter((l) => l.lenderId === actorId || l.borrowerId === actorId),

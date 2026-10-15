@@ -1,23 +1,24 @@
 import { DatabaseSync } from 'node:sqlite'
 import { mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
-import { buildSeed, type SeedData } from '../../web/src/data/seed'
-import type { AuditEvent } from '../../web/src/domain/types'
+import { SOURCES } from './reference'
+import type { AppData, AuditEvent } from '../../web-legacy/src/domain/types'
 
-export interface State extends SeedData {
+export interface State extends AppData {
   audit: AuditEvent[]
 }
 
 /** Tên bộ sưu tập → trường khóa. Mỗi dòng lưu dạng JSON, giữ thứ tự mảng bằng cột pos. */
 export const KEYS = {
   orgs: 'id', profiles: 'orgId', listed: 'orgId', receivables: 'id', products: 'id', rfqs: 'id', applications: 'id',
-  earlyOffers: 'id', limits: 'id', esg: 'id', connections: 'orgId', ledger: 'id', sources: 'id', external: 'id',
+  earlyOffers: 'id', limits: 'id', esg: 'id', connections: 'orgId', ledger: 'id', external: 'id',
   consents: 'id', notifications: 'id', audit: 'id',
 } as const
 export type CollectionName = keyof typeof KEYS
 const NAMES = Object.keys(KEYS) as CollectionName[]
 
 type Row = { id: string; pos: number; json: string }
+export interface UserRow { id: string; email: string; passwordHash: string; orgId: string; name: string; title: string; role: string }
 
 export class Database {
   private db: DatabaseSync
@@ -30,20 +31,15 @@ export class Database {
       PRAGMA journal_mode = WAL;
       CREATE TABLE IF NOT EXISTS docs (col TEXT NOT NULL, id TEXT NOT NULL, pos INTEGER NOT NULL, json TEXT NOT NULL, PRIMARY KEY (col, id));
       CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
-      CREATE TABLE IF NOT EXISTS sessions (token TEXT PRIMARY KEY, org_id TEXT NOT NULL, role TEXT NOT NULL, created_at TEXT NOT NULL, expires_at TEXT NOT NULL);
-      CREATE TABLE IF NOT EXISTS otp (id TEXT PRIMARY KEY, org_id TEXT NOT NULL, purpose TEXT NOT NULL, entity TEXT NOT NULL, code_hash TEXT NOT NULL, expires_at TEXT NOT NULL, used INTEGER NOT NULL DEFAULT 0, attempts INTEGER NOT NULL DEFAULT 0);
+      CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL, org_id TEXT NOT NULL, name TEXT NOT NULL, title TEXT NOT NULL, role TEXT NOT NULL, created_at TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS sessions (token_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL, created_at TEXT NOT NULL, expires_at TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS webhook_keys (org_id TEXT PRIMARY KEY, secret TEXT NOT NULL, created_at TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS idempotency (key TEXT PRIMARY KEY, response TEXT NOT NULL, created_at TEXT NOT NULL);
     `)
   }
 
   load(): State {
-    const has = this.db.prepare('SELECT COUNT(*) AS n FROM docs').get() as { n: number }
-    if (has.n === 0) {
-      const fresh: State = { ...buildSeed(), audit: [] }
-      this.save(fresh)
-      return fresh
-    }
-    const state = { seededAt: (this.db.prepare("SELECT value FROM meta WHERE key='seededAt'").get() as { value: string } | undefined)?.value ?? '' } as Record<string, unknown>
+    const state = {} as Record<string, unknown>
     for (const col of NAMES) {
       const rows = this.db.prepare('SELECT id, pos, json FROM docs WHERE col = ? ORDER BY pos').all(col) as Row[]
       state[col] = rows.map((r) => {
@@ -51,6 +47,7 @@ export class Database {
         return JSON.parse(r.json)
       })
     }
+    state.sources = SOURCES
     return state as unknown as State
   }
 
@@ -81,7 +78,6 @@ export class Database {
           this.cache.delete(ck)
         }
       }
-      this.db.prepare("INSERT INTO meta (key, value) VALUES ('seededAt', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").run(state.seededAt)
       this.db.exec('COMMIT')
     } catch (e) {
       this.db.exec('ROLLBACK')
@@ -90,34 +86,39 @@ export class Database {
     }
   }
 
-  reset(): State {
-    this.db.exec('DELETE FROM docs; DELETE FROM meta;')
-    this.cache.clear()
-    return this.load()
+  // ---- người dùng, phiên, khóa webhook ----
+  createUser(u: { id: string; email: string; passwordHash: string; orgId: string; name: string; title: string; role: string }) {
+    this.db.prepare('INSERT INTO users VALUES (?, ?, ?, ?, ?, ?, ?, ?)').run(u.id, u.email, u.passwordHash, u.orgId, u.name, u.title, u.role, new Date().toISOString())
   }
-
-  // ---- phiên, OTP, idempotency ----
-  createSession(token: string, orgId: string, role: string, ttlMs: number) {
+  userByEmail(email: string) {
+    return this.db.prepare('SELECT id, email, password_hash AS passwordHash, org_id AS orgId, name, title, role FROM users WHERE email = ?').get(email) as UserRow | undefined
+  }
+  userById(id: string) {
+    return this.db.prepare('SELECT id, email, password_hash AS passwordHash, org_id AS orgId, name, title, role FROM users WHERE id = ?').get(id) as UserRow | undefined
+  }
+  countUsers() {
+    return (this.db.prepare('SELECT COUNT(*) AS n FROM users').get() as { n: number }).n
+  }
+  createSession(tokenHash: string, userId: string, ttlMs: number) {
     const now = Date.now()
-    this.db.prepare('INSERT INTO sessions VALUES (?, ?, ?, ?, ?)').run(token, orgId, role, new Date(now).toISOString(), new Date(now + ttlMs).toISOString())
+    this.db.prepare('INSERT INTO sessions VALUES (?, ?, ?, ?)').run(tokenHash, userId, new Date(now).toISOString(), new Date(now + ttlMs).toISOString())
   }
-  getSession(token: string) {
-    const s = this.db.prepare('SELECT org_id AS orgId, role, expires_at AS expiresAt FROM sessions WHERE token = ?').get(token) as { orgId: string; role: string; expiresAt: string } | undefined
-    return s && s.expiresAt > new Date().toISOString() ? s : undefined
+  sessionUser(tokenHash: string) {
+    return this.db
+      .prepare('SELECT u.id, u.email, u.org_id AS orgId, u.name, u.title, u.role FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ? AND s.expires_at > ?')
+      .get(tokenHash, new Date().toISOString()) as Omit<UserRow, 'passwordHash'> | undefined
   }
-  deleteSession(token: string) {
-    this.db.prepare('DELETE FROM sessions WHERE token = ?').run(token)
+  deleteSession(tokenHash: string) {
+    this.db.prepare('DELETE FROM sessions WHERE token_hash = ?').run(tokenHash)
   }
-  createOtp(id: string, orgId: string, purpose: string, entity: string, codeHash: string, ttlMs: number) {
-    this.db.prepare('INSERT INTO otp (id, org_id, purpose, entity, code_hash, expires_at) VALUES (?, ?, ?, ?, ?, ?)').run(id, orgId, purpose, entity, codeHash, new Date(Date.now() + ttlMs).toISOString())
+  purgeSessions() {
+    this.db.prepare('DELETE FROM sessions WHERE expires_at <= ?').run(new Date().toISOString())
   }
-  getOtp(id: string) {
-    return this.db.prepare('SELECT id, org_id AS orgId, purpose, entity, code_hash AS codeHash, expires_at AS expiresAt, used, attempts FROM otp WHERE id = ?').get(id) as
-      | { id: string; orgId: string; purpose: string; entity: string; codeHash: string; expiresAt: string; used: number; attempts: number }
-      | undefined
+  getWebhookSecret(orgId: string) {
+    return (this.db.prepare('SELECT secret FROM webhook_keys WHERE org_id = ?').get(orgId) as { secret: string } | undefined)?.secret
   }
-  bumpOtp(id: string, used: boolean) {
-    this.db.prepare('UPDATE otp SET attempts = attempts + 1, used = ? WHERE id = ?').run(used ? 1 : 0, id)
+  setWebhookSecret(orgId: string, secret: string) {
+    this.db.prepare('INSERT INTO webhook_keys VALUES (?, ?, ?) ON CONFLICT(org_id) DO UPDATE SET secret = excluded.secret, created_at = excluded.created_at').run(orgId, secret, new Date().toISOString())
   }
   getIdempotent(key: string) {
     return (this.db.prepare('SELECT response FROM idempotency WHERE key = ?').get(key) as { response: string } | undefined)?.response

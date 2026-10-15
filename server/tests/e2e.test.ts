@@ -1,174 +1,226 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createHmac } from 'node:crypto'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { buildApp } from '../src/app'
-import type { Receivable, Rfq, FundingApplication, FinancingProduct } from '../../web/src/domain/types'
+import type { FinancingProduct, FundingApplication, Receivable, Rfq } from '../../web-legacy/src/domain/types'
 
-const SECRET = 'test-secret'
-const app = buildApp({ dbPath: ':memory:', demo: true, webhookSecret: SECRET, listedDir: '../web/public/listed' })
+const dir = mkdtempSync(join(tmpdir(), 'fcc-test-'))
+const dbPath = join(dir, 'fcc.db')
+const ADMIN = { email: 'ops@example.test', password: 'ops-password-123' }
+const PW = 'correct-horse-battery'
+let app = buildApp({ dbPath, listedDir: '../web-legacy/public/listed', admin: ADMIN })
 const iso = (d: Date) => d.toISOString().slice(0, 10)
+const due = iso(new Date(Date.now() + 40 * 86_400_000))
 
-async function login(orgId: string, reviewer = false) {
-  const r = await app.inject({ method: 'POST', url: '/api/auth/demo-login', payload: { orgId, reviewer } })
-  expect(r.statusCode).toBe(200)
-  return r.json().token as string
+type Json = any // eslint-disable-line @typescript-eslint/no-explicit-any
+async function post(path: string, body: unknown, token?: string, headers: Record<string, string> = {}) {
+  const r = await app.inject({ method: 'POST', url: path, headers: { ...(token ? { authorization: `Bearer ${token}` } : {}), ...headers }, payload: body as never })
+  return { status: r.statusCode, body: r.json() as Json, headers: r.headers }
 }
-async function act(token: string, name: string, ...args: unknown[]) {
-  const r = await app.inject({ method: 'POST', url: `/api/actions/${name}`, headers: { authorization: `Bearer ${token}` }, payload: { args } })
-  return { status: r.statusCode, body: r.json() as { result?: any; state?: any; error?: string } }
-}
-async function otp(token: string, purpose: string, entity: string) {
-  const r = await app.inject({ method: 'POST', url: '/api/otp', headers: { authorization: `Bearer ${token}` }, payload: { purpose, entity } })
-  expect(r.statusCode).toBe(200)
-  return { id: r.json().otpId as string, code: r.json().demoCode as string }
-}
-const getState = async (token: string) => (await app.inject({ method: 'GET', url: '/api/state', headers: { authorization: `Bearer ${token}` } })).json().state
+const act = (token: string, name: string, ...args: unknown[]) => post(`/api/actions/${name}`, { args }, token)
+const getState = async (token: string) => (await app.inject({ method: 'GET', url: '/api/state', headers: { authorization: `Bearer ${token}` } })).json().state as Json
 
-afterAll(() => app.close())
+let mst = 3_000_000_000
+async function register(type: 'buyer' | 'supplier' | 'lender', name: string, extra: Record<string, unknown> = {}) {
+  const n = ++mst
+  const r = await post('/api/auth/register', {
+    email: `${name.toLowerCase().replace(/\W+/g, '')}@example.test`, password: PW, name: `Người dùng ${name}`, title: 'Giám đốc',
+    org: { name: `Công ty ${name}`, shortName: name, taxCode: String(n), type, vsic: '2592', industryLabel: 'Gia công cơ khí', industryGroup: 'manufacturing', foundedYear: 2015, employees: 50, province: 'Bình Dương', ...extra },
+  })
+  expect(r.status, JSON.stringify(r.body)).toBe(201)
+  return { token: r.body.token as string, orgId: r.body.state.orgs.at(-1).id as string, email: `${name.toLowerCase().replace(/\W+/g, '')}@example.test` }
+}
+const product = (name: string): Partial<FinancingProduct> => ({
+  name, type: 'factoring_recourse', description: 'Bảo lý có truy đòi', status: 'pending_review',
+  eligibility: { minAmount: 100_000_000, maxAmount: 10_000_000_000, maxTenorDays: 120, requireBuyerConfirmation: true },
+  pricing: { advancePct: 80, rateMin: 8, rateMax: 12, fees: [], latePenaltyPct: 150 }, sla: { quoteHours: 24 }, effectiveFrom: '2020-01-01', effectiveTo: '2099-12-31',
+})
 
-describe('luồng tài trợ chuỗi cung ứng end-to-end', () => {
-  let seller: string, buyer: string, lender: string, other: string
-  let rec: Receivable
-  let rfq: Rfq
-  let fa: FundingApplication
-  const due = iso(new Date(Date.now() + 40 * 86_400_000))
+afterAll(async () => {
+  await app.close()
+  rmSync(dir, { recursive: true, force: true })
+})
+
+describe('luồng tài trợ chuỗi cung ứng — không có dữ liệu mẫu', () => {
+  let admin: string, S: Awaited<ReturnType<typeof register>>, S2: typeof S, B: typeof S, L1: typeof S, L2: typeof S, L3: typeof S
+  let rec: Receivable, rfq: Rfq, fa: FundingApplication, p1: string, p2: string
 
   beforeAll(async () => {
-    seller = await login('s1')
-    buyer = await login('b1')
-    other = await login('l4')
+    const r = await post('/api/auth/login', ADMIN)
+    expect(r.status).toBe(200)
+    admin = r.body.token
   })
 
-  it('từ chối khi không có token / token sai', async () => {
+  it('CSDL mới hoàn toàn trống ngoài tài khoản FCC', async () => {
+    const st = await getState(admin)
+    expect(st.orgs.map((o: Json) => o.type)).toEqual(['fcc'])
+    for (const k of ['profiles', 'products', 'receivables', 'rfqs', 'applications', 'esg', 'ledger', 'listed', 'external', 'limits']) expect(st[k], k).toEqual([])
+  })
+
+  it('đăng ký: kiểm tra dữ liệu, trùng MST/email, mật khẩu yếu; đăng nhập sai bị khóa sau 5 lần', async () => {
+    S = await register('supplier', 'Minh Tam')
+    S2 = await register('supplier', 'Phu Gia')
+    B = await register('buyer', 'An Phat')
+    L1 = await register('lender', 'Ngan Hang Mot')
+    L2 = await register('lender', 'Ngan Hang Hai')
+    L3 = await register('lender', 'Ngan Hang Ba')
+    const dupTax = await post('/api/auth/register', { email: 'x@example.test', password: PW, name: 'x', title: 'x', org: { name: 'x', taxCode: String(mst), type: 'buyer', vsic: '1', industryLabel: 'x', industryGroup: 'trade', foundedYear: 2000, employees: 1, province: 'x' } })
+    expect(dupTax.status).toBe(409)
+    expect((await post('/api/auth/register', { email: S.email, password: PW, name: 'x', title: 'x', org: { name: 'x', taxCode: '9999999999', type: 'buyer', vsic: '1', industryLabel: 'x', industryGroup: 'trade', foundedYear: 2000, employees: 1, province: 'x' } })).status).toBe(409)
+    expect((await post('/api/auth/register', { email: 'weak@example.test', password: 'short', name: 'x', title: 'x', org: {} })).status).toBe(400)
+    expect((await post('/api/auth/register', { email: 'bad@example.test', password: PW, name: 'x', title: 'x', org: { name: 'x', taxCode: '12AB', type: 'buyer' } })).status).toBe(400)
+    for (let i = 0; i < 5; i++) expect((await post('/api/auth/login', { email: S.email, password: 'sai-mat-khau-x' })).status).toBe(401)
+    expect((await post('/api/auth/login', { email: S.email, password: PW })).status).toBe(429)
     expect((await app.inject({ method: 'GET', url: '/api/state' })).statusCode).toBe(401)
-    expect((await app.inject({ method: 'GET', url: '/api/state', headers: { authorization: 'Bearer nope' } })).statusCode).toBe(401)
   })
 
-  it('nhà cung cấp tạo khoản phải thu; trùng bị chặn; bên mua không được tạo', async () => {
-    const input = { buyerId: 'b1', invoiceSeries: 'C26TAA', invoiceNumber: '0009001', issueDate: iso(new Date()), dueDate: due, amount: 1_500_000_000, description: 'Gia công', fingerprint: 'fp-test-1', docs: { xml: true, contract: true, delivery: true }, source: 'xml' }
-    const a = await act(seller, 'createReceivable', input)
+  it('tổ chức tài chính chỉ đăng sản phẩm sau khi FCC xác minh; sản phẩm phải được FCC duyệt mới hiện với doanh nghiệp', async () => {
+    expect((await act(L1.token, 'upsertProduct', product('SP1'))).status).toBe(403) // chưa xác minh
+    expect((await act(L1.token, 'verifyOrg', L1.orgId, true)).status).toBe(403) // không tự xác minh
+    for (const l of [L1, L2]) expect((await act(admin, 'verifyOrg', l.orgId, true)).status).toBe(200)
+    const a = await act(L1.token, 'upsertProduct', product('SP1'))
+    const b = await act(L2.token, 'upsertProduct', product('SP2'))
+    expect(a.status).toBe(200)
+    p1 = a.body.result.id
+    p2 = b.body.result.id
+    expect((await act(L1.token, 'setProductStatus', p1, 'published')).status).toBe(403) // không tự công bố
+    expect((await getState(S.token)).products).toEqual([]) // chưa duyệt → doanh nghiệp không thấy
+    expect((await act(S.token, 'approveProduct', p1, true)).status).toBe(403)
+    expect((await act(admin, 'approveProduct', p1, true)).status).toBe(200)
+    expect((await act(admin, 'approveProduct', p2, true)).status).toBe(200)
+    expect((await getState(S.token)).products.map((p: Json) => p.id).sort()).toEqual([p1, p2].sort())
+  })
+
+  it('nhà cung cấp tạo khoản phải thu; trùng bị chặn; sai vai trò bị từ chối', async () => {
+    const input = { buyerId: B.orgId, invoiceSeries: 'C26TAA', invoiceNumber: '0009001', issueDate: iso(new Date()), dueDate: due, amount: 1_500_000_000, description: 'Gia công', fingerprint: 'fp-1', docs: { xml: true, contract: true, delivery: true }, source: 'xml' }
+    const a = await act(S.token, 'createReceivable', input)
     expect(a.status).toBe(200)
     rec = a.body.result
-    expect(rec.state).toBe('DRAFT')
-    expect(rec.sellerId).toBe('s1')
-    expect((await act(seller, 'createReceivable', input)).status).toBe(409)
-    expect((await act(buyer, 'createReceivable', input)).status).toBe(403)
-    expect((await act(seller, 'createReceivable', { ...input, invoiceNumber: '1', amount: -5 })).status).toBe(400)
+    expect(rec.sellerId).toBe(S.orgId)
+    expect((await act(S.token, 'createReceivable', input)).status).toBe(409)
+    expect((await act(B.token, 'createReceivable', input)).status).toBe(403)
+    expect((await act(S.token, 'createReceivable', { ...input, invoiceNumber: '2', amount: -5 })).status).toBe(400)
+    expect((await act(S.token, 'createReceivable', { ...input, invoiceNumber: '3', buyerId: L1.orgId })).status).toBe(400)
   })
 
-  it('bên mua phải xác thực OTP mới được xác nhận; người khác không được xác nhận', async () => {
-    expect((await act(seller, 'sendToBuyer', rec.id)).status).toBe(200)
-    expect((await act(seller, 'buyerDecision', rec.id, true)).status).toBe(403)
-    expect((await act(buyer, 'buyerDecision', rec.id, true)).status).toBe(401) // thiếu OTP
-    const bad = await otp(buyer, 'buyer_confirm', `${rec.id}@v1`)
-    expect((await act(buyer, 'buyerDecision', rec.id, true, undefined, { id: bad.id, code: bad.code === '000000' ? '111111' : '000000' })).status).toBe(401)
-    const good = await otp(buyer, 'buyer_confirm', `${rec.id}@v1`)
-    const ok = await act(buyer, 'buyerDecision', rec.id, true, undefined, good)
+  it('bên mua phải nhập lại mật khẩu mới xác nhận được; người khác không xác nhận hộ', async () => {
+    expect((await act(S.token, 'sendToBuyer', rec.id)).status).toBe(200)
+    expect((await act(S.token, 'buyerDecision', rec.id, true, undefined, PW)).status).toBe(403)
+    expect((await act(B.token, 'buyerDecision', rec.id, true)).status).toBe(401)
+    expect((await act(B.token, 'buyerDecision', rec.id, true, undefined, 'sai-mat-khau')).status).toBe(401)
+    const ok = await act(B.token, 'buyerDecision', rec.id, true, undefined, PW)
     expect(ok.status).toBe(200)
     expect(ok.body.state.receivables.find((r: Receivable) => r.id === rec.id).state).toBe('BUYER_CONFIRMED')
-    // OTP dùng một lần
-    expect((await act(buyer, 'buyerDecision', rec.id, true, undefined, good)).status).toBe(409)
   })
 
-  it('RFQ: chỉ sản phẩm phù hợp; đối tác trả lời; chọn báo giá tạo hồ sơ và thu hồi quyền đối tác khác', async () => {
-    const st = await getState(seller)
-    const products: FinancingProduct[] = st.products.filter((p: FinancingProduct) => p.status === 'published')
-    const okIds: string[] = []
-    for (const p of products) {
-      const probe = await act(seller, 'createRfq', rec.id, [p.id])
-      if (probe.status === 200) {
-        okIds.push(p.id)
-        await act(seller, 'cancelRfq', probe.body.result.id)
-      } else expect(probe.status).toBe(422)
-    }
-    expect(okIds.length).toBeGreaterThanOrEqual(2)
-    const pick = okIds.slice(0, 3)
-    const created = await act(seller, 'createRfq', rec.id, pick)
-    expect(created.status).toBe(200)
-    rfq = created.body.result
-    expect((await act(seller, 'createRfq', rec.id, pick)).status).toBe(409) // đã có RFQ mở
-    await act(seller, 'simulateRfqResponses', rfq.id)
-    const after = (await getState(seller)).rfqs.find((q: Rfq) => q.id === rfq.id) as Rfq
-    expect(after.responses.length).toBe(pick.length)
-    const chosen = after.responses.find((x) => x.kind === 'quote')!
-    lender = await login(chosen.lenderId)
-
-    const sel = await act(seller, 'selectQuote', rfq.id, chosen.lenderId)
+  it('RFQ → báo giá của tổ chức tài chính thật (không có phản hồi giả lập) → chọn báo giá', async () => {
+    expect((await act(S.token, 'simulateRfqResponses', 'x')).status).toBe(404)
+    const c = await act(S.token, 'createRfq', rec.id, [p1, p2])
+    expect(c.status, JSON.stringify(c.body)).toBe(200)
+    rfq = c.body.result
+    expect((await getState(S.token)).rfqs[0].responses).toEqual([]) // chưa ai trả lời thì không có báo giá nào
+    expect((await act(L3.token, 'respondRfq', rfq.id, { productId: p1, kind: 'quote', advancePct: 80, ratePct: 9 })).status).toBe(403) // không thuộc RFQ
+    expect((await act(L1.token, 'respondRfq', rfq.id, { productId: p1, kind: 'quote', advancePct: 80, ratePct: 9.5, feesVnd: 1_000_000, validUntil: iso(new Date(Date.now() + 3 * 86_400_000)) })).status).toBe(200)
+    expect((await act(L2.token, 'respondRfq', rfq.id, { productId: p2, kind: 'decline', conditions: 'Ngoài khẩu vị' })).status).toBe(200)
+    expect((await act(S.token, 'selectQuote', rfq.id, L2.orgId)).status).toBe(400) // L2 từ chối, không có báo giá
+    const sel = await act(S.token, 'selectQuote', rfq.id, L1.orgId)
     expect(sel.status).toBe(200)
     fa = sel.body.state.applications.find((a: FundingApplication) => a.rfqId === rfq.id)
-    expect(fa.lenderId).toBe(chosen.lenderId)
-    expect(sel.body.state.receivables.find((r: Receivable) => r.id === rec.id).state).toBe('SUBMITTED')
-    // đối tác không được chọn mất quyền xem
-    const rest = after.responses.filter((x) => x.lenderId !== chosen.lenderId).map((x) => x.lenderId)
-    const st2 = await getState(seller)
-    for (const l of rest) expect(st2.consents.find((c: any) => c.recipientId === l && c.purpose === `Gói tóm tắt RFQ ${rfq.id}`).revokedAt).toBeTruthy()
+    expect(fa.lenderId).toBe(L1.orgId)
+    const st = await getState(S.token)
+    expect(st.consents.find((k: Json) => k.recipientId === L2.orgId && k.purpose === `Gói tóm tắt RFQ ${rfq.id}`).revokedAt).toBeTruthy()
   })
 
-  it('phân quyền dữ liệu: tổ chức không liên quan không thấy chứng từ; đối tác được chọn thấy', async () => {
-    const o = await getState(other)
-    const lr = o.receivables.find((r: Receivable) => r.id === rec.id)
-    if (lr) expect(lr.fingerprint).toBe('') // chỉ còn bản rút gọn cho chấm điểm
-    expect(o.consents.every((c: any) => c.ownerId === 'l4' || c.recipientId === 'l4')).toBe(true)
-    const l = await getState(lender)
-    expect(l.receivables.find((r: Receivable) => r.id === rec.id).fingerprint).toBeTruthy()
+  it('phân quyền dữ liệu', async () => {
+    const other = await getState(S2.token)
+    const seen = other.receivables.find((r: Receivable) => r.id === rec.id)
+    expect(seen.fingerprint).toBe('') // nhà cung cấp khác chỉ thấy bản rút gọn
+    expect(other.consents).toEqual([])
+    const l2 = await getState(L2.token) // đã bị loại khỏi RFQ
+    expect(l2.receivables.find((r: Receivable) => r.id === rec.id)?.fingerprint ?? '').toBe('')
+    expect((await getState(L1.token)).receivables.find((r: Receivable) => r.id === rec.id).fingerprint).toBe('fp-1')
+    const fcc = await getState(admin)
+    expect(fcc.receivables).toEqual([])
+    expect(fcc.applications).toEqual([])
   })
 
-  it('tổ chức tài chính thẩm định → đề nghị; doanh nghiệp chấp thuận bằng OTP; giải ngân qua webhook idempotent', async () => {
-    expect((await act(seller, 'startReview', fa.id)).status).toBe(403)
-    expect((await act(other, 'startReview', fa.id)).status).toBe(403)
-    expect((await act(lender, 'makeOffer', fa.id, {})).status).toBe(409) // chưa thẩm định
-    expect((await act(lender, 'startReview', fa.id)).status).toBe(200)
-    const offer = { advanceVnd: 1_200_000_000, ratePct: 11.5, feesVnd: 3_000_000, tenorDays: 40, conditions: 'Có truy đòi', expiresAt: iso(new Date(Date.now() + 5 * 86_400_000)) }
-    expect((await act(lender, 'makeOffer', fa.id, { ...offer, advanceVnd: 9_999_999_999 })).status).toBe(400)
-    expect((await act(lender, 'makeOffer', fa.id, offer)).status).toBe(200)
-    expect((await act(seller, 'acceptOffer', fa.id)).status).toBe(401) // thiếu OTP
-    const p = await otp(seller, 'accept_offer', fa.id)
-    expect((await act(seller, 'acceptOffer', fa.id, p)).status).toBe(200)
-    expect((await act(seller, 'fundApp', fa.id)).status).toBe(403) // chỉ tổ chức tài chính
+  it('thẩm định → đề nghị → chấp thuận (nhập lại mật khẩu) → giải ngân qua webhook theo khóa riêng, idempotent', async () => {
+    expect((await act(S.token, 'startReview', fa.id)).status).toBe(403)
+    expect((await act(L2.token, 'startReview', fa.id)).status).toBe(403)
+    expect((await act(L1.token, 'makeOffer', fa.id, {})).status).toBe(409)
+    expect((await act(L1.token, 'startReview', fa.id)).status).toBe(200)
+    const offer = { advanceVnd: 1_200_000_000, ratePct: 9.5, feesVnd: 1_000_000, tenorDays: 40, conditions: 'Có truy đòi', expiresAt: iso(new Date(Date.now() + 5 * 86_400_000)) }
+    expect((await act(L1.token, 'makeOffer', fa.id, { ...offer, advanceVnd: 9_999_999_999 })).status).toBe(400)
+    expect((await act(L1.token, 'makeOffer', fa.id, offer)).status).toBe(200)
+    expect((await act(S.token, 'acceptOffer', fa.id)).status).toBe(401)
+    expect((await act(S.token, 'acceptOffer', fa.id, 'sai-mat-khau')).status).toBe(401)
+    expect((await act(S.token, 'acceptOffer', fa.id, PW)).status).toBe(200)
+    expect((await act(S.token, 'fundApp', fa.id)).status).toBe(403)
 
+    const k1 = await post('/api/webhook-secret', {}, L1.token)
+    expect(k1.status).toBe(200)
+    expect((await post('/api/webhook-secret', {}, S.token)).status).toBe(403)
+    const k2 = await post('/api/webhook-secret', {}, L2.token)
     const body = JSON.stringify({ applicationId: fa.id, amount: offer.advanceVnd })
-    const sign = (b: string) => createHmac('sha256', SECRET).update(b).digest('hex')
-    const hook = (b: string, sig: string, key: string) => app.inject({ method: 'POST', url: '/api/webhooks/funding', headers: { 'content-type': 'application/json', 'x-fcc-signature': sig, 'x-idempotency-key': key }, payload: b })
-    expect((await hook(body, 'deadbeef', 'k1')).statusCode).toBe(401)
-    const h1 = await hook(body, sign(body), 'k1')
+    const sign = (secret: string) => createHmac('sha256', secret).update(body).digest('hex')
+    const hook = (org: string, sig: string, key: string) => app.inject({ method: 'POST', url: '/api/webhooks/funding', headers: { 'content-type': 'application/json', 'x-fcc-org': org, 'x-fcc-signature': sig, 'x-idempotency-key': key }, payload: body })
+    expect((await hook(L1.orgId, 'deadbeef', 'k1')).statusCode).toBe(401)
+    expect((await hook(L1.orgId, sign(k2.body.secret), 'k1')).statusCode).toBe(401) // khóa của tổ chức khác
+    expect((await hook(L2.orgId, sign(k2.body.secret), 'k1')).statusCode).toBe(404) // hồ sơ không thuộc L2
+    const h1 = await hook(L1.orgId, sign(k1.body.secret), 'k1')
     expect(h1.statusCode).toBe(200)
     expect(h1.json().changed).toBe(true)
-    const h2 = await hook(body, sign(body), 'k1')
-    expect(h2.headers['x-idempotent-replay']).toBe('true')
-    const h3 = await hook(body, sign(body), 'k2') // khóa khác nhưng đã giải ngân → không đổi
-    expect(h3.json().changed).toBe(false)
-    const s = await getState(seller)
+    expect((await hook(L1.orgId, sign(k1.body.secret), 'k1')).headers['x-idempotent-replay']).toBe('true')
+    expect((await hook(L1.orgId, sign(k1.body.secret), 'k2')).json().changed).toBe(false)
+    const s = await getState(S.token)
     expect(s.applications.find((a: FundingApplication) => a.id === fa.id).state).toBe('FUNDED')
-    expect(s.receivables.find((r: Receivable) => r.id === rec.id).state).toBe('FUNDED')
-    expect(s.notifications.some((n: any) => n.title.includes('đã giải ngân'))).toBe(true)
+    expect(s.notifications.some((n: Json) => n.title.includes('đã giải ngân'))).toBe(true)
   })
 
-  it('bên mua thanh toán → tất toán cả khoản phải thu lẫn hồ sơ; nhật ký có dấu vết', async () => {
-    expect((await act(seller, 'markBuyerPaid', rec.id)).status).toBe(403)
-    const r = await act(buyer, 'markBuyerPaid', rec.id)
+  it('bên mua thanh toán → tất toán; nhật ký có dấu vết', async () => {
+    expect((await act(S.token, 'markBuyerPaid', rec.id)).status).toBe(403)
+    const r = await act(B.token, 'markBuyerPaid', rec.id)
     expect(r.status).toBe(200)
     expect(r.body.state.receivables.find((x: Receivable) => x.id === rec.id).state).toBe('SETTLED')
-    const l = await getState(lender)
-    expect(l.applications.find((a: FundingApplication) => a.id === fa.id).state).toBe('SETTLED')
-    const actionsLogged = (await getState(seller)).audit.map((e: any) => e.action)
-    for (const a of ['Tạo khoản phải thu', 'Bên mua xác nhận', 'Chọn báo giá & gửi hồ sơ', 'Ghi nhận giải ngân', 'Ghi nhận thanh toán của bên mua']) expect(actionsLogged).toContain(a)
+    expect((await getState(L1.token)).applications.find((a: FundingApplication) => a.id === fa.id).state).toBe('SETTLED')
+    const logged = (await getState(S.token)).audit.map((e: Json) => e.action)
+    for (const a of ['Tạo khoản phải thu', 'Bên mua xác nhận', 'Chọn báo giá & gửi hồ sơ', 'Ghi nhận giải ngân', 'Ghi nhận thanh toán của bên mua']) expect(logged).toContain(a)
   })
 
-  it('ESG: chỉ reviewer mới xác nhận mức; dữ liệu được lưu bền', async () => {
-    const s3 = await login('s3')
-    const a = await act(s3, 'ensureEsg', 's3')
-    const id = a.body.result.id
-    expect((await act(s3, 'updateIndicator', id, 'E1', { finalLevel: 3 })).status).toBe(403)
-    const rv = await login('s3', true)
-    expect((await act(rv, 'updateIndicator', id, 'E1', { finalLevel: 3, reviewerNote: 'ok' })).status).toBe(200)
-    expect((await act(s3, 'issueEsg', id, true)).status).toBe(403)
-    expect((await act(rv, 'issueEsg', id, true)).status).toBe(200)
+  it('ESG: doanh nghiệp tải bằng chứng, chỉ nhân sự FCC xác nhận mức và phát hành chính thức', async () => {
+    const e = await act(S2.token, 'ensureEsg', S2.orgId)
+    const id = e.body.result.id
+    expect((await act(S2.token, 'updateIndicator', id, 'E1', { selfDeclared: 'Có hóa đơn điện 12 tháng' })).status).toBe(200)
+    expect((await act(S2.token, 'updateIndicator', id, 'E1', { finalLevel: 3 })).status).toBe(403)
+    expect((await act(admin, 'updateIndicator', id, 'E1', { selfDeclared: 'sửa hộ' })).status).toBe(403)
+    expect((await act(S.token, 'updateIndicator', id, 'E1', { selfDeclared: 'x' })).status).toBe(403) // doanh nghiệp khác
+    expect((await getState(admin)).esg.some((x: Json) => x.id === id)).toBe(true)
+    expect((await act(admin, 'updateIndicator', id, 'E1', { finalLevel: 3, reviewerNote: 'Đã đối chiếu hóa đơn' })).status).toBe(200)
+    expect((await act(S2.token, 'issueEsg', id, true)).status).toBe(403)
+    expect((await act(admin, 'issueEsg', id, true)).status).toBe(200)
+    expect((await getState(S2.token)).esg.find((x: Json) => x.id === id).status).toBe('official')
   })
 
-  it('tải lại từ DB cho cùng trạng thái', async () => {
-    const before = app.getState()
-    const { Database } = await import('../src/state')
-    const db2 = new Database(':memory:')
-    db2.save(before)
-    expect(db2.load().receivables.map((r) => r.id)).toEqual(before.receivables.map((r) => r.id))
+  it('dòng tiền: nhập số dư, chi định kỳ và công nợ do người dùng cung cấp', async () => {
+    expect((await act(S.token, 'saveCashProfile', S.orgId, { openingCash: 500_000_000, recurringMonthlyOut: [{ name: 'Lương', amount: 100_000_000, day: 5 }] })).status).toBe(200)
+    expect((await act(S.token, 'saveCashProfile', S.orgId, { openingCash: 1, recurringMonthlyOut: [{ name: 'x', amount: 1, day: 31 }] })).status).toBe(400)
+    expect((await act(S.token, 'importLedger', S.orgId, [{ kind: 'AP', counterpartyName: 'NCC A', docNo: 'PN01', amount: 50_000_000, paid: 0, dueDate: due }])).status).toBe(200)
+    expect((await act(S2.token, 'importLedger', S.orgId, [])).status).toBe(403)
+    const st = await getState(S.token)
+    expect(st.connections[0].openingCash).toBe(500_000_000)
+    expect(st.ledger).toHaveLength(1)
+  })
+
+  it('dữ liệu và tài khoản còn nguyên sau khi khởi động lại; thu hồi phiên khi đăng xuất', async () => {
+    const before = app.getState().receivables.map((r) => r.id)
+    await app.close()
+    app = buildApp({ dbPath, listedDir: '../web-legacy/public/listed', admin: ADMIN })
+    expect(app.getState().receivables.map((r) => r.id)).toEqual(before)
+    const lg = await post('/api/auth/login', { email: B.email, password: PW })
+    expect(lg.status).toBe(200)
+    expect((await post('/api/auth/logout', {}, lg.body.token)).status).toBe(200)
+    expect((await app.inject({ method: 'GET', url: '/api/state', headers: { authorization: `Bearer ${lg.body.token}` } })).statusCode).toBe(401)
   })
 })

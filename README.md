@@ -4,46 +4,46 @@ Nền tảng tài trợ chuỗi cung ứng cho **bên mua**, **bên bán (SME/gi
 
 - Đặc tả: [document/SPEC_FCC_MVP.md](document/SPEC_FCC_MVP.md)
 - Phương pháp: [5C](document/Phương%20pháp%20đánh%20giá%20tín%20dụng%20SME%20theo%20mô%20hình%205C.md), [khung ESG](document/Khung%20chấm%20điểm%20ESG%20cho%20SMEs%20vay%20vốn%20FCC.md)
-- Frontend: [web/](web/) — React + TypeScript + Vite. Backend: [server/](server/) — Fastify + SQLite (luật nghiệp vụ, phân quyền, OTP, webhook, nhật ký).
+- Frontend: [web/](web/) — **bản mock giao diện** Next.js (dữ liệu minh họa, chưa nối backend), xem [web/README.md](web/README.md). Bản frontend React + Vite nối với backend đã chuyển sang [web-legacy/](web-legacy/). Backend: [server/](server/) — Fastify + SQLite (luật nghiệp vụ, phân quyền, OTP, webhook, nhật ký).
 
 ## Chạy dự án (backend + frontend)
 
-Cần Node ≥ 22.13 (backend dùng `node:sqlite` có sẵn, không cần cài driver).
+Cần Node ≥ 22.13 (backend dùng `node:sqlite` có sẵn). **Hệ thống khởi động với cơ sở dữ liệu trống** — không có doanh nghiệp, hóa đơn hay sản phẩm mẫu; mọi dữ liệu do người dùng đăng ký, nhập, tải lên hoặc lấy từ nguồn thật (AI, vnstock).
 
 ```bash
 # Terminal 1 — backend (http://127.0.0.1:8787)
 cd server
 npm install
-cp .env.example .env         # điền OLLAMA_API_KEY nếu muốn dùng AI thật
-npm start                    # tạo server/data/fcc.db và nạp dữ liệu mẫu ở lần chạy đầu
+cp .env.example .env     # điền ADMIN_EMAIL, ADMIN_PASSWORD (≥ 12 ký tự), OLLAMA_API_KEY
+npm start                # tạo server/data/fcc.db
 
-# Terminal 2 — frontend (http://localhost:5173, tự chuyển tiếp /api tới backend)
-cd web
+# Terminal 2 — frontend nối backend (http://localhost:5173, tự chuyển /api tới backend)
+cd web-legacy
 npm install
 npm run dev
 ```
 
-- **Backend** ([server/](server/)): Fastify + SQLite. Toàn bộ luật nghiệp vụ và phân quyền nằm ở [server/src/service.ts](server/src/service.ts); mỗi hành động kiểm tra tổ chức đăng nhập, trạng thái hợp lệ, rồi mới ghi DB và nhật ký. Trình duyệt chỉ giữ bản sao đã lọc theo quyền ([server/src/views.ts](server/src/views.ts)) và tự đồng bộ mỗi 4 giây, nên mở hai tab (hai tổ chức) sẽ thấy thay đổi của nhau.
-- **Đăng nhập:** chế độ demo (`DEMO_MODE=true`) cho chọn tổ chức ở ô góc trên trái, không mật khẩu. Đây chưa phải xác thực thật — khi triển khai cần đặt `DEMO_MODE=false` và cắm nhà cung cấp danh tính (SSO/OIDC).
-- **OTP:** máy chủ phát mã dùng một lần cho thao tác “bên mua xác nhận” và “doanh nghiệp chấp thuận đề nghị” (hết hạn 5 phút, tối đa 5 lần thử). Chưa nối SMS/email nên ở chế độ demo mã được trả về và điền sẵn vào ô nhập.
-- **Webhook giải ngân:** `POST /api/webhooks/funding` — chữ ký `x-fcc-signature` = HMAC-SHA256(`WEBHOOK_SECRET`, thân yêu cầu), kèm `x-idempotency-key`; gọi lặp không ghi nhận hai lần. Nút “Ghi nhận giải ngân” trên giao diện dùng chung logic này.
-- **AI:** trình duyệt gọi `/api/ollama/chat` (cần đăng nhập); backend gắn khóa và chuyển tới ollama.com — khóa chỉ nằm ở `server/.env`. `gpt-oss:120b` (văn bản), `gemma4:31b` (ảnh/OCR). Khi API lỗi app tự chuyển sang **AI mô phỏng** và gắn nhãn rõ; có thể chọn ở *Cài đặt → AI*.
-- **Tác vụ định kỳ** (mỗi phút): RFQ quá hạn → `EXPIRED` và thu hồi quyền xem; đề nghị tài trợ quá hạn chấp thuận → rút lại; khoản đến hạn chưa thanh toán → `OVERDUE`.
-- `cd server && npm test` chạy kịch bản end-to-end qua API (tạo hóa đơn → bên mua xác nhận bằng OTP → RFQ → chọn báo giá → thẩm định → đề nghị → chấp thuận → giải ngân bằng webhook → tất toán) cùng các kiểm tra phân quyền; `cd web && npm test` chạy kiểm thử công thức (ESG 66,67/100; ví dụ 2 tỷ – 90 ngày – ứng 80%).
-- Đặt lại dữ liệu mẫu: *Cài đặt → Khôi phục dữ liệu mẫu* (áp dụng cho mọi người dùng) hoặc xóa `server/data/`.
+**Chế độ dev (bỏ qua đăng nhập/đăng ký)** — đặt `DEV_AUTOLOGIN=true` trong `server/.env` (chỉ chạy được trên localhost). Mở mỗi bên ở một tab:
+- http://localhost:5173/supplier — nhà cung cấp
+- http://localhost:5173/buyer — bên mua
+- http://localhost:5173/lender — tổ chức tài chính (tự được xác minh, sản phẩm tự công bố)
+- http://localhost:5173/fcc — nhân sự FCC (chỉ cần để thẩm định/phát hành ESG chính thức)
 
-## Tài liệu mẫu để trình diễn AI
+Mỗi trang tự vào bằng một tài khoản dev (tổ chức trống, không có dữ liệu mẫu), bỏ bước nhập lại mật khẩu. Điền thông tin tổ chức ở *Cài đặt → Tổ chức → Cập nhật hồ sơ*. Bỏ `DEV_AUTOLOGIN` để dùng đăng ký/đăng nhập thật. **Luồng chuẩn dưới đây** áp dụng khi tắt chế độ dev.
 
-`web/public/samples/` (mở tại http://localhost:5173/samples/…) — chứng từ **giả lập** để tải lên khi demo:
+**Luồng sử dụng thật**
+1. Mỗi tổ chức **đăng ký** (nhà cung cấp, bên mua, tổ chức tài chính) kèm tài khoản người dùng đầu tiên. MST phải đủ 10/13 số và không trùng. Mật khẩu băm scrypt; đăng nhập sai quá 5 lần bị khóa 15 phút.
+2. Tài khoản **nhân sự FCC** (tạo từ `ADMIN_EMAIL`/`ADMIN_PASSWORD` khi khởi động) vào *Quản trị FCC*: xác minh tổ chức tài chính, duyệt sản phẩm Marketplace, thẩm định và phát hành điểm ESG chính thức. Nhân sự FCC không xem chứng từ hay hồ sơ tài trợ.
+3. Tổ chức tài chính (đã xác minh) đăng sản phẩm → FCC duyệt → hiện cho doanh nghiệp. Sửa sản phẩm phải duyệt lại.
+4. Nhà cung cấp tạo khoản phải thu (XML hóa đơn, ảnh/PDF qua AI OCR hoặc nhập tay) → bên mua xác nhận (nhập lại mật khẩu) → RFQ tới tối đa 3 sản phẩm phù hợp → tổ chức tài chính tự báo giá → chọn báo giá → thẩm định → đề nghị chính thức → doanh nghiệp chấp thuận (nhập lại mật khẩu) → giải ngân → bên mua thanh toán → tất toán.
+5. Giải ngân ghi nhận bằng nút của tổ chức tài chính hoặc **webhook** `POST /api/webhooks/funding`: mỗi tổ chức tài chính có khóa riêng (*Cài đặt → Tổ chức → Tạo khóa webhook*), header `x-fcc-org`, `x-idempotency-key`, `x-fcc-signature` = HMAC-SHA256(khóa, thân yêu cầu); gọi lặp không ghi nhận hai lần.
+6. Dòng tiền: doanh nghiệp tự khai số dư tiền và chi định kỳ, nhập file công nợ CSV; hóa đơn trên FCC tự vào dự báo; độ trễ thanh toán bên mua tính từ lịch sử thanh toán thật trên FCC.
 
-| File | Dùng ở | Kết quả AI đã kiểm tra (12/10/2026) |
-| --- | --- | --- |
-| `BCTC_mau_Phu_Gia_2025.png` | Chấm điểm DN → VLXD Phú Gia → Tải BCTC | `gemma4:31b` trích đúng 15/15 chỉ tiêu, ~4 giây |
-| `Hoa_don_GTGT_mau_0005678.png` | Hóa đơn → Tạo khoản phải thu → Ảnh/PDF (vai Cơ khí Minh Tâm) | Đúng ký hiệu, số, ngày, MST, tổng tiền; tự khớp bên mua theo MST, ~9 giây |
-| `Hoa_don_dien_12_thang_Hung_Thinh.png` | ESG → Giấy Hưng Thịnh → Bằng chứng | Phân loại E1/E3, trích 500.400 kWh và 98.000 kWh điện mặt trời |
-| `Thong_bao_BHXH_Hung_Thinh.png` | ESG → Giấy Hưng Thịnh → Bằng chứng | Phân loại S1, trích 114/120 lao động đóng BHXH |
-
-Sau khi tải bằng chứng, bấm **AI đề xuất** ở E1/S1: `gpt-oss:120b` đề xuất mức 2 kèm trích dẫn và danh sách bằng chứng còn thiếu; chỉ tiêu không có bằng chứng (ví dụ G3) trả về “Chưa xác minh”, không gán 0.
+**Kiến trúc**
+- Backend ([server/](server/)): Fastify + SQLite. Luật nghiệp vụ và phân quyền ở [server/src/service.ts](server/src/service.ts); dữ liệu trả về trình duyệt được lọc theo quyền chia sẻ ở [server/src/views.ts](server/src/views.ts). Trình duyệt tự đồng bộ mỗi 4 giây nên nhiều người dùng thấy thay đổi của nhau.
+- AI: trình duyệt gọi `/api/ollama/chat` (cần đăng nhập); backend gắn khóa ollama.com (chỉ ở `server/.env`). Khi AI lỗi, tác vụ báo lỗi để nhập tay — không tự điền số liệu thay AI.
+- Tác vụ định kỳ mỗi phút: RFQ quá hạn → hết hạn và thu hồi quyền xem; đề nghị quá hạn chấp thuận → rút lại; khoản đến hạn chưa thanh toán → `OVERDUE`.
+- Kiểm thử: `cd server && npm test` (luồng end-to-end qua API từ CSDL trống, kèm phân quyền, webhook, khởi động lại); `cd web-legacy && npm test` (công thức chấm điểm).
 
 ## Dữ liệu bên mua niêm yết (vnstock)
 
@@ -53,28 +53,22 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt   # vnstock 4
 .venv/bin/python scripts/fetch_listed.py HPG --tax-code <MST>
 ```
 
-- Script ghi `web/public/listed/<MÃ>.json`; trong app: *Chấm điểm DN* → bên mua niêm yết → nhập mã → **Làm mới từ vnstock**. Đã có sẵn `HPG.json` (gán cho bên mua mẫu *Thép Đông Á Việt*) và `CTD.json` (gán cho *An Phát Hưng*) lấy ngày 12/10/2026 — giao diện ghi rõ đây là dữ liệu thật dùng để minh họa cho doanh nghiệp hư cấu.
+- Script ghi `web-legacy/public/listed/<MÃ>.json`. Bên mua niêm yết (đã khai mã chứng khoán khi đăng ký) vào *Chấm điểm DN* → **Nạp dữ liệu từ vnstock**; máy chủ đọc đúng file của mã đó và từ chối mã khác với mã đã khai. Repo có sẵn `HPG.json`, `CTD.json` (dữ liệu thật lấy ngày 12/10/2026); công ty thật có mã tương ứng đăng ký sẽ dùng được ngay.
 - **Lưu ý dữ liệu (vnstock 4.0.9):** nguồn mặc định KBS trả BCTC năm với **nhãn năm bị đảo** (cột "2025" chứa số liệu 2022 của HPG; quý cũng lệch). Script dùng nguồn **VCI** (nhãn đúng, đã đối chiếu: tổng 4 quý 2025 của HPG = doanh thu năm 2025 = 156,1 nghìn tỷ) và dừng nếu thứ tự năm bất thường.
 - Bản Cộng đồng: 60 lượt/phút, tối đa 8 kỳ BCTC. Ý kiến kiểm toán và diện cảnh báo không có trong vnstock — đang để mặc định, cần đối chiếu nguồn công bố thông tin.
 - Quyền riêng tư: vnai đăng ký thiết bị với vnstocks.com (mặc định băm hostname) và có telemetry tùy chọn — đặt `VNSTOCK_DEVICE_ID` trung tính và `VNSTOCK_TELEMETRY=off`. Bản 4.0.9 không còn tự ghi vào file hướng dẫn của trợ lý AI (`~/.claude/CLAUDE.md`…) khi import; vẫn đặt `VNSTOCK_DISABLE_AGENT_SETUP=1` để chặn.
 
-## Kịch bản trình diễn (≈ 7 phút)
+## Danh mục sản phẩm công khai
 
-Chuyển vai trò bằng ô tổ chức ở góc trên trái.
-
-1. **Nhà cung cấp — Cơ khí Minh Tâm**: *Tổng quan* (phải thu, hạn mức do đối tác cấp, xếp hạng AA, dự báo dòng tiền có cảnh báo thiếu hụt → gợi ý tài trợ).
-2. *Chấm điểm DN*: 5C + dữ liệu thay thế, độ bao phủ, cờ rủi ro, 20 chỉ tiêu có nguồn; **Tạo nhận xét AI**; *Tải BCTC* để AI trích xuất.
-3. *Hóa đơn → Tạo khoản phải thu*: tải XML mẫu (QĐ1450), tạo lại lần 2 để thấy **chặn trùng**.
-4. *Marketplace → Tìm nguồn vốn*: INV-001 khớp 4 sản phẩm, 2 sản phẩm “chưa phù hợp” kèm lý do; chọn 3 → **Gửi RFQ** → *Mô phỏng phản hồi* → **Chọn** báo giá tốt nhất (khóa hồ sơ, thu hồi quyền đối tác khác).
-5. **Tổ chức tài chính** (đối tác được chọn): *Hồ sơ tài trợ* → thẩm định → đưa đề nghị chính thức; quay lại nhà cung cấp **chấp thuận**; tổ chức tài chính **ghi nhận giải ngân**.
-6. **Bên mua — An Phát Hưng**: xác nhận INV-003 (OTP mô phỏng), ESG chuỗi cung ứng, ghi nhận thanh toán → tất toán.
-7. **Nhà cung cấp — Giấy Hưng Thịnh**: *ESG & Xanh* → tải bằng chứng (ví dụ ảnh hóa đơn điện) → AI phân loại/trích số liệu → bật *Chế độ người thẩm định FCC* → AI đề xuất, chấp nhận/sửa có lý do → phát hành; tab *Tài chính xanh* cho thấy ưu đãi do đối tác cấu hình.
-8. *Cài đặt → Nhật ký*: mọi bước đều có dấu vết; *Quyền chia sẻ dữ liệu*: thu hồi có hiệu lực ngay.
+Tab *Marketplace → Tất cả sản phẩm* có 4 mục tham khảo thu thập từ trang chính thức của BIDV, Techcombank và MB, đối chiếu ngày 12/10/2026. Dữ liệu và liên kết nguồn nằm ở `web-legacy/src/data/publicProducts.ts`. Trang nguồn thường không công bố lãi suất, phí, điều kiện đầy đủ hoặc ngày hết hiệu lực; ứng dụng để các mục đó ở trạng thái chưa công bố. Danh mục tham khảo không đi vào bộ khớp sản phẩm hay RFQ. Chỉ sản phẩm do tổ chức tài chính đã xác minh đăng và FCC duyệt mới được gửi yêu cầu báo giá trên FCC. Khi cập nhật danh mục, cần mở lại từng URL nguồn và sửa ngày đối chiếu của mục tương ứng.
 
 ## Giới hạn hiện tại
 
-- Toàn bộ doanh nghiệp, ngân hàng, MST, mã CK (…X) là hư cấu; số liệu là mô phỏng.
-- Chưa có xác thực thật (chỉ đăng nhập mẫu), chưa gửi OTP qua SMS/email, chưa có kết nối thật tới MISA/FAST hay ngân hàng; “kết nối kế toán”, “crawl” và phản hồi báo giá của “Mô phỏng phản hồi đối tác” là dữ liệu mẫu và được gắn nhãn.
-- Bộ chấm điểm (5C, ESG, xếp hạng hồ sơ) vẫn chạy ở trình duyệt trên dữ liệu máy chủ đã lọc. Để chấm điểm các khoản phải thu của tổ chức khác, máy chủ gửi bản rút gọn (không có số/ký hiệu hóa đơn, mô tả, chứng từ); bước tiếp theo là chuyển chấm điểm sang máy chủ.
-- SQLite một tiến trình, phù hợp demo; chạy nhiều bản sao cần chuyển sang PostgreSQL.
+- **Chưa có đối chiếu với cơ quan nhà nước:** MST, hóa đơn, CIC, thuế, BHXH đều do người dùng khai/tải lên; MST chưa tra cứu với cơ quan thuế; chưa có crawl dữ liệu doanh nghiệp từ nguồn công khai.
+- **Chưa có kết nối phần mềm kế toán hay ngân hàng:** công nợ nhập bằng CSV; giải ngân/thanh toán do các bên tự xác nhận hoặc webhook. Muốn tích hợp MISA AMIS cần đăng ký đối tác tích hợp với MISA để có `app_id`.
+- **Xác thực mới ở mức cơ bản:** email + mật khẩu, mỗi tổ chức một người dùng (chưa có mời thêm thành viên, quên mật khẩu, 2FA). Chưa có cấp hạn mức tín dụng cho doanh nghiệp.
+- **Tham số mô hình chấm điểm là giá trị khởi tạo** (bảng rủi ro ngành, trung vị biên lợi nhuận, hệ số phát thải lưới điện) — cần hiệu chỉnh và thẩm định trước khi dùng cho quyết định thật.
+- Bộ chấm điểm chạy ở trình duyệt trên dữ liệu máy chủ đã lọc; khoản phải thu của tổ chức khác được gửi ở dạng rút gọn (không số/ký hiệu hóa đơn, mô tả, chứng từ) để tính điểm. Bước tiếp theo là chuyển chấm điểm sang máy chủ.
+- SQLite một tiến trình; nhiều bản sao cần PostgreSQL. Chạy ngoài localhost cần đặt sau HTTPS.
+- `web-legacy/public/samples/` là ảnh chứng từ giả lập chỉ dùng để thử tính năng AI đọc tài liệu; ứng dụng không nạp chúng.
 - Gói `vnstock` trên PyPI ở trạng thái *quarantined*; cài từ chỉ mục chính thức vnstocks.com (`requirements.txt`).

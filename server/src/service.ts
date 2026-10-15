@@ -1,21 +1,19 @@
 // Luật nghiệp vụ FCC chạy phía máy chủ. Mỗi hành động kiểm tra quyền theo tổ chức đăng nhập (actor),
-// kiểm tra trạng thái hợp lệ, rồi mới thay đổi dữ liệu. Chuyển từ web/src/store.ts (trước đây chạy ở trình duyệt).
+// kiểm tra trạng thái hợp lệ, rồi mới thay đổi dữ liệu. Chuyển từ web-legacy/src/store.ts (trước đây chạy ở trình duyệt).
 import { randomBytes } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type {
   AccountingConnection, Consent, CreditProfile, EarlyPaymentOffer, EsgAssessment, EsgDocument, EsgIndicatorResult, FinancialYear,
   FinancingProduct, FundingApplication, LedgerItem, ListedSnapshot, Org, Receivable, ReceivableState, Rfq, RfqResponse,
-} from '../../web/src/domain/types'
-import { iso } from '../../web/src/data/seed'
-import { applicationScoreOf, buyerScoreOf, esgOf, supplierScoreOf } from '../../web/src/domain/engine'
-import { estimateCost, matchProduct, tenorOf } from '../../web/src/domain/marketplace'
-import { RATING_ORDER } from '../../web/src/domain/credit'
+} from '../../web-legacy/src/domain/types'
+import { iso } from '../../web-legacy/src/domain/util'
+import { applicationScoreOf, buyerScoreOf, esgOf, supplierScoreOf } from '../../web-legacy/src/domain/engine'
+import { matchProduct } from '../../web-legacy/src/domain/marketplace'
 import { bad, conflict, forbidden, notFound, unprocessable } from './errors'
 import type { State } from './state'
 
 export type Role = 'member' | 'fcc_reviewer'
-export interface OtpProof { id: string; code: string }
 
 export interface Ctx {
   actor: Org
@@ -23,10 +21,11 @@ export interface Ctx {
   /** Bản nháp trạng thái — chỉ được ghi nhận khi hành động thành công. */
   s: State
   now: Date
-  demo: boolean
   listedDir: string
-  /** Xác thực OTP đã cấp cho (actor, purpose, entity); ném lỗi nếu sai/hết hạn/đã dùng. */
-  checkOtp: (purpose: string, entity: string, proof: OtpProof | undefined) => void
+  /** Chế độ dev: sản phẩm của tổ chức tài chính được công bố ngay, không chờ FCC duyệt */
+  autoApprove: boolean
+  /** Xác thực lại người dùng bằng mật khẩu cho thao tác có giá trị pháp lý; ném lỗi nếu sai. */
+  checkPassword: (password: string | undefined) => void
 }
 
 const uid = (p: string) => `${p}-${randomBytes(4).toString('hex').toUpperCase()}`
@@ -67,7 +66,7 @@ function rfqOf(c: Ctx, id: string) {
   return q
 }
 function requireType(c: Ctx, t: Org['type']) {
-  if (c.actor.type !== t) throw forbidden(`Chỉ ${t === 'supplier' ? 'nhà cung cấp' : t === 'buyer' ? 'bên mua' : 'tổ chức tài chính'} mới được thực hiện thao tác này`)
+  if (c.actor.type !== t) throw forbidden(`Chỉ ${{ supplier: 'nhà cung cấp', buyer: 'bên mua', lender: 'tổ chức tài chính', fcc: 'nhân sự FCC' }[t]} mới được thực hiện thao tác này`)
 }
 function requireSelf(c: Ctx, orgId: string) {
   if (orgId !== c.actor.id) throw forbidden('Chỉ được thao tác trên dữ liệu của tổ chức mình')
@@ -149,15 +148,15 @@ export const actions: Record<string, Action> = {
     notify(c, r.buyerId, `Yêu cầu xác nhận ${r.code}`, `${orgName(c, r.sellerId)} đề nghị xác nhận khoản phải trả ${vnd(r.amount)} ₫.`, '/invoices')
     log(c, 'Gửi lời mời xác nhận', r.code, `Tới ${orgName(c, r.buyerId)}`)
   },
-  buyerDecision(c, id: string, confirm: boolean, reason?: string, otp?: OtpProof) {
+  buyerDecision(c, id: string, confirm: boolean, reason?: string, password?: string) {
     const r = recv(c, id)
     requireSelf(c, r.buyerId)
     requireState('Khoản phải thu', r.state, ['BUYER_PENDING'])
-    if (confirm) c.checkOtp('buyer_confirm', `${r.id}@v${r.version}`, otp)
+    if (confirm) c.checkPassword(password)
     else if (!reason?.trim()) throw bad('Cần nêu lý do tranh chấp')
     patchRecv(c, id, confirm ? { state: 'BUYER_CONFIRMED', confirmedAt: iso(c.now), disputeReason: undefined } : { state: 'BUYER_DISPUTED', disputeReason: reason!.trim().slice(0, 500) })
     notify(c, r.sellerId, confirm ? `${r.code} đã được xác nhận` : `${r.code} bị tranh chấp`, confirm ? `${orgName(c, r.buyerId)} xác nhận nghĩa vụ thanh toán phiên bản v${r.version}. Có thể đưa lên Marketplace.` : `Lý do: ${reason}`, '/invoices')
-    log(c, confirm ? 'Bên mua xác nhận' : 'Bên mua nêu tranh chấp', r.code, confirm ? `Phiên bản v${r.version}, xác thực lại bằng OTP` : reason!)
+    log(c, confirm ? 'Bên mua xác nhận' : 'Bên mua nêu tranh chấp', r.code, confirm ? `Phiên bản v${r.version}, xác thực lại bằng mật khẩu` : reason!)
   },
   reviseDisputed(c, id: string, amount: number, note: string) {
     const r = recv(c, id)
@@ -210,7 +209,7 @@ export const actions: Record<string, Action> = {
     log(c, 'Tạo yêu cầu báo giá', rfq.id, `${r.code} → ${lenders.map((l) => orgName(c, l)).join(', ')} (chia sẻ gói tóm tắt)`)
     return rfq
   },
-  respondRfq(c, rfqId: string, resp: Omit<RfqResponse, 'lenderId' | 'respondedAt' | 'simulated'>) {
+  respondRfq(c, rfqId: string, resp: Omit<RfqResponse, 'lenderId' | 'respondedAt'>) {
     requireType(c, 'lender')
     const q = rfqOf(c, rfqId)
     requireState('RFQ', q.state, ['OPEN', 'RESPONDED'])
@@ -222,30 +221,8 @@ export const actions: Record<string, Action> = {
       if (!(typeof resp.ratePct === 'number' && resp.ratePct > 0 && resp.ratePct <= 100)) throw bad('Lãi suất không hợp lệ')
       if (resp.feesVnd !== undefined && (!Number.isFinite(resp.feesVnd) || resp.feesVnd < 0)) throw bad('Phí không hợp lệ')
     } else if (resp.kind !== 'decline') throw bad('Loại phản hồi không hợp lệ')
-    const full: RfqResponse = { ...resp, lenderId: c.actor.id, respondedAt: c.now.toISOString(), simulated: false }
+    const full: RfqResponse = { ...resp, lenderId: c.actor.id, respondedAt: c.now.toISOString() }
     putResponse(c, q, full)
-  },
-  /** Chỉ chế độ demo: nhà cung cấp tạo phản hồi mẫu thay cho các đối tác chưa trả lời. */
-  simulateRfqResponses(c, rfqId: string) {
-    if (!c.demo) throw forbidden('Chức năng mô phỏng chỉ có ở chế độ demo')
-    const q = rfqOf(c, rfqId)
-    requireSelf(c, q.sellerId)
-    requireState('RFQ', q.state, ['OPEN', 'RESPONDED'])
-    const r = recv(c, q.receivableId)
-    const rating = applicationScoreOf(c.s, r.id).rating
-    const bump = Math.max(0, RATING_ORDER.indexOf('AAA') - RATING_ORDER.indexOf(rating)) * 0.12
-    const e = esgOf(c.s, r.sellerId)
-    for (const pid of q.productIds) {
-      const p = c.s.products.find((x) => x.id === pid)!
-      if (rfqOf(c, rfqId).responses.some((x) => x.lenderId === p.lenderId)) continue
-      const cost = estimateCost(p, r.amount, tenorOf(r, c.now), e ? { score: e.result.score, coverage: e.result.coverage, official: e.assessment.status === 'official', flags: e.result.flags.length } : undefined)
-      const rate = Math.min(cost.rateMax, Math.round((cost.rateMin + bump) * 100) / 100)
-      putResponse(c, rfqOf(c, rfqId), {
-        lenderId: p.lenderId, productId: pid, kind: 'quote', advancePct: p.pricing.advancePct, ratePct: rate, feesVnd: cost.fees,
-        conditions: p.type === 'factoring_nonrecourse' ? 'Miễn truy đòi; bảo hiểm rủi ro bên mua' : 'Có truy đòi; bên mua thanh toán vào TK chuyên dùng',
-        validUntil: iso(new Date(c.now.getTime() + 4 * DAY)), respondedAt: c.now.toISOString(), simulated: true,
-      })
-    }
   },
   selectQuote(c, rfqId: string, lenderId: string) {
     const q = rfqOf(c, rfqId)
@@ -327,17 +304,17 @@ export const actions: Record<string, Action> = {
     notify(c, r.sellerId, `${appId} bị từ chối`, reason, '/invoices')
     log(c, 'Đối tác từ chối hồ sơ', appId, reason)
   },
-  acceptOffer(c, appId: string, otp?: OtpProof) {
+  acceptOffer(c, appId: string, password?: string) {
     const a = app(c, appId)
     const r = recv(c, a.receivableId)
     requireSelf(c, r.sellerId)
     requireState('Hồ sơ', a.state, ['OFFERED'])
     if (a.offer && a.offer.expiresAt < iso(c.now)) throw conflict('Đề nghị đã hết hạn chấp thuận')
-    c.checkOtp('accept_offer', appId, otp)
+    c.checkPassword(password)
     patchApp(c, appId, { state: 'ACCEPTED' })
     patchRecv(c, a.receivableId, { state: 'ACCEPTED' })
     notify(c, a.lenderId, `${appId}: doanh nghiệp chấp thuận đề nghị`, 'Tiến hành ký hợp đồng và giải ngân trên kênh của tổ chức tài chính.')
-    log(c, 'Doanh nghiệp chấp thuận đề nghị', appId, 'Xác thực lại bằng OTP')
+    log(c, 'Doanh nghiệp chấp thuận đề nghị', appId, 'Xác thực lại bằng mật khẩu')
   },
   fundApp(c, appId: string) {
     const a = app(c, appId)
@@ -348,23 +325,81 @@ export const actions: Record<string, Action> = {
   // ===== Sản phẩm Marketplace =====
   upsertProduct(c, p: FinancingProduct) {
     requireType(c, 'lender')
+    if (!c.actor.verified) throw forbidden('Tổ chức chưa được FCC xác minh nên chưa đăng sản phẩm')
     const ex = c.s.products.find((x) => x.id === p?.id)
     if (ex && ex.lenderId !== c.actor.id) throw forbidden('Sản phẩm thuộc tổ chức khác')
     if (!p?.name?.trim() || !p.eligibility || !p.pricing) throw bad('Thiếu thông tin sản phẩm')
     if (!(p.pricing.advancePct > 0 && p.pricing.advancePct <= 100) || !(p.pricing.rateMin > 0) || p.pricing.rateMax < p.pricing.rateMin) throw bad('Biểu giá không hợp lệ')
     if (p.eligibility.minAmount > p.eligibility.maxAmount) throw bad('Khoảng giá trị tài trợ không hợp lệ')
-    const next: FinancingProduct = { ...p, lenderId: c.actor.id, sample: ex?.sample ?? false, version: ex ? ex.version + 1 : 1 }
+    // mọi lần sửa nội dung đều quay lại chờ FCC duyệt
+    const publish = c.autoApprove && p.status !== 'draft'
+    const next: FinancingProduct = { ...p, id: ex?.id ?? uid('P'), lenderId: c.actor.id, version: ex ? ex.version + 1 : 1, status: p.status === 'draft' ? 'draft' : publish ? 'published' : 'pending_review', fccApproved: publish }
     c.s.products = ex ? c.s.products.map((x) => (x.id === next.id ? next : x)) : [next, ...c.s.products]
-    log(c, 'Lưu sản phẩm Marketplace', next.id, `${next.name} — phiên bản v${next.version}`)
+    log(c, 'Lưu sản phẩm Marketplace', next.id, `${next.name} — phiên bản v${next.version}, ${next.status === 'draft' ? 'nháp' : publish ? 'công bố (chế độ dev)' : 'chờ FCC duyệt'}`)
     return next
   },
   setProductStatus(c, id: string, status: FinancingProduct['status']) {
     const p = c.s.products.find((x) => x.id === id)
     if (!p) throw notFound('Không tìm thấy sản phẩm')
     requireSelf(c, p.lenderId)
-    if (!['draft', 'pending_review', 'published', 'paused', 'expired'].includes(status)) throw bad('Trạng thái không hợp lệ')
+    if (status === 'published') {
+      if (!p.fccApproved) throw forbidden('Sản phẩm cần FCC duyệt trước khi công bố')
+    } else if (!['draft', 'pending_review', 'paused'].includes(status)) throw bad('Trạng thái không hợp lệ')
+    if (status === 'pending_review' && p.fccApproved) throw conflict('Sản phẩm đã được duyệt')
     c.s.products = c.s.products.map((x) => (x.id === id ? { ...x, status } : x))
     log(c, 'Đổi trạng thái sản phẩm', id, status)
+  },
+
+  /** Cập nhật hồ sơ tổ chức của chính mình (MST không đổi được). */
+  updateOrg(c, patch: Partial<Pick<Org, 'name' | 'shortName' | 'vsic' | 'industryLabel' | 'industryGroup' | 'province' | 'foundedYear' | 'employees' | 'listedSymbol' | 'exchange'>>) {
+    const o = c.actor
+    const next: Org = { ...o }
+    const text = (k: 'name' | 'shortName' | 'vsic' | 'industryLabel' | 'province', max: number) => {
+      if (patch[k] === undefined) return
+      const v = String(patch[k]).trim()
+      if (!v || v.length > max) throw bad(`Giá trị ${k} không hợp lệ`)
+      next[k] = v
+    }
+    text('name', 200); text('shortName', 40); text('vsic', 8); text('industryLabel', 200); text('province', 80)
+    if (patch.industryGroup !== undefined) {
+      if (!['manufacturing', 'trade', 'agri', 'tech'].includes(patch.industryGroup)) throw bad('Nhóm ngành không hợp lệ')
+      next.industryGroup = patch.industryGroup
+    }
+    if (patch.foundedYear !== undefined) {
+      if (!Number.isInteger(patch.foundedYear) || patch.foundedYear < 1900 || patch.foundedYear > c.now.getFullYear()) throw bad('Năm thành lập không hợp lệ')
+      next.foundedYear = patch.foundedYear
+    }
+    if (patch.employees !== undefined) {
+      if (!Number.isInteger(patch.employees) || patch.employees < 0) throw bad('Số lao động không hợp lệ')
+      next.employees = patch.employees
+    }
+    if (o.type === 'buyer' && patch.listedSymbol !== undefined) {
+      const sym = String(patch.listedSymbol).trim().toUpperCase()
+      if (sym && !/^[A-Z0-9]{2,6}$/.test(sym)) throw bad('Mã chứng khoán không hợp lệ')
+      next.listedSymbol = sym || undefined
+      next.exchange = sym && ['HOSE', 'HNX', 'UPCOM'].includes(String(patch.exchange)) ? patch.exchange : undefined
+    }
+    c.s.orgs = c.s.orgs.map((x) => (x.id === o.id ? next : x))
+    log(c, 'Cập nhật hồ sơ tổ chức', o.id, Object.keys(patch).join(', '))
+  },
+
+  // ===== Quản trị FCC =====
+  approveProduct(c, id: string, approve: boolean, note?: string) {
+    requireType(c, 'fcc')
+    const p = c.s.products.find((x) => x.id === id)
+    if (!p) throw notFound('Không tìm thấy sản phẩm')
+    requireState('Sản phẩm', p.status, ['pending_review'])
+    c.s.products = c.s.products.map((x) => (x.id === id ? { ...x, status: approve ? 'published' : 'draft', fccApproved: approve } : x))
+    notify(c, p.lenderId, approve ? `Sản phẩm “${p.name}” đã được duyệt` : `Sản phẩm “${p.name}” chưa được duyệt`, approve ? 'Sản phẩm đã công bố trên Marketplace.' : (note ?? 'Cần chỉnh sửa và gửi lại.'), '/marketplace?tab=mine')
+    log(c, approve ? 'FCC duyệt sản phẩm' : 'FCC từ chối sản phẩm', id, note ?? p.name)
+  },
+  verifyOrg(c, orgId: string, verified: boolean) {
+    requireType(c, 'fcc')
+    const o = c.s.orgs.find((x) => x.id === orgId)
+    if (!o || o.type !== 'lender') throw notFound('Chỉ xác minh tổ chức tài chính')
+    c.s.orgs = c.s.orgs.map((x) => (x.id === orgId ? { ...x, verified } : x))
+    notify(c, orgId, verified ? 'Tổ chức đã được FCC xác minh' : 'FCC đã thu hồi xác minh', verified ? 'Bạn có thể đăng sản phẩm lên Marketplace.' : 'Sản phẩm đang công bố vẫn hiển thị cho đến khi FCC tạm dừng.')
+    log(c, verified ? 'FCC xác minh tổ chức tài chính' : 'FCC thu hồi xác minh', orgId, o.name)
   },
 
   // ===== Thanh toán sớm =====
@@ -418,12 +453,14 @@ export const actions: Record<string, Action> = {
     return a
   },
   updateIndicator(c, assessmentId: string, code: string, patch: Partial<EsgIndicatorResult>) {
-    const a = ownEsg(c, assessmentId)
+    const a = esgAccess(c, assessmentId, 'any')
     const OWNER_FIELDS = ['aiLevel', 'aiRationale', 'aiCitations', 'aiMissing', 'aiSimulated', 'selfDeclared']
     const REVIEWER_FIELDS = ['finalLevel', 'na', 'naReason', 'reviewerNote', 'redFlag']
     const keys = Object.keys(patch ?? {})
     if (keys.some((k) => !OWNER_FIELDS.includes(k) && !REVIEWER_FIELDS.includes(k))) throw bad('Trường không hợp lệ')
-    if (keys.some((k) => REVIEWER_FIELDS.includes(k)) && c.role !== 'fcc_reviewer') throw forbidden('Chỉ người thẩm định FCC mới được xác nhận mức/ghi chú thẩm định')
+    const isFcc = c.actor.type === 'fcc'
+    if (keys.some((k) => REVIEWER_FIELDS.includes(k)) && !isFcc) throw forbidden('Chỉ người thẩm định FCC mới được xác nhận mức/ghi chú thẩm định')
+    if (keys.some((k) => OWNER_FIELDS.includes(k)) && isFcc) throw forbidden('Người thẩm định không sửa dữ liệu tự khai/đề xuất AI của doanh nghiệp')
     if ('finalLevel' in patch && patch.finalLevel !== undefined && ![0, 1, 2, 3, 4].includes(patch.finalLevel)) throw bad('Mức chỉ tiêu phải từ 0 đến 4')
     const has = a.indicators.some((i) => i.code === code)
     const indicators = has ? a.indicators.map((i) => (i.code === code ? { ...i, ...patch } : i)) : [...a.indicators, { code, ...patch }]
@@ -431,7 +468,7 @@ export const actions: Record<string, Action> = {
     if ('finalLevel' in patch || 'na' in patch) log(c, 'Reviewer cập nhật chỉ tiêu ESG', `${a.id}/${code}`, patch.na ? `N/A: ${patch.naReason ?? ''}` : `Mức ${patch.finalLevel ?? 'chưa xác minh'}${patch.reviewerNote ? ` — ${patch.reviewerNote}` : ''}`)
   },
   addEsgDocument(c, assessmentId: string, doc: EsgDocument) {
-    const a = ownEsg(c, assessmentId)
+    const a = esgAccess(c, assessmentId, 'owner')
     if (!doc?.name || !doc.mime) throw bad('Thiếu thông tin tài liệu')
     if (doc.dataUrl && doc.dataUrl.length > 8_000_000) throw bad('Tệp quá lớn (tối đa ~6 MB)')
     const clean: EsgDocument = { ...doc, id: doc.id || uid('doc'), uploadedAt: c.now.toISOString(), indicatorCodes: doc.indicatorCodes ?? [] }
@@ -439,20 +476,21 @@ export const actions: Record<string, Action> = {
     log(c, 'Tải bằng chứng ESG', a.id, `${clean.name} → ${clean.indicatorCodes.join(', ') || 'chưa phân loại'}`)
   },
   updateEsgMetrics(c, assessmentId: string, m: Partial<EsgAssessment['metrics']>) {
-    const a = ownEsg(c, assessmentId)
+    const a = esgAccess(c, assessmentId, 'owner')
     const allowed = ['kwh12m', 'waterM3_12m', 'solarKwh12m', 'bhxhCovered', 'employees'] as const
     const clean: EsgAssessment['metrics'] = {}
     for (const k of allowed) if (m?.[k] !== undefined && Number.isFinite(m[k])) clean[k] = m[k]
     c.s.esg = c.s.esg.map((x) => (x.id === a.id ? { ...x, metrics: { ...x.metrics, ...clean } } : x))
   },
   issueEsg(c, assessmentId: string, official: boolean) {
-    const a = ownEsg(c, assessmentId)
-    if (official && c.role !== 'fcc_reviewer') throw forbidden('Chỉ người thẩm định FCC mới được phát hành điểm ESG chính thức')
+    const a = esgAccess(c, assessmentId, 'any')
+    if (official && c.actor.type !== 'fcc') throw forbidden('Chỉ người thẩm định FCC mới được phát hành điểm ESG chính thức')
+    if (!official && c.actor.type === 'fcc') throw forbidden('Người thẩm định chỉ phát hành điểm chính thức')
     c.s.esg = c.s.esg.map((x) => (x.id === a.id ? { ...x, status: official ? 'official' : 'provisional', issuedAt: iso(c.now), validUntil: iso(new Date(c.now.getTime() + 365 * DAY)) } : x))
     log(c, official ? 'Phát hành điểm ESG chính thức' : 'Lưu điểm ESG tạm tính', assessmentId, '')
   },
   setEsgIndustry(c, assessmentId: string, g: EsgAssessment['industryGroup']) {
-    const a = ownEsg(c, assessmentId)
+    const a = esgAccess(c, assessmentId, 'owner')
     if (!['manufacturing', 'trade', 'agri', 'tech'].includes(g)) throw bad('Nhóm ngành không hợp lệ')
     c.s.esg = c.s.esg.map((x) => (x.id === a.id ? { ...x, industryGroup: g } : x))
   },
@@ -460,9 +498,10 @@ export const actions: Record<string, Action> = {
   // ===== Hồ sơ chấm điểm =====
   /** Nạp dữ liệu niêm yết từ file JSON do scripts/fetch_listed.py (vnstock) sinh ra; máy chủ tự đọc, không nhận dữ liệu từ trình duyệt. */
   refreshListed(c, symbol: string) {
-    if (c.actor.type !== 'buyer') throw forbidden('Chỉ bên mua niêm yết mới nạp dữ liệu niêm yết')
+    if (c.actor.type !== 'buyer' || !c.actor.listedSymbol) throw forbidden('Chỉ bên mua có mã chứng khoán đã khai báo mới nạp dữ liệu niêm yết')
     const sym = String(symbol ?? '').trim().toUpperCase()
     if (!/^[A-Z0-9]{2,6}$/.test(sym)) throw bad('Mã chứng khoán không hợp lệ')
+    if (sym !== c.actor.listedSymbol.toUpperCase()) throw forbidden(`Tổ chức chỉ được nạp dữ liệu của mã ${c.actor.listedSymbol}`)
     let j: { snapshot: Omit<ListedSnapshot, 'orgId'>; financials: Omit<FinancialYear, 'status'>[] }
     try {
       j = JSON.parse(readFileSync(join(c.listedDir, `${sym}.json`), 'utf8'))
@@ -494,43 +533,29 @@ export const actions: Record<string, Action> = {
     log(c, 'Cập nhật hồ sơ chấm điểm', orgId, keys.join(', '))
   },
 
-  // ===== Kế toán =====
-  connectAccounting(c, orgId: string, provider: AccountingConnection['provider'], method: AccountingConnection['method']) {
+  // ===== Dòng tiền =====
+  /** Doanh nghiệp tự khai số dư tiền và các khoản chi định kỳ; công nợ lấy từ hóa đơn trên FCC và file nhập. */
+  saveCashProfile(c, orgId: string, input: { openingCash: number; recurringMonthlyOut: { name: string; amount: number; day: number }[] }) {
     requireSelf(c, orgId)
-    const exist = c.s.connections.find((x) => x.orgId === orgId)
-    const nowIso = c.now.toISOString()
-    const conn: AccountingConnection = exist
-      ? { ...exist, provider, method, status: 'connected', lastSyncedAt: nowIso }
-      : { orgId, provider, method, status: 'connected', lastSyncedAt: nowIso, openingCash: 900_000_000, recurringMonthlyOut: [{ name: 'Lương nhân viên', amount: 420_000_000, day: 5 }, { name: 'Chi phí vận hành', amount: 150_000_000, day: 15 }], buyerDelayDays: { '*': { median: 7, p80: 18 } }, simulated: true }
+    if (c.actor.type === 'lender' || c.actor.type === 'fcc') throw forbidden('Chỉ doanh nghiệp bán/mua mới thiết lập dòng tiền')
+    if (!Number.isFinite(input?.openingCash) || input.openingCash < 0) throw bad('Số dư tiền không hợp lệ')
+    const out = (input.recurringMonthlyOut ?? []).map((r) => {
+      if (!r.name?.trim() || !(r.amount > 0) || !Number.isInteger(r.day) || r.day < 1 || r.day > 28) throw bad('Khoản chi định kỳ không hợp lệ (ngày 1–28)')
+      return { name: r.name.trim().slice(0, 80), amount: Math.round(r.amount), day: r.day }
+    })
+    const conn: AccountingConnection = { orgId, provider: 'CSV', method: 'file', status: 'connected', lastSyncedAt: c.now.toISOString(), openingCash: Math.round(input.openingCash), recurringMonthlyOut: out, buyerDelayDays: {} }
     c.s.connections = [conn, ...c.s.connections.filter((x) => x.orgId !== orgId)]
-    if (!c.s.ledger.some((l) => l.orgId === orgId)) {
-      const items: LedgerItem[] = c.s.receivables
-        .filter((r) => r.sellerId === orgId && ['BUYER_PENDING', 'BUYER_CONFIRMED', 'OVERDUE', 'BUYER_DISPUTED'].includes(r.state))
-        .map((r) => ({ id: uid('L'), orgId, kind: 'AR' as const, counterpartyName: orgName(c, r.buyerId), counterpartyTaxCode: c.s.orgs.find((o) => o.id === r.buyerId)?.taxCode, docNo: r.code, amount: r.amount, paid: 0, dueDate: r.dueDate }))
-      c.s.ledger = [...c.s.ledger, ...items]
-    }
-    log(c, 'Kết nối phần mềm kế toán', orgId, `${provider} (${method === 'api' ? 'API' : 'nhập file'}) — chỉ đọc`)
-  },
-  disconnectAccounting(c, orgId: string) {
-    requireSelf(c, orgId)
-    c.s.connections = c.s.connections.map((x) => (x.orgId === orgId ? { ...x, status: 'disconnected' } : x))
-    log(c, 'Ngắt kết nối kế toán', orgId, 'Dừng đồng bộ ngay')
-  },
-  syncAccounting(c, orgId: string) {
-    requireSelf(c, orgId)
-    const conn = c.s.connections.find((x) => x.orgId === orgId)
-    if (!conn || conn.status !== 'connected') throw conflict('Chưa kết nối phần mềm kế toán')
-    c.s.connections = c.s.connections.map((x) => (x.orgId === orgId ? { ...x, lastSyncedAt: c.now.toISOString() } : x))
-    log(c, 'Đồng bộ kế toán', orgId, 'Đồng bộ tăng dần')
+    log(c, 'Cập nhật thiết lập dòng tiền', orgId, `Số dư ${vnd(conn.openingCash)} ₫, ${out.length} khoản chi định kỳ`)
   },
   importLedger(c, orgId: string, items: LedgerItem[]) {
     requireSelf(c, orgId)
-    if (!Array.isArray(items) || items.length > 5000) throw bad('Dữ liệu công nợ không hợp lệ')
+    if (!Array.isArray(items) || items.length === 0 || items.length > 5000) throw bad('Dữ liệu công nợ không hợp lệ')
     const clean: LedgerItem[] = items.map((i) => {
       if (!i.docNo || !(i.amount >= 0) || !(i.paid >= 0) || !isDate(i.dueDate) || (i.kind !== 'AR' && i.kind !== 'AP')) throw bad(`Dòng công nợ không hợp lệ: ${i.docNo ?? '?'}`)
       return { id: i.id || uid('L'), orgId, kind: i.kind, counterpartyName: String(i.counterpartyName ?? ''), counterpartyTaxCode: i.counterpartyTaxCode, docNo: i.docNo, amount: i.amount, paid: i.paid, dueDate: i.dueDate }
     })
     c.s.ledger = [...c.s.ledger.filter((l) => l.orgId !== orgId || !clean.some((i) => i.docNo === l.docNo)), ...clean]
+    c.s.connections = c.s.connections.map((x) => (x.orgId === orgId ? { ...x, lastSyncedAt: c.now.toISOString() } : x))
     log(c, 'Nhập file công nợ', orgId, `${clean.length} dòng`)
   },
 
@@ -543,18 +568,6 @@ export const actions: Record<string, Action> = {
     c.s.consents = c.s.consents.map((x) => (x.id === id ? { ...x, revokedAt: iso(c.now) } : x))
     log(c, 'Thu hồi quyền chia sẻ', id, 'Có hiệu lực tức thời với truy cập mới')
   },
-  refreshExternal(c, orgId: string) {
-    requireSelf(c, orgId)
-    c.s.external = c.s.external.map((e) => (e.orgId === orgId && c.s.sources.find((x) => x.id === e.sourceId)?.status === 'approved' ? { ...e, fetchedAt: c.now.toISOString() } : e))
-    log(c, 'Làm mới dữ liệu nguồn công khai', orgId, 'Chỉ nguồn đã phê duyệt; tra cứu theo MST')
-  },
-  disputeExternal(c, id: string) {
-    const e = c.s.external.find((x) => x.id === id)
-    if (!e) throw notFound('Không tìm thấy bản ghi')
-    requireSelf(c, e.orgId)
-    c.s.external = c.s.external.map((x) => (x.id === id ? { ...x, disputed: true } : x))
-    log(c, 'Doanh nghiệp khiếu nại dữ liệu ngoài', id, 'Chờ FCC operations xử lý')
-  },
   markNotificationsRead(c) {
     c.s.notifications = c.s.notifications.map((n) => (n.orgId === c.actor.id ? { ...n, read: true } : n))
   },
@@ -564,7 +577,7 @@ export const actions: Record<string, Action> = {
 function putResponse(c: Ctx, q: Rfq, resp: RfqResponse) {
   c.s.rfqs = c.s.rfqs.map((x) => (x.id === q.id ? { ...x, state: 'RESPONDED', responses: [...x.responses.filter((y) => y.lenderId !== resp.lenderId), resp] } : x))
   notify(c, q.sellerId, `Báo giá mới cho ${q.id}`, `${orgName(c, resp.lenderId)} ${resp.kind === 'quote' ? `báo giá ${resp.ratePct}%/năm, ứng ${resp.advancePct}%` : 'từ chối'}.`, '/marketplace?tab=rfq')
-  log(c, resp.kind === 'quote' ? 'Đối tác trả báo giá sơ bộ' : 'Đối tác từ chối RFQ', q.id, `${orgName(c, resp.lenderId)}${resp.simulated ? ' (mô phỏng)' : ''}`)
+  log(c, resp.kind === 'quote' ? 'Đối tác trả báo giá sơ bộ' : 'Đối tác từ chối RFQ', q.id, orgName(c, resp.lenderId))
 }
 
 /** Ghi nhận giải ngân — idempotent: gọi lại khi đã FUNDED không đổi gì. */
@@ -580,10 +593,10 @@ export function fundApplication(c: Ctx, a: FundingApplication, source = 'thao t�
   return true
 }
 
-function ownEsg(c: Ctx, assessmentId: string) {
+function esgAccess(c: Ctx, assessmentId: string, who: 'owner' | 'any') {
   const a = c.s.esg.find((x) => x.id === assessmentId)
   if (!a) throw notFound('Không tìm thấy đánh giá ESG')
-  requireSelf(c, a.orgId)
+  if (!(who === 'any' && c.actor.type === 'fcc')) requireSelf(c, a.orgId)
   if (a.source !== 'assessed') throw forbidden('Đánh giá từ báo cáo công bố không chỉnh sửa tại đây')
   return a
 }
