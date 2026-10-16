@@ -18,8 +18,27 @@ Tài liệu này dành cho người dùng của ba nhóm: **nhà cung cấp**, *
    - tài khoản của chủ tổ chức: họ tên, chức danh, email, mật khẩu dài và khó đoán.
 3. Đăng nhập bằng email và mật khẩu. Quên mật khẩu thì bấm **Quên mật khẩu** để nhận liên kết đặt lại qua email.
 
-### 1.1a. Tài khoản của bạn
-Nếu ban tổ chức đã cấp tài khoản, bạn nhận **email đăng nhập và mật khẩu** riêng qua kênh bảo mật (không nằm trong tài liệu này). Hãy đăng nhập, **đổi mật khẩu** ngay lần đầu và bật xác thực 2 bước (mục dưới). Tài khoản cấp sẵn là **chủ tổ chức**: mời thêm đồng nghiệp ở mục 1.3. Riêng tổ chức tài chính cần chờ FCC xác minh trước khi đăng sản phẩm.
+### 1.1a. Tài khoản dùng thử
+Ban tổ chức cấp sẵn tài khoản cho từng vai trò. **Mật khẩu được gửi riêng**, không nằm trong tài liệu này. Đăng nhập bằng email dưới đây rồi bật xác thực 2 bước (mục 1.2).
+
+| Tổ chức | Vai trò | Email |
+| --- | --- | --- |
+| FCC | Quản trị | admin@demo.fcc.local |
+| FCC | Thẩm định tín dụng/ESG | reviewer@demo.fcc.local |
+| FCC | Vận hành | operations@demo.fcc.local |
+| FCC | Chủ mô hình chấm điểm | model_owner@demo.fcc.local |
+| FCC | Kiểm toán (chỉ đọc) | auditor@demo.fcc.local |
+| Nhà cung cấp | Chủ tổ chức | owner.supplier@demo.fcc.local |
+| Nhà cung cấp | Người phê duyệt | approver.supplier@demo.fcc.local |
+| Nhà cung cấp | Người lập hồ sơ | operator.supplier@demo.fcc.local |
+| Bên mua | Chủ tổ chức | owner.buyer@demo.fcc.local |
+| Bên mua | Người phê duyệt | approver.buyer@demo.fcc.local |
+| Bên mua | Người lập hồ sơ | operator.buyer@demo.fcc.local |
+| Tổ chức tài chính | Chủ tổ chức | owner.lender@demo.fcc.local |
+| Tổ chức tài chính | Chuyên viên thẩm định | analyst.lender@demo.fcc.local |
+| Tổ chức tài chính | Quản lý sản phẩm | product_manager.lender@demo.fcc.local |
+
+Gợi ý chọn tài khoản theo việc cần thử: dùng **chủ tổ chức** để cài đặt và mời người; **người phê duyệt** để xác nhận, gửi yêu cầu báo giá, chấp thuận (cần MFA); **người lập hồ sơ** để nhập hóa đơn (thử xem các nút cam kết có bị chặn không). Tổ chức tài chính chỉ đăng sản phẩm và báo giá được sau khi FCC xác minh.
 
 ### 1.2. Bật xác thực 2 bước (bắt buộc cho thao tác quan trọng)
 Các thao tác có ảnh hưởng tài chính đều cần **mã 6 số** từ ứng dụng xác thực trên điện thoại (Google Authenticator, Microsoft Authenticator…). Làm một lần:
