@@ -107,7 +107,7 @@ describe('phí và doanh thu theo 6 nguồn', () => {
     expect(html.status).toBe(200)
     expect(html.text).toContain('Bảng kê phí dịch vụ FCC')
     expect(html.text).toContain('Phí giao dịch tài trợ')
-    expect((await call('GET', link.body.url.replace(/sig=\w/, 'sig=0'))).status).toBe(403)
+    expect((await call('GET', link.body.url.replace(/sig=(\w)/, (_, c) => `sig=${c === '0' ? '1' : '0'}`))).status).toBe(403)
     const before = (await call('GET', '/v1/fees', undefined, S)).body.charges.length
     const csv = await call('GET', '/v1/exports/receivables.csv', undefined, S)
     expect(csv.status).toBe(200)

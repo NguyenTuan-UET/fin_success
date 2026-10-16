@@ -35,7 +35,7 @@ export interface Org {
   /** Website của doanh nghiệp (do doanh nghiệp khai, đồng ý cho FCC đọc công khai để gợi ý bằng chứng ESG) */
   website?: string
   /** FCC đã xác minh ánh xạ MST ↔ mã chứng khoán của bên mua niêm yết (lần đầu bằng tay) */
-  listedVerified?: { by: string; at: string }
+  listedVerified?: { symbol: string; by: string; at: string; note?: string }
   /** Xác minh danh tính người đại diện (eKYC qua nhà cung cấp, hoặc FCC đối chiếu giấy tờ) */
   kyc?: OrgKyc
   /** Tổ chức tài chính giả lập (sim-bank) — phase hiện tại chưa kết nối ngân hàng thật */

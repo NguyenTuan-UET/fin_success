@@ -126,7 +126,7 @@ describe('xác minh người đại diện (KYC) với giấy tờ trong kho t�
     const file = await app.inject({ method: 'GET', url: u.body.url })
     expect(file.statusCode).toBe(200)
     expect(file.body).toContain('giấy tờ')
-    expect((await app.inject({ method: 'GET', url: u.body.url.replace(/sig=\w/, 'sig=0') })).statusCode).toBe(403)
+    expect((await app.inject({ method: 'GET', url: u.body.url.replace(/sig=(\w)/, (_, c) => `sig=${c === '0' ? '1' : '0'}`) })).statusCode).toBe(403)
     const d = await act(adm, 'decideKyc', S.orgId, true)
     expect(d.status, JSON.stringify(d.body)).toBe(200)
     expect(d.body.state.orgs.find((o: Json) => o.id === S.orgId).kyc).toMatchObject({ status: 'verified', method: 'manual_documents' })

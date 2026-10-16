@@ -2,7 +2,7 @@
 """Lấy dữ liệu bên mua niêm yết qua vnstock (>= 4.0) và ghi JSON cho web demo FCC.
 
 Cách dùng (từ thư mục gốc dự án, dùng venv đã cài vnstock):
-    .venv/bin/python scripts/fetch_listed.py HPG --tax-code <MST> [--out web-legacy/public/listed]
+    .venv/bin/python scripts/fetch_listed.py HPG --tax-code <MST> [--out server/seed/listed]
 
 Biến môi trường đọc từ scripts/.env (gitignored) nếu chưa có trong môi trường:
     VNSTOCK_API_KEY=...            khóa cộng đồng/sponsor của vnstock
@@ -103,7 +103,7 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("symbol")
     ap.add_argument("--tax-code", required=True, help="MST của doanh nghiệp (ánh xạ MST ↔ mã CK, xác minh thủ công lần đầu)")
-    ap.add_argument("--out", default=str(HERE.parent / "web-legacy" / "public" / "listed"))
+    ap.add_argument("--out", default=str(HERE.parent / "server" / "seed" / "listed"))
     ap.add_argument("--exchange", default="HOSE")
     ap.add_argument("--years", type=int, default=3)
     a = ap.parse_args()

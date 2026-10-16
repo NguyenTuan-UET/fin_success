@@ -18,7 +18,7 @@ let fccUrl = ''
 
 beforeAll(async () => {
   // FCC ở chế độ dev (không MFA, sản phẩm tự công bố) — test tập trung vào hành vi ngân hàng giả lập
-  fcc = await buildApp({ dbUrl: DB, dbSchema: schema, listedDir: '../web-legacy/public/listed', dataKey: randomBytes(32).toString('hex'), filesDir: mkdtempSync(join(tmpdir(), 'fcc-sim-')), devAutologin: true })
+  fcc = await buildApp({ dbUrl: DB, dbSchema: schema, listedDir: '../server/seed/listed', dataKey: randomBytes(32).toString('hex'), filesDir: mkdtempSync(join(tmpdir(), 'fcc-sim-')), devAutologin: true })
   await fcc.listen({ port: 0, host: '127.0.0.1' })
   fccUrl = `http://127.0.0.1:${(fcc.server.address() as AddressInfo).port}`
   // cấp phát trước để biết khóa, rồi dựng sim-bank và cập nhật địa chỉ webhook theo cổng thật

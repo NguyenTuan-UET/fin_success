@@ -381,6 +381,8 @@ export const ENDPOINTS: Endpoint[] = [
       const v = view(core, s.a!.activeOrgId)
       return v.external.filter((e) => e.orgId === id).map((e) => ({ ...e, source: core.getState().sources.find((x) => x.id === e.sourceId)?.name, label: 'Nguồn công khai – tham khảo', status: e.disputed ? 'Đang được xem xét' : e.resolution ? `Đã xử lý khiếu nại: ${e.resolution.outcome === 'upheld' ? 'chấp nhận' : 'giữ nguyên'}` : undefined }))
     } },
+  { method: 'POST', path: '/v1/organizations/{id}/listed-verification', tag: 'Dữ liệu công khai', summary: 'FCC xác minh ánh xạ MST ↔ mã chứng khoán của bên mua (điều kiện để nạp dữ liệu niêm yết)', auth: 'user', action: 'verifyListed', args: (s) => [P(s, 'id'), B(s).note], body: { note: 'string' } },
+  { method: 'POST', path: '/v1/organizations/{id}/listed-flags', tag: 'Dữ liệu công khai', summary: 'FCC nhập ý kiến kiểm toán / diện giao dịch từ công bố thông tin (không có trong vnstock)', auth: 'user', action: 'setListedFlags', args: (s) => [P(s, 'id'), B(s)], body: { auditOpinion: 'string', tradingStatus: 'string', note: 'string' } },
   { method: 'POST', path: '/v1/external-records/{id}/disputes', tag: 'Dữ liệu công khai', summary: 'Doanh nghiệp khiếu nại sai lệch dữ liệu công khai về mình', auth: 'user', action: 'disputeExternal', args: (s) => [P(s, 'id'), B(s).reason], body: { reason: 'string' } },
   { method: 'POST', path: '/v1/external-records/{id}/resolution', tag: 'Dữ liệu công khai', summary: 'FCC xử lý khiếu nại (upheld gỡ bản ghi; rejected giữ nguyên)', auth: 'user', action: 'resolveExternal', args: (s) => [P(s, 'id'), B(s).outcome, B(s).note], body: { outcome: 'upheld|rejected', note: 'string' } },
 

@@ -26,7 +26,7 @@ const app = await buildApp({
   dataKey: ObjectStore.keyFor(dev, resolve('data')),
   filesDir: resolve(process.env.FILES_DIR ?? 'data/objects'),
   appUrl: process.env.APP_URL ?? 'http://localhost:3000',
-  listedDir: resolve(process.env.LISTED_DIR ?? '../web-legacy/public/listed'),
+  listedDir: resolve(process.env.LISTED_DIR ?? 'seed/listed'),
   admin: !dev && email && password ? { email, password } : undefined,
   ollamaKey: process.env.OLLAMA_API_KEY || undefined,
   ollamaBase: process.env.OLLAMA_BASE_URL || undefined,

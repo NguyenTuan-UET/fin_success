@@ -1,5 +1,6 @@
 "use client";
 
+import { PublicData } from "@/components/screens/PublicData";
 import { useEffect, useMemo, useState } from "react";
 import { Sparkles } from "lucide-react";
 import type { FundingApplication } from "@fcc/domain/types";
@@ -177,6 +178,11 @@ export function LenderAppraisal() {
           </div>
 
           <Disclaimer>Xếp hạng tham khảo FCC — không phải quyết định tín dụng. Bạn tự thẩm định, ra quyết định, ký hợp đồng và giải ngân.</Disclaimer>
+
+          <div className="card stack">
+            <h2 className="ct">Dữ liệu công khai về người bán</h2>
+            <PublicData orgId={r.sellerId} empty="Chưa có dữ liệu công khai được chia sẻ cho bạn." />
+          </div>
 
           <div className="card stack">
             <h2 className="ct">Quyết định</h2>

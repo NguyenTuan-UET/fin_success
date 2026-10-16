@@ -8,6 +8,7 @@ import { date, dateTime } from "@/lib/format";
 import { orgName } from "@/lib/model";
 import { useData } from "@/lib/session";
 import { PageHeader } from "@/components/ui/basic";
+import { PublicData } from "@/components/screens/PublicData";
 import { useToast } from "@/components/providers/Toast";
 import type { Role } from "@/lib/roles";
 
@@ -84,6 +85,7 @@ export function SettingsPanel({ role }: { role: Role }) {
           {([["name", "Tên đầy đủ"], ["shortName", "Tên viết tắt"], ["vsic", "Mã ngành VSIC"], ["industryLabel", "Ngành nghề"], ["province", "Tỉnh/thành"], ["foundedYear", "Năm thành lập"], ["employees", "Số lao động"]] as const).map(([k, label]) => (
             <label key={k} className="field"><span>{label}</span><input className="input" disabled={!isOwner || org.type === "fcc"} value={val(k)} onChange={(e) => upd(k, (typeof org[k] === "number" ? Number(e.target.value.replace(/\D/g, "")) : e.target.value) as never)} /></label>
           ))}
+          {(org.type === "supplier" || org.type === "buyer") && <label className="field"><span>Website doanh nghiệp (để FCC đọc chứng nhận công bố)</span><input className="input" disabled={!isOwner} placeholder="https://" value={val("website")} onChange={(e) => upd("website", e.target.value.trim())} /></label>}
           {org.type === "buyer" && <label className="field"><span>Mã chứng khoán (nếu niêm yết)</span><input className="input" disabled={!isOwner} value={val("listedSymbol")} onChange={(e) => upd("listedSymbol", e.target.value.toUpperCase())} /></label>}
         </div>
         {isOwner && org.type !== "fcc" && <button className="btn bp" style={{ alignSelf: "flex-start" }} disabled={busy || !Object.keys(profile).length} onClick={() => run(async () => { await act("POST", "/v1/organizations/me", profile); setProfile({}); }, "Đã cập nhật hồ sơ")}>Lưu hồ sơ</button>}
@@ -103,6 +105,14 @@ export function SettingsPanel({ role }: { role: Role }) {
               }, "Đã nộp hồ sơ xác minh")}>Nộp hồ sơ xác minh</button>
             </div>
           )}
+        </section>
+      )}
+
+      {(org.type === "supplier" || org.type === "buyer") && (
+        <section className="card stack">
+          <h2 className="ct">Dữ liệu công khai về tổ chức</h2>
+          <div className="muted">Thông tin FCC đọc từ nguồn công khai về doanh nghiệp bạn. Chỉ để tham khảo khi thẩm định, không tự động đổi điểm. Nếu có sai lệch, bạn có thể khiếu nại.</div>
+          <PublicData orgId={org.id} canDispute={["owner", "approver"].includes(me.role)} />
         </section>
       )}
 

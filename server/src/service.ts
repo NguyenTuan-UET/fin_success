@@ -772,6 +772,7 @@ export const actions: Record<string, Action> = {
     const sym = String(symbol ?? '').trim().toUpperCase()
     if (!/^[A-Z0-9]{2,6}$/.test(sym)) throw bad('Mã chứng khoán không hợp lệ')
     if (sym !== c.actor.listedSymbol.toUpperCase()) throw forbidden(`Tổ chức chỉ được nạp dữ liệu của mã ${c.actor.listedSymbol}`)
+    if (c.actor.listedVerified?.symbol !== sym) throw forbidden('FCC chưa xác minh ánh xạ MST ↔ mã chứng khoán; liên hệ FCC để xác minh trước khi nạp dữ liệu niêm yết')
     let j: { snapshot: Omit<ListedSnapshot, 'orgId'>; financials: Omit<FinancialYear, 'status'>[] }
     try {
       j = JSON.parse(readFileSync(join(c.listedDir, `${sym}.json`), 'utf8'))
@@ -784,6 +785,26 @@ export const actions: Record<string, Action> = {
     c.s.profiles = c.s.profiles.map((p) => (p.orgId === snap.orgId && financials.length ? { ...p, financials } : p))
     log(c, 'Cập nhật dữ liệu niêm yết', snap.symbol, `${snap.provider} · ${financials.length} năm BCTC`)
     return snap
+  },
+  /** FCC xác minh bên mua đúng là chủ sở hữu mã chứng khoán đã khai (đối chiếu MST với công bố của sở giao dịch) trước khi nạp dữ liệu niêm yết. */
+  verifyListed(c, orgId: string, note: string) {
+    if (c.actor.type !== 'fcc') throw forbidden('Chỉ FCC xác minh mã chứng khoán')
+    const o = c.s.orgs.find((x) => x.id === orgId)
+    if (!o || o.type !== 'buyer' || !o.listedSymbol) throw notFound('Tổ chức không phải bên mua có mã chứng khoán')
+    if (String(note ?? '').trim().length < 10) throw bad('Cần ghi căn cứ đối chiếu MST ↔ mã chứng khoán (≥ 10 ký tự)')
+    c.s.orgs = c.s.orgs.map((x) => (x.id === orgId ? { ...x, listedVerified: { symbol: x.listedSymbol!, by: c.userId ?? c.actor.shortName, at: c.now.toISOString(), note: note.trim() } } : x))
+    log(c, 'Xác minh mã chứng khoán', orgId, `${o.listedSymbol} — ${note.trim()}`)
+  },
+  /** Ý kiến kiểm toán và diện cảnh báo không có trong vnstock: FCC nhập từ công bố thông tin của sở giao dịch, kèm căn cứ. */
+  setListedFlags(c, orgId: string, flags: { auditOpinion?: ListedSnapshot['auditOpinion']; tradingStatus?: ListedSnapshot['tradingStatus']; note: string }) {
+    if (c.actor.type !== 'fcc') throw forbidden('Chỉ FCC nhập ý kiến kiểm toán / diện cảnh báo')
+    const l = c.s.listed.find((x) => x.orgId === orgId)
+    if (!l) throw notFound('Chưa có dữ liệu niêm yết của tổ chức này')
+    if (flags.auditOpinion && !['unqualified', 'qualified', 'adverse', 'disclaimer'].includes(flags.auditOpinion)) throw bad('Ý kiến kiểm toán không hợp lệ')
+    if (flags.tradingStatus && !['normal', 'warning', 'controlled', 'restricted'].includes(flags.tradingStatus)) throw bad('Diện giao dịch không hợp lệ')
+    if (String(flags.note ?? '').trim().length < 10) throw bad('Cần ghi nguồn công bố (≥ 10 ký tự)')
+    c.s.listed = c.s.listed.map((x) => (x.orgId === orgId ? { ...x, auditOpinion: flags.auditOpinion ?? x.auditOpinion, tradingStatus: flags.tradingStatus ?? x.tradingStatus } : x))
+    log(c, 'Cập nhật ý kiến kiểm toán/diện giao dịch', orgId, `${flags.auditOpinion ?? ''} ${flags.tradingStatus ?? ''} — ${flags.note.trim()}`)
   },
   upsertFinancialYear(c, orgId: string, fy: FinancialYear) {
     requireSelf(c, orgId)

@@ -123,6 +123,7 @@ export const ROLES: Record<Role, RoleMeta> = {
       { href: "/admin", label: "Bảng điều khiển", icon: "overview" },
       { href: "/admin#users", label: "Người dùng & quyền", icon: "users" },
       { href: "/admin/esg", label: "Thẩm định ESG", icon: "esg" },
+      { href: "/admin/sources", label: "Nguồn dữ liệu công khai", icon: "shield" },
       { href: "/admin#security", label: "Bảo mật & gian lận", icon: "shield" },
       { href: "/admin/settings", label: "Cài đặt hệ thống", icon: "settings" },
     ],

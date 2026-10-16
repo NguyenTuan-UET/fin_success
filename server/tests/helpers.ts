@@ -10,7 +10,7 @@ import { Database } from '../src/state'
  * Mỗi file test dùng một schema riêng và xóa schema khi kết thúc.
  */
 export const TEST_DB_URL = process.env.TEST_DATABASE_URL ?? `postgres://fcc@/fcc_test?host=${resolve('data/pg-run')}&port=5433`
-export const LISTED_DIR = '../web-legacy/public/listed'
+export const LISTED_DIR = 'seed/listed'
 
 export const newSchema = () => `t_${randomBytes(6).toString('hex')}`
 

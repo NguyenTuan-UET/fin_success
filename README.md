@@ -52,7 +52,7 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt   # vnstock 4
 .venv/bin/python scripts/fetch_listed.py HPG --tax-code <MST>
 ```
 
-- Script ghi `web-legacy/public/listed/<MÃ>.json`. Bên mua niêm yết (đã khai mã chứng khoán ở *Cài đặt*) vào *Chấm điểm DN* → **Nạp dữ liệu từ vnstock**; máy chủ đọc đúng file của mã đó và từ chối mã khác với mã đã khai. Repo có sẵn `HPG.json`, `CTD.json` (dữ liệu thật lấy ngày 12/10/2026); công ty thật có mã tương ứng đăng ký sẽ dùng được ngay.
+- Script ghi `server/seed/listed/<MÃ>.json`. Bên mua niêm yết (đã khai mã chứng khoán ở *Cài đặt*) vào *Chấm điểm DN* → **Nạp dữ liệu từ vnstock**; máy chủ đọc đúng file của mã đó và từ chối mã khác với mã đã khai. Repo có sẵn `HPG.json`, `CTD.json` (dữ liệu thật lấy ngày 12/10/2026); công ty thật có mã tương ứng đăng ký sẽ dùng được ngay.
 - **Lưu ý dữ liệu (vnstock 4.0.9):** nguồn mặc định KBS trả BCTC năm với **nhãn năm bị đảo** (cột "2025" chứa số liệu 2022 của HPG; quý cũng lệch). Script dùng nguồn **VCI** (nhãn đúng, đã đối chiếu: tổng 4 quý 2025 của HPG = doanh thu năm 2025 = 156,1 nghìn tỷ) và dừng nếu thứ tự năm bất thường.
 - Bản Cộng đồng: 60 lượt/phút, tối đa 8 kỳ BCTC. Ý kiến kiểm toán và diện cảnh báo không có trong vnstock — đang để mặc định, cần đối chiếu nguồn công bố thông tin.
 - Quyền riêng tư: vnai đăng ký thiết bị với vnstocks.com (mặc định băm hostname) và có telemetry tùy chọn — đặt `VNSTOCK_DEVICE_ID` trung tính và `VNSTOCK_TELEMETRY=off`. Bản 4.0.9 không còn tự ghi vào file hướng dẫn của trợ lý AI (`~/.claude/CLAUDE.md`…) khi import; vẫn đặt `VNSTOCK_DISABLE_AGENT_SETUP=1` để chặn.

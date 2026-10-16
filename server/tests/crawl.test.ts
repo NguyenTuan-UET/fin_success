@@ -170,3 +170,25 @@ describe('tra cứu thủ công và khiếu nại', () => {
     expect(app.getState().external.find((x) => x.id === r2.id)).toMatchObject({ disputed: false, resolution: { outcome: 'rejected' } })
   })
 })
+
+describe('dữ liệu niêm yết (vnstock): chỉ nạp sau khi FCC xác minh ánh xạ MST ↔ mã', () => {
+  it('chưa xác minh → 403; sau xác minh nạp được đúng mã; FCC nhập ý kiến kiểm toán kèm căn cứ', async () => {
+    const F = await session('fcc')
+    const B = await session('buyer')
+    const buyer = app.getState().orgs.find((o) => o.type === 'buyer')!
+    expect((await act(B, 'updateOrg', { listedSymbol: 'HPG', exchange: 'HOSE' })).status).toBe(200)
+    expect((await act(B, 'refreshListed', 'HPG')).status).toBe(403)
+    expect((await act(B, 'verifyListed', buyer.id, 'tự xác minh bản thân')).status).toBe(403)
+    expect((await post(`/v1/organizations/${buyer.id}/listed-verification`, { note: 'ngắn' }, F)).status).toBe(422)
+    expect((await post(`/v1/organizations/${buyer.id}/listed-verification`, { note: 'Đối chiếu MST với công bố thông tin trên HOSE ngày 16/10/2026' }, F)).status).toBe(200)
+    expect((await act(B, 'refreshListed', 'HPG')).status).toBe(200)
+    expect(app.getState().listed.find((l) => l.orgId === buyer.id)?.symbol).toBe('HPG')
+    expect((await post(`/v1/organizations/${buyer.id}/listed-flags`, { auditOpinion: 'qualified', note: 'x' }, F)).status).toBe(422)
+    expect((await post(`/v1/organizations/${buyer.id}/listed-flags`, { auditOpinion: 'qualified', tradingStatus: 'warning', note: 'BCTC kiểm toán 2025 công bố trên HOSE' }, F)).status).toBe(200)
+    expect(app.getState().listed.find((l) => l.orgId === buyer.id)).toMatchObject({ auditOpinion: 'qualified', tradingStatus: 'warning' })
+    // đổi mã → mất xác minh
+    await act(B, 'updateOrg', { listedSymbol: 'CTD' })
+    expect(app.getState().orgs.find((o) => o.id === buyer.id)?.listedVerified).toBeUndefined()
+    expect((await act(B, 'refreshListed', 'CTD')).status).toBe(403)
+  })
+})
