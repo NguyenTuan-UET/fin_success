@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { Check, Minus } from "lucide-react";
 import { api } from "@/lib/api";
-import { date, dateTime } from "@/lib/format";
+import { date, dateTime, money } from "@/lib/format";
 import { useData } from "@/lib/session";
 import { Kpi, PageHeader } from "@/components/ui/basic";
 import { useToast } from "@/components/providers/Toast";
@@ -50,6 +50,9 @@ export default function AdminPage() {
   const [versions, setVersions] = useState<Ver[]>([]);
   type Rev = { bySource: { source: string; label: string; total: number; count: number; paid: number }[]; total: number; paid: number };
   const [rev, setRev] = useState<Rev | null>(null);
+  type Step = { avgDays: number | null; samples: number };
+  type Kpis = { users: number; receivables: { total: number; totalAmount: number }; financed: { count: number; amount: number }; approvalRate: number | null; disputeRate: number | null; stepTimes: Record<"createdToBuyerConfirmed" | "submittedToDecision" | "decisionToFunded" | "fundedToSettled", Step>; exceptions: { openInvoiceFlags: number; openRefunds: number; disputedPublicData: number } };
+  const [kpis, setKpis] = useState<Kpis | null>(null);
   const [schedules, setSchedules] = useState<{ id: string; name: string; params: Record<string, unknown>; effectiveFrom: string }[]>([]);
   const [feeForm, setFeeForm] = useState<{ name: string; transactionPct: string; supplier: string; buyer: string; lender: string; scoringFee: string; apiMonthlyPerKey: string; reportFee: string; referralPctOfFees: string; effectiveFrom: string } | null>(null);
   const loadScoring = useCallback(async () => {
@@ -57,6 +60,7 @@ export default function AdminPage() {
     setAppeals(await api<Appeal[]>("GET", "/v1/appeals?status=open").catch(() => []));
     setVersions((await api<{ versions: Ver[] }>("GET", "/v1/operations/scorecard-versions").catch(() => ({ versions: [] }))).versions);
     setRev(await api<Rev>("GET", "/v1/operations/revenue").catch(() => null));
+    setKpis(await api<Kpis>("GET", "/v1/operations/kpis").catch(() => null));
     setSchedules(await api<typeof schedules>("GET", "/v1/operations/fee-schedules").catch(() => []));
   }, []);
   // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -77,6 +81,27 @@ export default function AdminPage() {
         <Kpi label="Sản phẩm chờ duyệt" value={String(productsPending.length)} />
         <Kpi label="Hồ sơ ESG chưa phát hành" value={String(esgPending.length)} note={<Link href="/admin/esg">Thẩm định</Link>} />
       </section>
+
+      {kpis && (
+        <section className="stack-sm">
+          <div className="grid-kpi">
+            <Kpi label="Người dùng" value={String(kpis.users)} />
+            <Kpi label="Khoản phải thu trên nền tảng" value={String(kpis.receivables.total)} note={`${money(kpis.receivables.totalAmount)} tổng giá trị`} />
+            <Kpi label="Giá trị đã tài trợ" value={money(kpis.financed.amount)} note={`${kpis.financed.count} hồ sơ đã giải ngân`} />
+            <Kpi label="Tỷ lệ phê duyệt" value={kpis.approvalRate === null ? "—" : `${kpis.approvalRate}%`} note="hồ sơ đã quyết định, không bị từ chối" />
+            <Kpi label="Tỷ lệ tranh chấp" value={kpis.disputeRate === null ? "—" : `${kpis.disputeRate}%`} tone={kpis.disputeRate && kpis.disputeRate > 10 ? "bad" : undefined} note="khoản đã gửi bên mua từng bị tranh chấp" />
+          </div>
+          <div className="card stack-sm">
+            <b>Thời gian trung bình từng bước (ngày)</b>
+            <div className="grid-fields" style={{ fontSize: 13 }}>
+              {([["createdToBuyerConfirmed", "Tạo hóa đơn → bên mua xác nhận"], ["submittedToDecision", "Nộp hồ sơ → quyết định"], ["decisionToFunded", "Quyết định → giải ngân"], ["fundedToSettled", "Giải ngân → tất toán"]] as const).map(([k, label]) => (
+                <div key={k}><div className="muted">{label}</div><div className="num strong">{kpis.stepTimes[k].avgDays === null ? "—" : kpis.stepTimes[k].avgDays}<span className="muted"> ({kpis.stepTimes[k].samples} mẫu)</span></div></div>
+              ))}
+            </div>
+            <div className="muted">Ngoại lệ đang mở: {kpis.exceptions.openInvoiceFlags} cờ hóa đơn · {kpis.exceptions.openRefunds} hoàn tiền chưa trả · {kpis.exceptions.disputedPublicData} khiếu nại dữ liệu công khai.</div>
+          </div>
+        </section>
+      )}
 
       <section className="card flush" id="users">
         <div className="ch"><h2 className="ct">Hàng đợi xác minh</h2></div>

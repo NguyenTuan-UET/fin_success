@@ -30,6 +30,9 @@ const app = await buildApp({
   admin: !dev && email && password ? { email, password } : undefined,
   ollamaKey: process.env.OLLAMA_API_KEY || undefined,
   ollamaBase: process.env.OLLAMA_BASE_URL || undefined,
+  // dev: tắt (nhiều vai trò thử cùng một địa chỉ); staging/production: bật, chỉnh bằng RATE_LIMIT_PER_MIN / RATE_LIMIT_AUTH_PER_MIN
+  rateLimit: dev ? false : { perMinute: Number(process.env.RATE_LIMIT_PER_MIN ?? 600), authPerMinute: Number(process.env.RATE_LIMIT_AUTH_PER_MIN ?? 30) },
+  trustProxy: process.env.TRUST_PROXY === '1',
 })
 await app.sweep()
 const port = Number(process.env.PORT ?? 8787)

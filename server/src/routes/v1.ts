@@ -1,5 +1,6 @@
 // API REST /v1. Bảng ENDPOINTS là nguồn duy nhất: vừa đăng ký route, vừa sinh tài liệu OpenAPI (GET /v1/openapi.json).
 // Hành động ghi chạy qua cùng luật nghiệp vụ (service.ts) và cùng ma trận quyền/MFA như giao diện.
+import { operationsKpis } from '../kpis'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { createHash, randomBytes } from 'node:crypto'
 import { matchProduct, rankMatches } from '@fcc/domain/marketplace'
@@ -330,6 +331,11 @@ export const ENDPOINTS: Endpoint[] = [
       const xs = all.filter((e) => (!s.query.from || e.at >= s.query.from) && (!s.query.to || e.at <= s.query.to))
       return page(xs, s.query)
     } },
+  { method: 'GET', path: '/v1/operations/kpis', tag: 'Vận hành', summary: 'Chỉ số vận hành: người dùng, hóa đơn, giá trị tài trợ, tỷ lệ phê duyệt, thời gian từng bước, tỷ lệ tranh chấp, ngoại lệ (FCC)', auth: 'user',
+    run: async (s, core) => {
+      if (orgOf(core, s.a!.activeOrgId)?.type !== 'fcc') throw forbidden('Chỉ nhân sự FCC')
+      return operationsKpis(core.getState(), await core.db.countUsers())
+    } },
   { method: 'GET', path: '/v1/audit-events/integrity', tag: 'Nhật ký', summary: 'Kiểm tra chuỗi băm nhật ký (FCC)', auth: 'user',
     run: async (s, core) => {
       if (orgOf(core, s.a!.activeOrgId)?.type !== 'fcc') throw forbidden('Chỉ nhân sự FCC')
@@ -648,6 +654,8 @@ export function v1Routes(app: FastifyInstance, core: Core) {
       handler: async (req, reply) => {
         const s: Src = { params: req.params as Record<string, string>, body: (req.body ?? {}) as Json, query: req.query as Src['query'], req, reply }
         if (ep.auth === 'user') s.a = await core.auth(req)
+        // mọi lần kiểm toán viên truy cập đều được ghi vào nhật ký (trừ các lần đồng bộ nền)
+        if (s.a?.role === 'fcc_auditor' && !/^\/v1\/(me|snapshot|events)/.test(req.url)) await core.audit(s.a.activeOrgId, s.a.id, 'Kiểm toán viên truy cập', `${req.method} ${req.url.split('?')[0]}`, 'Truy cập chỉ đọc', req.id)
         if (ep.auth === 'partner') s.p = await partnerAuth(core.db, req, ep.scope!)
 
         // Idempotency-Key cho mọi POST/PUT: gọi lặp cùng khóa trả lại đúng kết quả lần đầu

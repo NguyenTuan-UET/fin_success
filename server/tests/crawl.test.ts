@@ -192,3 +192,37 @@ describe('dữ liệu niêm yết (vnstock): chỉ nạp sau khi FCC xác minh �
     expect((await act(B, 'refreshListed', 'CTD')).status).toBe(403)
   })
 })
+
+describe('KPI vận hành', () => {
+  it('chỉ FCC xem được; số liệu tính từ dữ liệu thật', async () => {
+    const F = await session('fcc')
+    const S = await session('supplier')
+    expect((await call('GET', '/v1/operations/kpis', undefined, S)).status).toBe(403)
+    const k = (await call('GET', '/v1/operations/kpis', undefined, F)).body
+    const st = app.getState()
+    expect(k.orgs.total).toBe(st.orgs.length)
+    expect(k.receivables.total).toBe(st.receivables.length)
+    expect(k.users).toBeGreaterThan(0)
+    expect(k.approvalRate === null || (k.approvalRate >= 0 && k.approvalRate <= 100)).toBe(true)
+    expect(k.exceptions.disputedPublicData).toBe(st.external.filter((e) => e.disputed).length)
+  })
+})
+
+describe('giới hạn tần suất và nhật ký kiểm toán viên', () => {
+  it('đăng nhập sai quá nhiều → 429; tiêu đề bảo mật có mặt', async () => {
+    const schema2 = newSchema()
+    const a2 = await startApp(schema2, { rateLimit: { perMinute: 1000, authPerMinute: 3 } })
+    try {
+      const codes: number[] = []
+      for (let i = 0; i < 5; i++) codes.push((await a2.inject({ method: 'POST', url: '/api/auth/login', payload: { email: 'x@example.test', password: 'sai-mat-khau' } })).statusCode)
+      expect(codes.slice(0, 3).every((c) => c !== 429)).toBe(true)
+      expect(codes.slice(3)).toEqual([429, 429])
+      const h = await a2.inject({ method: 'GET', url: '/v1/openapi.json' })
+      expect(h.headers['x-content-type-options']).toBe('nosniff')
+      expect(h.headers['cache-control']).toBe('no-store')
+    } finally {
+      await a2.close()
+      await dropSchema(schema2)
+    }
+  })
+})

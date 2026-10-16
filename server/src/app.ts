@@ -1,3 +1,4 @@
+import { DEFAULT_RATE_LIMIT, installLimits, type RateLimitOptions } from './limits'
 import Fastify, { type FastifyInstance, type FastifyRequest } from 'fastify'
 import { randomUUID } from 'node:crypto'
 import { Database, type State } from './state'
@@ -40,6 +41,10 @@ export interface AppOptions {
   mailer?: Mailer
   /** Tùy chọn crawler (kiểm thử: fetch giả, cho phép địa chỉ nội bộ, bỏ giãn cách) */
   crawl?: CrawlOptions
+  /** Giới hạn tần suất; mặc định bật (tắt khi chạy kiểm thử trừ khi truyền vào) */
+  rateLimit?: RateLimitOptions | false
+  /** Chỉ bật khi máy chủ đứng sau proxy tin cậy (nginx, Next) để lấy địa chỉ thật từ X-Forwarded-For */
+  trustProxy?: boolean
 }
 
 export type FccApp = FastifyInstance & { db: Database; core: Core; sweep: () => Promise<void>; getState: () => State; deliverWebhooks: () => Promise<unknown>; deliverEmails: () => Promise<number>; processCrawl: () => Promise<number>; routes: { method: string; url: string }[] }
@@ -55,6 +60,7 @@ export async function buildApp(opt: AppOptions): Promise<FccApp> {
   const app = Fastify({
     logger: process.env.NODE_ENV === 'test' ? false : { level: 'info', redact: ['req.headers.authorization', 'req.headers["x-fcc-signature"]'] },
     bodyLimit: 25 * 1024 * 1024,
+    trustProxy: !!opt.trustProxy,
     genReqId: (req) => String(req.headers['x-request-id'] ?? '').slice(0, 64) || randomUUID(),
   })
   const routes: { method: string; url: string }[] = []
@@ -64,6 +70,7 @@ export async function buildApp(opt: AppOptions): Promise<FccApp> {
   app.addHook('onSend', async (req, reply) => {
     reply.header('x-request-id', req.id)
   })
+  installLimits(app, opt.rateLimit ?? (process.env.NODE_ENV === 'test' ? false : DEFAULT_RATE_LIMIT))
 
   // giữ nguyên thân thô để kiểm tra chữ ký webhook
   app.addContentTypeParser('application/json', { parseAs: 'string' }, (req, body, done) => {

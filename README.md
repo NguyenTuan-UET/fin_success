@@ -1,48 +1,54 @@
 # fin_success — FCC (Fast Cash Connect)
 
-Nền tảng tài trợ chuỗi cung ứng cho **bên mua**, **bên bán (SME/gia công)** và **tổ chức tài chính**: chấm điểm doanh nghiệp, chấm điểm ESG bằng AI, Marketplace tài chính, tổng quan và dự báo dòng tiền từ phần mềm kế toán.
+Nền tảng tài trợ chuỗi cung ứng cho **bên mua**, **bên bán (SME/gia công)** và **tổ chức tài chính**: chấm điểm tín dụng và ESG, Marketplace tài chính (RFQ → thẩm định → giải ngân → thu hồi), bút toán đề xuất, dự báo dòng tiền, phí và doanh thu theo 6 nguồn thu.
 
-- Đặc tả: [document/SPEC_FCC_MVP.md](document/SPEC_FCC_MVP.md)
+Phase này **không kết nối ngân hàng thật**: phía ngân hàng/tổ chức tài chính do [sim-bank/](sim-bank/) giả lập (tổ chức hư cấu, đi qua đúng API đối tác và webhook ký HMAC). Mọi chức năng còn lại chạy thật.
+
+- Đặc tả: [document/SPEC_FCC_MVP.md](document/SPEC_FCC_MVP.md); kế hoạch hoàn thiện và trạng thái từng gói việc: [document/SPEC_HOAN_THIEN.md](document/SPEC_HOAN_THIEN.md); vận hành: [document/VAN_HANH.md](document/VAN_HANH.md)
 - Phương pháp: [5C](document/Phương%20pháp%20đánh%20giá%20tín%20dụng%20SME%20theo%20mô%20hình%205C.md), [khung ESG](document/Khung%20chấm%20điểm%20ESG%20cho%20SMEs%20vay%20vốn%20FCC.md)
-- Frontend: [web/](web/) — **bản mock giao diện** Next.js (dữ liệu minh họa, chưa nối backend), xem [web/README.md](web/README.md). Bản frontend React + Vite nối với backend đã chuyển sang [web-legacy/](web-legacy/). Backend: [server/](server/) — Fastify + SQLite (luật nghiệp vụ, phân quyền, OTP, webhook, nhật ký).
 
-## Chạy dự án (backend + frontend)
+## Cấu trúc
 
-Cần Node ≥ 22.13 (backend dùng `node:sqlite` có sẵn). **Hệ thống khởi động với cơ sở dữ liệu trống** — không có doanh nghiệp, hóa đơn hay sản phẩm mẫu; mọi dữ liệu do người dùng khai, nhập, tải lên hoặc lấy từ nguồn thật (AI, vnstock).
+| Thư mục | Vai trò |
+| --- | --- |
+| [web/](web/) | Giao diện duy nhất (Next.js 16, React 19); gọi `/api` và `/v1` cùng nguồn, Next chuyển tiếp tới `server/`. Kiểm thử e2e Playwright |
+| [server/](server/) | Fastify 5 + PostgreSQL: luật nghiệp vụ, phân quyền theo vai trò, MFA, kho tệp mã hóa, nhật ký chuỗi băm, API công khai `/v1` (OpenAPI), SSE, webhook hai chiều, crawl nguồn công khai |
+| [packages/domain/](packages/domain/) | `@fcc/domain`: công thức chấm điểm 5C/bên mua/hồ sơ, ESG, EWS, tài sản bảo đảm, gian lận hóa đơn, thu hồi, phí, bút toán, dòng tiền — dùng chung cho server và giao diện |
+| [sim-bank/](sim-bank/) | Ngân hàng giả lập: 3 tổ chức hư cấu báo giá, thẩm định, giải ngân qua API đối tác |
+| [scripts/](scripts/) | `fetch_listed.py` (vnstock cho bên mua niêm yết) |
+| [ocr_lab/](ocr_lab/) | Thử nghiệm đọc chứng từ; `samples/` là ảnh chứng từ giả lập để thử AI |
+
+## Chạy dự án
+
+Cần Node ≥ 22.13 và PostgreSQL (dev dùng cụm riêng do script dựng, không cần sudo).
 
 ```bash
-# Terminal 1 — backend (http://127.0.0.1:8787)
+# Terminal 1 — PostgreSQL cục bộ + backend (http://127.0.0.1:8787)
 cd server
 npm install
-cp .env.example .env     # điền OLLAMA_API_KEY
-npm start                # tạo server/data/fcc.db
+scripts/pg-local.sh start
+cp .env.example .env       # điền OLLAMA_API_KEY (AI đọc chứng từ, chấm ESG, trợ lý)
+npm start
 
-# Terminal 2 — frontend nối backend (http://localhost:5173, tự chuyển /api tới backend)
-cd web-legacy
+# Terminal 2 — giao diện (http://localhost:3000)
+cd web
 npm install
 npm run dev
+
+# Terminal 3 (tùy chọn) — ngân hàng giả lập, xem sim-bank/README.md
 ```
 
-**Không có đăng nhập.** Mở http://localhost:5173 để chọn vai trò, hoặc mở thẳng trang của từng vai trò, mỗi vai trò một tab:
-- http://localhost:5173/supplier — nhà cung cấp
-- http://localhost:5173/buyer — bên mua
-- http://localhost:5173/lender — tổ chức tài chính (tự được xác minh, sản phẩm tự công bố)
-- http://localhost:5173/fcc — nhân sự FCC (chỉ cần để thẩm định/phát hành ESG chính thức)
+Cơ sở dữ liệu khởi động **trống** — không có doanh nghiệp, hóa đơn hay sản phẩm mẫu.
 
-Mỗi trang tự vào phiên của vai trò đó, dùng một tổ chức trống (không có dữ liệu mẫu); nút *Đổi vai trò* trên thanh trên cùng quay về trang chọn vai trò. Điền thông tin tổ chức (kể cả mã chứng khoán của bên mua niêm yết) ở *Cài đặt → Tổ chức → Cập nhật hồ sơ*. Vì ai vào được cổng máy chủ cũng dùng được mọi vai trò, máy chủ chỉ chạy trên localhost.
+**Chế độ dev (`FCC_ENV=dev`, mặc định, chỉ localhost):** không đăng nhập; mở http://localhost:3000 chọn vai trò hoặc vào thẳng `/supplier`, `/buyer`, `/lender`, `/admin`, mỗi vai trò một tab. **Staging/production (`FCC_ENV=staging|production`):** bắt buộc đăng nhập email/mật khẩu + MFA (TOTP) cho hành động nhạy cảm, nhiều tổ chức/vai trò theo thành viên, tài khoản FCC tạo từ `ADMIN_EMAIL`/`ADMIN_PASSWORD`; cần `DATABASE_URL`, `FCC_DATA_KEY`, HTTPS ở lớp proxy (xem [VAN_HANH.md](document/VAN_HANH.md)).
 
 **Luồng sử dụng**
-1. Nhân sự FCC (`/fcc`) vào *Quản trị FCC*: thẩm định và phát hành điểm ESG chính thức. Nhân sự FCC không xem chứng từ hay hồ sơ tài trợ.
-2. Tổ chức tài chính đăng sản phẩm Marketplace, hiện ngay cho doanh nghiệp.
-3. Nhà cung cấp tạo khoản phải thu (XML hóa đơn, ảnh/PDF qua AI OCR hoặc nhập tay) → bên mua xác nhận → RFQ tới tối đa 3 sản phẩm phù hợp → tổ chức tài chính tự báo giá → chọn báo giá → thẩm định → đề nghị chính thức → doanh nghiệp chấp thuận → giải ngân → bên mua thanh toán → tất toán.
-4. Giải ngân ghi nhận bằng nút của tổ chức tài chính hoặc **webhook** `POST /api/webhooks/funding`: mỗi tổ chức tài chính có khóa riêng (*Cài đặt → Tổ chức → Tạo khóa webhook*), header `x-fcc-org`, `x-idempotency-key`, `x-fcc-signature` = HMAC-SHA256(khóa, thân yêu cầu); gọi lặp không ghi nhận hai lần.
-5. Dòng tiền: doanh nghiệp tự khai số dư tiền và chi định kỳ, nhập file công nợ CSV; hóa đơn trên FCC tự vào dự báo; độ trễ thanh toán bên mua tính từ lịch sử thanh toán thật trên FCC.
+1. Nhân sự FCC xác minh tổ chức tài chính, duyệt sản phẩm, thẩm định/phát hành điểm ESG và điểm tín dụng, phê duyệt nguồn dữ liệu công khai.
+2. Tổ chức tài chính đăng sản phẩm Marketplace (giao diện hoặc API `/v1/partner/*`).
+3. Nhà cung cấp tạo khoản phải thu (XML, ảnh/PDF qua AI OCR hoặc nhập tay; hệ thống cảnh báo bất thường) → bên mua xác nhận → RFQ tới tối đa 3 sản phẩm → báo giá → thẩm định → đề nghị chính thức → chấp thuận (MFA) → giải ngân → bên mua thanh toán → thu hồi theo phí → lãi → gốc → hoàn phần dư.
+4. Dòng tiền, bút toán đề xuất (TT133/TT200) và sao kê giả lập sinh từ dữ liệu thật trên nền tảng; sai số dự báo được đo và hiển thị.
 
-**Kiến trúc**
-- Backend ([server/](server/)): Fastify + SQLite. Luật nghiệp vụ và phân quyền ở [server/src/service.ts](server/src/service.ts); dữ liệu trả về trình duyệt được lọc theo quyền chia sẻ ở [server/src/views.ts](server/src/views.ts). Trình duyệt tự đồng bộ mỗi 4 giây nên nhiều người dùng thấy thay đổi của nhau.
-- AI: trình duyệt gọi `/api/ollama/chat` (cần có phiên); backend gắn khóa ollama.com (chỉ ở `server/.env`). Khi AI lỗi, tác vụ báo lỗi để nhập tay — không tự điền số liệu thay AI.
-- Tác vụ định kỳ mỗi phút: RFQ quá hạn → hết hạn và thu hồi quyền xem; đề nghị quá hạn chấp thuận → rút lại; khoản đến hạn chưa thanh toán → `OVERDUE`.
-- Kiểm thử: `cd server && npm test` (luồng end-to-end qua API từ CSDL trống, kèm phân quyền, webhook, khởi động lại); `cd packages/domain && npm test` (công thức chấm điểm, dùng chung cho server và giao diện).
+**Kiểm thử:** `cd server && npm test` (API từ CSDL trống, phân quyền, MFA, webhook, crawl, thanh toán…); `cd packages/domain && npm test`; `cd sim-bank && npm test`; `cd web && npm run e2e` (Playwright, cần backend dev đang chạy).
 
 ## Dữ liệu bên mua niêm yết (vnstock)
 
@@ -52,22 +58,16 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt   # vnstock 4
 .venv/bin/python scripts/fetch_listed.py HPG --tax-code <MST>
 ```
 
-- Script ghi `server/seed/listed/<MÃ>.json`. Bên mua niêm yết (đã khai mã chứng khoán ở *Cài đặt*) vào *Chấm điểm DN* → **Nạp dữ liệu từ vnstock**; máy chủ đọc đúng file của mã đó và từ chối mã khác với mã đã khai. Repo có sẵn `HPG.json`, `CTD.json` (dữ liệu thật lấy ngày 12/10/2026); công ty thật có mã tương ứng đăng ký sẽ dùng được ngay.
+- Script ghi `server/seed/listed/<MÃ>.json`. Bên mua niêm yết (đã khai mã chứng khoán ở *Cài đặt*) vào *Chấm điểm DN* → **Nạp dữ liệu từ vnstock**; máy chủ chỉ nạp sau khi **FCC xác minh ánh xạ MST ↔ mã** (`/admin/sources`), đọc đúng file của mã đó và từ chối mã khác với mã đã khai. Repo có sẵn `HPG.json`, `CTD.json` (dữ liệu thật lấy ngày 12/10/2026); công ty thật có mã tương ứng đăng ký sẽ dùng được ngay.
 - **Lưu ý dữ liệu (vnstock 4.0.9):** nguồn mặc định KBS trả BCTC năm với **nhãn năm bị đảo** (cột "2025" chứa số liệu 2022 của HPG; quý cũng lệch). Script dùng nguồn **VCI** (nhãn đúng, đã đối chiếu: tổng 4 quý 2025 của HPG = doanh thu năm 2025 = 156,1 nghìn tỷ) và dừng nếu thứ tự năm bất thường.
-- Bản Cộng đồng: 60 lượt/phút, tối đa 8 kỳ BCTC. Ý kiến kiểm toán và diện cảnh báo không có trong vnstock — đang để mặc định, cần đối chiếu nguồn công bố thông tin.
+- Bản Cộng đồng: 60 lượt/phút, tối đa 8 kỳ BCTC. Ý kiến kiểm toán và diện cảnh báo không có trong vnstock — nhân sự FCC nhập từ công bố thông tin của sở giao dịch, kèm nguồn (`/admin/sources`).
 - Quyền riêng tư: vnai đăng ký thiết bị với vnstocks.com (mặc định băm hostname) và có telemetry tùy chọn — đặt `VNSTOCK_DEVICE_ID` trung tính và `VNSTOCK_TELEMETRY=off`. Bản 4.0.9 không còn tự ghi vào file hướng dẫn của trợ lý AI (`~/.claude/CLAUDE.md`…) khi import; vẫn đặt `VNSTOCK_DISABLE_AGENT_SETUP=1` để chặn.
-
-## Danh mục sản phẩm công khai
-
-Tab *Marketplace → Tất cả sản phẩm* có 4 mục tham khảo thu thập từ trang chính thức của BIDV, Techcombank và MB, đối chiếu ngày 12/10/2026. Dữ liệu và liên kết nguồn nằm ở `web-legacy/src/data/publicProducts.ts`. Trang nguồn thường không công bố lãi suất, phí, điều kiện đầy đủ hoặc ngày hết hiệu lực; ứng dụng để các mục đó ở trạng thái chưa công bố. Danh mục tham khảo không đi vào bộ khớp sản phẩm hay RFQ. Chỉ sản phẩm do tổ chức tài chính đã xác minh đăng và FCC duyệt mới được gửi yêu cầu báo giá trên FCC. Khi cập nhật danh mục, cần mở lại từng URL nguồn và sửa ngày đối chiếu của mục tương ứng.
 
 ## Giới hạn hiện tại
 
-- **Chưa có đối chiếu với cơ quan nhà nước:** MST, hóa đơn, CIC, thuế, BHXH đều do người dùng khai/tải lên; MST chưa tra cứu với cơ quan thuế; chưa có crawl dữ liệu doanh nghiệp từ nguồn công khai.
-- **Chưa có kết nối phần mềm kế toán hay ngân hàng:** công nợ nhập bằng CSV; giải ngân/thanh toán do các bên tự xác nhận hoặc webhook. Muốn tích hợp MISA AMIS cần đăng ký đối tác tích hợp với MISA để có `app_id`.
-- **Không có đăng nhập:** mỗi vai trò dùng một tổ chức cố định, chỉ chạy trên localhost. API đăng ký/đăng nhập (`/api/auth/*`) vẫn còn ở backend và được kiểm thử, nhưng giao diện không dùng. Chưa có cấp hạn mức tín dụng cho doanh nghiệp.
-- **Tham số mô hình chấm điểm là giá trị khởi tạo** (bảng rủi ro ngành, trung vị biên lợi nhuận, hệ số phát thải lưới điện) — cần hiệu chỉnh và thẩm định trước khi dùng cho quyết định thật.
-- Bộ chấm điểm chạy ở trình duyệt trên dữ liệu máy chủ đã lọc; khoản phải thu của tổ chức khác được gửi ở dạng rút gọn (không số/ký hiệu hóa đơn, mô tả, chứng từ) để tính điểm. Bước tiếp theo là chuyển chấm điểm sang máy chủ.
-- SQLite một tiến trình; nhiều bản sao cần PostgreSQL. Chạy ngoài localhost cần đặt sau HTTPS.
-- `web-legacy/public/samples/` là ảnh chứng từ giả lập chỉ dùng để thử tính năng AI đọc tài liệu; ứng dụng không nạp chúng.
+- **Không liên kết ngân hàng thật** (phase sau): giải ngân/sao kê do sim-bank phát sinh.
+- **Đối chiếu cơ quan nhà nước:** cổng thuế, đăng ký kinh doanh, hóa đơn điện tử, tòa án… khảo sát 16/10/2026 đều không cho tự động hóa (CAPTCHA, đăng nhập, không kết nối được) nên xếp loại B — nhân sự FCC tra cứu thủ công và ghi kết quả kèm đường dẫn nguồn. Chỉ website do chính doanh nghiệp khai (loại A) được đọc tự động, và chỉ sau khi FCC phê duyệt nguồn. Dữ liệu công khai chỉ để tham khảo, **không đưa vào điểm**.
+- **Tham số mô hình chấm điểm là giá trị khởi tạo** (bảng rủi ro ngành, trung vị biên lợi nhuận, hệ số phát thải lưới điện); đổi tham số cần hai người duyệt, nhưng vẫn cần chuyên gia tín dụng hiệu chỉnh trước khi dùng cho quyết định thật.
+- **AI** chạy qua dịch vụ ngoài (ollama.com); khóa chỉ ở `server/.env`. Cần quyết định tự vận hành hay giữ dịch vụ ngoài trước pilot (xem [VAN_HANH.md](document/VAN_HANH.md)).
+- Chữ ký số từ xa và eKYC qua nhà cung cấp chưa tích hợp (dùng MFA + băm nội dung, FCC đối chiếu giấy tờ); kết nối trực tiếp phần mềm kế toán (MISA AMIS…) cần đăng ký đối tác, hiện nhập CSV công nợ.
 - Gói `vnstock` trên PyPI ở trạng thái *quarantined*; cài từ chỉ mục chính thức vnstocks.com (`requirements.txt`).

@@ -1,8 +1,6 @@
-# FCC · Fast Cash Connect — bản mock giao diện (Next.js)
+# FCC · Fast Cash Connect — giao diện (Next.js)
 
-Bản mock tương tác cho dự án **FCC (Fast Cash Connect)** của nhóm Fin Success. Giao diện bám theo bộ 16 màn hình gợi ý trong `FINSUCCESS · FCC Fast Cash Connect.html`, nội dung lấy từ `document/REPPORT_FINSUCCESS.md` và `document/SPEC_FCC_MVP.md`.
-
-> Mọi số liệu là **dữ liệu minh họa**, chưa có backend: không có đăng nhập, cơ sở dữ liệu hay kết nối ngân hàng thật.
+Giao diện của dự án **FCC (Fast Cash Connect)** của nhóm Fin Success, nối với backend [server/](../server/) (dữ liệu thật từ PostgreSQL; không có số liệu cứng). Nội dung và quy tắc bám `document/REPPORT_FINSUCCESS.md` và `document/SPEC_FCC_MVP.md`. Cần chạy backend trước (xem README gốc); biến `FCC_API_URL` (mặc định `http://127.0.0.1:8787`) chỉ địa chỉ backend.
 
 ## Chạy thử
 
