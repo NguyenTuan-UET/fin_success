@@ -18,6 +18,9 @@ Tài liệu này dành cho người dùng của ba nhóm: **nhà cung cấp**, *
    - tài khoản của chủ tổ chức: họ tên, chức danh, email, mật khẩu dài và khó đoán.
 3. Đăng nhập bằng email và mật khẩu. Quên mật khẩu thì bấm **Quên mật khẩu** để nhận liên kết đặt lại qua email.
 
+### 1.1a. Tài khoản của bạn
+Nếu ban tổ chức đã cấp tài khoản, bạn nhận **email đăng nhập và mật khẩu** riêng qua kênh bảo mật (không nằm trong tài liệu này). Hãy đăng nhập, **đổi mật khẩu** ngay lần đầu và bật xác thực 2 bước (mục dưới). Tài khoản cấp sẵn là **chủ tổ chức**: mời thêm đồng nghiệp ở mục 1.3. Riêng tổ chức tài chính cần chờ FCC xác minh trước khi đăng sản phẩm.
+
 ### 1.2. Bật xác thực 2 bước (bắt buộc cho thao tác quan trọng)
 Các thao tác có ảnh hưởng tài chính đều cần **mã 6 số** từ ứng dụng xác thực trên điện thoại (Google Authenticator, Microsoft Authenticator…). Làm một lần:
 1. Cài ứng dụng xác thực trên điện thoại.

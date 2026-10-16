@@ -5,3 +5,4 @@ __pycache__/
 .env
 *.env
 scripts/.env
+TAI_KHOAN_NGUOI_DUNG.md
