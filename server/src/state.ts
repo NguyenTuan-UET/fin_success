@@ -114,6 +114,19 @@ CREATE TABLE IF NOT EXISTS files (
   key text NOT NULL, org_id text NOT NULL, name text NOT NULL, mime text NOT NULL, size bigint NOT NULL, kind text NOT NULL,
   uploaded_by text NOT NULL, created_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY (key, org_id)
 );
+-- WP3: khóa tích hợp đối tác, địa chỉ webhook đi, hàng đợi webhook, vé SSE
+CREATE TABLE IF NOT EXISTS integration_keys (
+  id text PRIMARY KEY, org_id text NOT NULL, name text NOT NULL, scopes text[] NOT NULL, key_hash text NOT NULL,
+  created_by text NOT NULL, created_at timestamptz NOT NULL DEFAULT now(), last_used_at timestamptz, revoked_at timestamptz
+);
+CREATE TABLE IF NOT EXISTS partner_endpoints (org_id text PRIMARY KEY, url text NOT NULL, updated_at timestamptz NOT NULL DEFAULT now());
+CREATE TABLE IF NOT EXISTS webhook_outbox (
+  id bigserial PRIMARY KEY, event_id text NOT NULL UNIQUE, org_id text NOT NULL, type text NOT NULL, payload jsonb NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(), attempts int NOT NULL DEFAULT 0, next_attempt_at timestamptz NOT NULL DEFAULT now(),
+  delivered_at timestamptz, dead_at timestamptz, last_status int, last_error text
+);
+CREATE INDEX IF NOT EXISTS webhook_outbox_due ON webhook_outbox (next_attempt_at) WHERE delivered_at IS NULL AND dead_at IS NULL;
+CREATE TABLE IF NOT EXISTS sse_tickets (ticket_hash text PRIMARY KEY, session_hash text NOT NULL, expires_at timestamptz NOT NULL);
 CREATE TABLE IF NOT EXISTS email_outbox (
   id bigserial PRIMARY KEY, to_email text NOT NULL, subject text NOT NULL, body text NOT NULL, kind text NOT NULL,
   dedupe_key text UNIQUE, created_at timestamptz NOT NULL DEFAULT now(), attempts int NOT NULL DEFAULT 0,
@@ -379,6 +392,82 @@ export class Database {
   async anyFile(key: string) {
     return (await this.pool.query<{ name: string; mime: string }>('SELECT name, mime FROM files WHERE key = $1 LIMIT 1', [key])).rows[0]
   }
+  // ---- tích hợp đối tác ----
+  async createIntegrationKey(k: { id: string; orgId: string; name: string; scopes: string[]; keyHash: string; createdBy: string }) {
+    await this.pool.query('INSERT INTO integration_keys (id, org_id, name, scopes, key_hash, created_by) VALUES ($1, $2, $3, $4, $5, $6)', [k.id, k.orgId, k.name, k.scopes, k.keyHash, k.createdBy])
+  }
+  async integrationKey(id: string) {
+    return (
+      await this.pool.query<{ id: string; orgId: string; scopes: string[]; keyHash: string; revokedAt: Date | null }>(
+        'SELECT id, org_id AS "orgId", scopes, key_hash AS "keyHash", revoked_at AS "revokedAt" FROM integration_keys WHERE id = $1',
+        [id],
+      )
+    ).rows[0]
+  }
+  async touchIntegrationKey(id: string) {
+    await this.pool.query('UPDATE integration_keys SET last_used_at = now() WHERE id = $1', [id])
+  }
+  async integrationKeys(orgId: string) {
+    return (
+      await this.pool.query(
+        'SELECT id, name, scopes, created_by AS "createdBy", created_at AS "createdAt", last_used_at AS "lastUsedAt", revoked_at AS "revokedAt" FROM integration_keys WHERE org_id = $1 ORDER BY created_at DESC',
+        [orgId],
+      )
+    ).rows
+  }
+  async revokeIntegrationKey(orgId: string, id: string) {
+    return (await this.pool.query('UPDATE integration_keys SET revoked_at = now() WHERE org_id = $1 AND id = $2 AND revoked_at IS NULL', [orgId, id])).rowCount === 1
+  }
+  async setPartnerEndpoint(orgId: string, url: string | null) {
+    if (url === null) await this.pool.query('DELETE FROM partner_endpoints WHERE org_id = $1', [orgId])
+    else await this.pool.query('INSERT INTO partner_endpoints (org_id, url) VALUES ($1, $2) ON CONFLICT (org_id) DO UPDATE SET url = excluded.url, updated_at = now()', [orgId, url])
+  }
+  async partnerEndpoint(orgId: string) {
+    return (await this.pool.query<{ url: string }>('SELECT url FROM partner_endpoints WHERE org_id = $1', [orgId])).rows[0]?.url
+  }
+  async enqueueWebhooks(rows: { eventId: string; orgId: string; type: string; payload: unknown }[]) {
+    if (!rows.length) return
+    await this.pool.query(
+      `INSERT INTO webhook_outbox (event_id, org_id, type, payload) SELECT * FROM unnest($1::text[], $2::text[], $3::text[], $4::jsonb[]) ON CONFLICT (event_id) DO NOTHING`,
+      [rows.map((r) => r.eventId), rows.map((r) => r.orgId), rows.map((r) => r.type), rows.map((r) => JSON.stringify(r.payload))],
+    )
+  }
+  /** Nhận một lô webhook đến hạn gửi (khóa dòng để nhiều tiến trình không gửi trùng). */
+  async claimWebhooks(limit: number, now: Date) {
+    return (
+      await this.pool.query<{ id: string; eventId: string; orgId: string; type: string; payload: unknown; attempts: number }>(
+        `UPDATE webhook_outbox SET next_attempt_at = $2::timestamptz + interval '2 minutes'
+         WHERE id IN (SELECT id FROM webhook_outbox WHERE delivered_at IS NULL AND dead_at IS NULL AND next_attempt_at <= $2 ORDER BY id LIMIT $1 FOR UPDATE SKIP LOCKED)
+         RETURNING id, event_id AS "eventId", org_id AS "orgId", type, payload, attempts`,
+        [limit, now],
+      )
+    ).rows
+  }
+  async webhookResult(id: string, r: { ok: boolean; status?: number; error?: string; nextAttemptAt?: Date; dead?: boolean }) {
+    await this.pool.query(
+      `UPDATE webhook_outbox SET attempts = attempts + 1, last_status = $2, last_error = $3,
+         delivered_at = CASE WHEN $4 THEN now() END, dead_at = CASE WHEN $5 THEN now() END,
+         next_attempt_at = COALESCE($6, next_attempt_at) WHERE id = $1`,
+      [id, r.status ?? null, r.error ?? null, r.ok, !!r.dead, r.nextAttemptAt ?? null],
+    )
+  }
+  async webhookDeliveries(orgId: string, limit = 50) {
+    return (
+      await this.pool.query(
+        `SELECT event_id AS "eventId", type, created_at AS "createdAt", attempts, last_status AS "lastStatus", last_error AS "lastError",
+           delivered_at AS "deliveredAt", dead_at AS "deadAt" FROM webhook_outbox WHERE org_id = $1 ORDER BY id DESC LIMIT $2`,
+        [orgId, limit],
+      )
+    ).rows
+  }
+  async createSseTicket(ticketHash: string, sessionHash: string, ttlMs: number) {
+    await this.pool.query('DELETE FROM sse_tickets WHERE expires_at < now()')
+    await this.pool.query('INSERT INTO sse_tickets (ticket_hash, session_hash, expires_at) VALUES ($1, $2, $3)', [ticketHash, sessionHash, new Date(Date.now() + ttlMs)])
+  }
+  async useSseTicket(ticketHash: string) {
+    return (await this.pool.query<{ sessionHash: string }>('DELETE FROM sse_tickets WHERE ticket_hash = $1 AND expires_at > now() RETURNING session_hash AS "sessionHash"', [ticketHash])).rows[0]?.sessionHash
+  }
+
   async queueEmail(m: { to: string; subject: string; body: string; kind: string; dedupeKey?: string }) {
     await this.pool.query('INSERT INTO email_outbox (to_email, subject, body, kind, dedupe_key) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (dedupe_key) DO NOTHING', [m.to, m.subject, m.body, m.kind, m.dedupeKey ?? null])
   }

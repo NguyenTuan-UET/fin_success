@@ -3,7 +3,7 @@ import type { FastifyRequest } from 'fastify'
 import { randomBytes } from 'node:crypto'
 import { ConstraintError, type Database, type SessionInfo, type State } from './state'
 import type { ObjectStore } from './storage'
-import type { Ctx, Role } from './service'
+import type { Ctx, DomainEvent, Role } from './service'
 import { canDo, MFA_ROLES, STEP_UP_ACTIONS, STEP_UP_MS, type MemberRole } from './auth/roles'
 import { hashToken } from './auth/password'
 import { HttpError, forbidden } from './errors'
@@ -27,6 +27,7 @@ export interface Authed extends SessionInfo {
 export type Who =
   | { kind: 'user'; user: Authed; correlationId?: string }
   | { kind: 'system'; orgId: string; label: string; correlationId?: string }
+  | { kind: 'partner'; orgId: string; role: MemberRole; keyId: string; correlationId?: string }
 
 export type Core = ReturnType<typeof createCore>
 
@@ -37,6 +38,7 @@ export function createCore(db: Database, files: ObjectStore, dataKey: Buffer, in
   let version = 1 // tăng sau mỗi thay đổi; trình duyệt dùng để hỏi “có gì mới không”
   const clock = opt.now ?? (() => new Date())
   const listeners = new Set<(v: number) => void>()
+  const eventSinks = new Set<(events: DomainEvent[]) => Promise<void>>()
 
   // Mọi thay đổi chạy tuần tự: bản nháp luôn dựng từ trạng thái đã ghi mới nhất.
   let chain: Promise<unknown> = Promise.resolve()
@@ -63,26 +65,39 @@ export function createCore(db: Database, files: ObjectStore, dataKey: Buffer, in
     const orgId = who.kind === 'user' ? who.user.activeOrgId : who.orgId
     const actor = draft.orgs.find((o) => o.id === orgId)
     if (!actor) throw new HttpError(401, 'Tổ chức không tồn tại')
-    const base = { s: draft, now: clock(), listedDir: opt.listedDir, autoApprove: !!opt.devAutologin, correlationId: who.correlationId }
+    const base = { s: draft, now: clock(), listedDir: opt.listedDir, autoApprove: !!opt.devAutologin, correlationId: who.correlationId, events: [] as DomainEvent[] }
     if (who.kind === 'system') return { ...base, actor, role: 'system' as Role, authMethod: 'system' }
+    if (who.kind === 'partner') return { ...base, actor, role: who.role, userId: `key:${who.keyId}`, authMethod: 'system' }
     return { ...base, actor, role: who.user.role, userId: who.user.id, authMethod: opt.devAutologin ? 'dev_session' : 'mfa' }
   }
 
-  /** Chạy một hàm nghiệp vụ trên bản nháp, chỉ chốt khi không lỗi và CSDL chấp nhận. */
+  /** Chạy một hàm nghiệp vụ trên bản nháp, chỉ chốt khi không lỗi và CSDL chấp nhận; sau đó chuyển sự kiện tới webhook. */
   function mutate<T>(who: Who, fn: (c: Ctx) => T): Promise<T> {
     return serial(async () => {
       const draft: State = { ...state }
-      const result = fn(ctxFor(draft, who))
+      const c = ctxFor(draft, who)
+      const result = fn(c)
       await commit(draft)
+      await dispatch(c.events ?? [])
       return result
     })
+  }
+  async function dispatch(events: DomainEvent[]) {
+    if (events.length) for (const sink of eventSinks) await sink(events)
+  }
+  /** Chạy với một ngữ cảnh đã dựng sẵn (tác vụ định kỳ), cùng quy tắc chốt và phát sự kiện. */
+  async function commitWithEvents(draft: State, events: DomainEvent[]) {
+    await commit(draft)
+    await dispatch(events)
   }
 
   async function auth(req: FastifyRequest): Promise<Authed> {
     const h = req.headers.authorization
     const token = h?.startsWith('Bearer ') ? h.slice(7) : ''
-    const tokenHash = token ? hashToken(token) : ''
-    const s = token ? await db.sessionUser(tokenHash) : undefined
+    return authByHash(token ? hashToken(token) : '', token)
+  }
+  async function authByHash(tokenHash: string, token = ''): Promise<Authed> {
+    const s = tokenHash ? await db.sessionUser(tokenHash) : undefined
     if (!s) throw new HttpError(401, 'Chưa đăng nhập, phiên đã hết hạn hoặc quyền thành viên đã bị thu hồi')
     return { ...s, role: s.role as MemberRole, token, tokenHash }
   }
@@ -106,10 +121,12 @@ export function createCore(db: Database, files: ObjectStore, dataKey: Buffer, in
   const snapshot = (a: Authed) => ({ version, me: me(a), state: viewFor(state, a.activeOrgId, clock()) })
 
   return {
-    db, files, dataKey, opt, clock, serial, commit, mutate, auth, authorize, requireStepUp, snapshot, me,
+    db, files, dataKey, opt, clock, serial, commit, mutate, auth, authByHash, authorize, requireStepUp, snapshot, me,
     getState: () => state,
     version: () => version,
     onChange: (l: (v: number) => void) => (listeners.add(l), () => listeners.delete(l)),
+    onEvents: (sink: (events: DomainEvent[]) => Promise<void>) => (eventSinks.add(sink), () => eventSinks.delete(sink)),
+    commitWithEvents,
     sessionTokenHash: (token: string) => hashToken(token),
   }
 }

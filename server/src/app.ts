@@ -9,6 +9,8 @@ import { HttpError } from './errors'
 import { authRoutes } from './routes/auth'
 import { orgRoutes } from './routes/org'
 import { businessRoutes } from './routes/business'
+import { v1Routes } from './routes/v1'
+import { deliverWebhooks } from './integrations/partner'
 
 export interface AppOptions {
   /** Chuỗi kết nối PostgreSQL */
@@ -31,7 +33,7 @@ export interface AppOptions {
   now?: () => Date
 }
 
-export type FccApp = FastifyInstance & { db: Database; core: Core; sweep: () => Promise<void>; getState: () => State }
+export type FccApp = FastifyInstance & { db: Database; core: Core; sweep: () => Promise<void>; getState: () => State; deliverWebhooks: () => Promise<unknown>; routes: { method: string; url: string }[] }
 
 export async function buildApp(opt: AppOptions): Promise<FccApp> {
   const db = await Database.open(opt.dbUrl, opt.dbSchema)
@@ -45,6 +47,10 @@ export async function buildApp(opt: AppOptions): Promise<FccApp> {
     logger: process.env.NODE_ENV === 'test' ? false : { level: 'info', redact: ['req.headers.authorization', 'req.headers["x-fcc-signature"]'] },
     bodyLimit: 25 * 1024 * 1024,
     genReqId: (req) => String(req.headers['x-request-id'] ?? '').slice(0, 64) || randomUUID(),
+  })
+  const routes: { method: string; url: string }[] = []
+  app.addHook('onRoute', (r) => {
+    for (const m of [r.method].flat()) if (m !== 'HEAD') routes.push({ method: m, url: r.url })
   })
   app.addHook('onSend', async (req, reply) => {
     reply.header('x-request-id', req.id)
@@ -61,7 +67,9 @@ export async function buildApp(opt: AppOptions): Promise<FccApp> {
   })
 
   app.setErrorHandler((err, req, reply) => {
-    if (err instanceof HttpError) return reply.code(err.status).send({ error: err.message, ...((err as { mfaRequired?: boolean }).mfaRequired ? { mfaRequired: true } : {}) })
+    // /v1: dữ liệu không hợp lệ trả 422 (SPEC mục 13); /api giữ 400 cho giao diện cũ
+    const status = err instanceof HttpError && err.status === 400 && req.url.startsWith('/v1/') ? 422 : err instanceof HttpError ? err.status : 0
+    if (err instanceof HttpError) return reply.code(status).send({ error: err.message, ...((err as { mfaRequired?: boolean }).mfaRequired ? { mfaRequired: true } : {}) })
     const e = err as { statusCode?: number; message: string }
     if (e.statusCode && e.statusCode < 500) return reply.code(e.statusCode).send({ error: e.message })
     req.log.error(err)
@@ -71,6 +79,7 @@ export async function buildApp(opt: AppOptions): Promise<FccApp> {
   const { openSession } = authRoutes(app, core)
   orgRoutes(app, core, openSession)
   businessRoutes(app, core, { ollamaKey: opt.ollamaKey, ollamaBase: opt.ollamaBase })
+  v1Routes(app, core)
 
   // ---------------- khởi tạo ----------------
   if (opt.admin) {
@@ -99,19 +108,24 @@ export async function buildApp(opt: AppOptions): Promise<FccApp> {
         if (!st.orgs.length) return
         const draft: State = { ...st }
         // tác nhân hệ thống; nhật ký ghi "Hệ thống"
-        const ctx: Ctx = { s: draft, now: core.clock(), listedDir: opt.listedDir, autoApprove: !!opt.devAutologin, actor: { ...st.orgs[0], id: 'system', shortName: 'Hệ thống' }, role: 'system', authMethod: 'system' }
-        if (runSweep(ctx) > 0) await core.commit(draft)
+        const ctx: Ctx = { s: draft, now: core.clock(), listedDir: opt.listedDir, autoApprove: !!opt.devAutologin, actor: { ...st.orgs[0], id: 'system', shortName: 'Hệ thống' }, role: 'system', authMethod: 'system', events: [] }
+        if (runSweep(ctx) > 0) await core.commitWithEvents(draft, ctx.events ?? [])
       } catch (e) {
         app.log.error(e, 'sweep failed')
       }
     })
   const timer = setInterval(() => void sweep(), 60_000)
   timer.unref()
+  // gửi webhook tới đối tác (có thử lại); kiểm thử gọi trực tiếp app.deliverWebhooks()
+  const deliver = () => deliverWebhooks(db, core.clock).catch((e) => app.log.error(e, 'webhook delivery failed'))
+  const hookTimer = process.env.NODE_ENV === 'test' ? undefined : setInterval(() => void deliver(), 5_000)
+  hookTimer?.unref()
   app.addHook('onClose', async () => {
     clearInterval(timer)
+    if (hookTimer) clearInterval(hookTimer)
     await core.serial(async () => undefined)
     await db.close()
   })
 
-  return Object.assign(app, { db, core, sweep, getState: () => core.getState() }) as FccApp
+  return Object.assign(app, { db, core, sweep, getState: () => core.getState(), deliverWebhooks: deliver, routes }) as FccApp
 }

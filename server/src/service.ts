@@ -31,8 +31,23 @@ export interface Ctx {
   listedDir: string
   /** Chế độ dev: sản phẩm của tổ chức tài chính được công bố ngay, không chờ FCC duyệt */
   autoApprove: boolean
+  /** Sự kiện nghiệp vụ phát sinh trong hành động; sau khi ghi thành công được chuyển tới webhook của đối tác */
+  events?: DomainEvent[]
   /** Phương thức xác thực của thao tác có giá trị pháp lý (route đã kiểm tra MFA trước khi gọi), dùng cho nhật ký và bằng chứng ký */
   authMethod: 'mfa' | 'dev_session' | 'system'
+}
+
+export interface DomainEvent {
+  /** Tổ chức nhận sự kiện */
+  orgId: string
+  type:
+    | 'rfq.created' | 'rfq.closed' | 'application.submitted' | 'application.not_selected' | 'offer.accepted'
+    | 'application.withdrawn' | 'receivable.paid' | 'receivable.overdue' | 'application.funded' | 'application.settled'
+  data: Record<string, unknown>
+  at: string
+}
+function emit(c: Ctx, orgId: string, type: DomainEvent['type'], data: Record<string, unknown>) {
+  c.events?.push({ orgId, type, data, at: c.now.toISOString() })
 }
 
 /** Bằng chứng ký: băm nội dung đã đồng ý + phương thức xác thực của người ký. */
@@ -99,19 +114,21 @@ function positiveInt(v: unknown, label: string) {
 }
 const isDate = (v: unknown): v is string => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(v))
 
-function matchCtx(c: Ctx, r: Receivable) {
-  const seller = c.s.orgs.find((o) => o.id === r.sellerId)!
-  const e = esgOf(c.s, r.sellerId)
+/** Đầu vào khớp sản phẩm cho một khoản phải thu (dùng cả ở API /v1/receivables/{id}/matches). */
+export function matchContextFor(s: State, r: Receivable, now: Date) {
+  const seller = s.orgs.find((o) => o.id === r.sellerId)!
+  const e = esgOf(s, r.sellerId)
   return {
     receivable: r,
     industryGroup: seller.industryGroup,
-    supplierRating: supplierScoreOf(c.s, r.sellerId).rating,
-    buyerRating: buyerScoreOf(c.s, r.buyerId).rating,
-    applicationRating: applicationScoreOf(c.s, r.id).rating,
+    supplierRating: supplierScoreOf(s, r.sellerId).rating,
+    buyerRating: buyerScoreOf(s, r.buyerId).rating,
+    applicationRating: applicationScoreOf(s, r.id).rating,
     esg: e ? { score: e.result.score, coverage: e.result.coverage, official: e.assessment.status === 'official', flags: e.result.flags.length } : undefined,
-    now: c.now,
+    now,
   }
 }
+const matchCtx = (c: Ctx, r: Receivable) => matchContextFor(c.s, r, c.now)
 
 function assertEligible(c: Ctx, r: Receivable, productIds: string[]) {
   const mc = matchCtx(c, r)
@@ -204,6 +221,7 @@ export const actions: Record<string, Action> = {
     if (a) {
       patchApp(c, a.id, { state: 'SETTLED', settledAt: iso(c.now) })
       notify(c, a.lenderId, `${r.code} đã tất toán`, `Bên mua thanh toán ${vnd(r.amount)} ₫ vào tài khoản chuyên dùng.`)
+      emit(c, a.lenderId, 'receivable.paid', { applicationId: a.id, receivableId: r.id, amount: r.amount })
     }
     notify(c, r.sellerId, `${r.code} đã được thanh toán`, 'Khoản phải thu đã tất toán.')
     log(c, 'Ghi nhận thanh toán của bên mua', r.code, a ? `Tất toán ${a.id}` : 'Thanh toán trực tiếp')
@@ -223,6 +241,7 @@ export const actions: Record<string, Action> = {
     for (const l of lenders) {
       grantConsent(c, { ownerId: r.sellerId, recipientId: l, purpose: `Gói tóm tắt RFQ ${rfq.id}`, scopes: ['credit_score', 'esg'], expiresAt: rfq.expiresAt })
       notify(c, l, `Yêu cầu báo giá ${rfq.id}`, `${orgName(c, r.sellerId)} — ${r.code}, ${vnd(r.amount)} ₫, bên mua ${orgName(c, r.buyerId)}.`, '/marketplace?tab=rfq')
+      emit(c, l, 'rfq.created', { rfqId: rfq.id, receivableId: r.id, amount: r.amount, dueDate: r.dueDate, sellerId: r.sellerId, buyerId: r.buyerId, productIds: productIds.filter((p) => c.s.products.find((x) => x.id === p)?.lenderId === l), expiresAt: rfq.expiresAt })
     }
     log(c, 'Tạo yêu cầu báo giá', rfq.id, `${r.code} → ${lenders.map((l) => orgName(c, l)).join(', ')} (chia sẻ gói tóm tắt)`)
     return rfq
@@ -256,8 +275,12 @@ export const actions: Record<string, Action> = {
     c.s.consents = c.s.consents.map((k) => (k.purpose === `Gói tóm tắt RFQ ${rfqId}` && k.recipientId !== lenderId && !k.revokedAt ? { ...k, revokedAt: iso(c.now) } : k))
     patchRecv(c, q.receivableId, { state: 'SUBMITTED' })
     grantConsent(c, { ownerId: q.sellerId, recipientId: lenderId, purpose: `Hồ sơ đầy đủ ${a.id}`, scopes: ['credit_score', 'esg', 'documents', 'accounting'], expiresAt: iso(new Date(c.now.getTime() + 180 * DAY)) })
-    for (const x of q.responses) if (x.lenderId !== lenderId) notify(c, x.lenderId, `${rfqId}: doanh nghiệp đã chọn đối tác khác`, 'Quyền xem gói tóm tắt đã được thu hồi.')
+    for (const x of q.responses) if (x.lenderId !== lenderId) {
+      notify(c, x.lenderId, `${rfqId}: doanh nghiệp đã chọn đối tác khác`, 'Quyền xem gói tóm tắt đã được thu hồi.')
+      emit(c, x.lenderId, 'application.not_selected', { rfqId })
+    }
     notify(c, lenderId, `Hồ sơ mới ${a.id}`, `Được chọn từ ${rfqId}. Bộ chứng từ đầy đủ đã được chia sẻ.`, '/invoices')
+    emit(c, lenderId, 'application.submitted', { applicationId: a.id, rfqId, receivableId: a.receivableId })
     log(c, 'Chọn báo giá & gửi hồ sơ', a.id, `${orgName(c, lenderId)} từ ${rfqId}; khóa khoản phải thu, thu hồi quyền của đối tác còn lại`)
   },
   cancelRfq(c, rfqId: string) {
@@ -266,6 +289,7 @@ export const actions: Record<string, Action> = {
     requireState('RFQ', q.state, ['OPEN', 'RESPONDED'])
     c.s.rfqs = c.s.rfqs.map((x) => (x.id === rfqId ? { ...x, state: 'CANCELLED' } : x))
     c.s.consents = c.s.consents.map((k) => (k.purpose === `Gói tóm tắt RFQ ${rfqId}` && !k.revokedAt ? { ...k, revokedAt: iso(c.now) } : k))
+    for (const l of new Set(q.productIds.map((p) => c.s.products.find((x) => x.id === p)?.lenderId).filter(Boolean) as string[])) emit(c, l, 'rfq.closed', { rfqId, reason: 'cancelled' })
     log(c, 'Hủy RFQ', rfqId, 'Thu hồi quyền xem gói tóm tắt')
   },
   submitDirect(c, receivableId: string, productId: string) {
@@ -281,6 +305,7 @@ export const actions: Record<string, Action> = {
     patchRecv(c, receivableId, { state: 'SUBMITTED' })
     grantConsent(c, { ownerId: r.sellerId, recipientId: p.lenderId, purpose: `Hồ sơ đầy đủ ${a.id}`, scopes: ['credit_score', 'esg', 'documents', 'accounting'], expiresAt: iso(new Date(c.now.getTime() + 180 * DAY)) })
     notify(c, p.lenderId, `Hồ sơ mới ${a.id}`, `${orgName(c, r.sellerId)} — ${r.code}`, '/invoices')
+    emit(c, p.lenderId, 'application.submitted', { applicationId: a.id, receivableId: r.id, productId })
     log(c, 'Gửi hồ sơ tài trợ', a.id, `${r.code} → ${orgName(c, p.lenderId)} · ${p.name}`)
     return a
   },
@@ -331,6 +356,7 @@ export const actions: Record<string, Action> = {
     patchApp(c, appId, { state: 'ACCEPTED' })
     patchRecv(c, a.receivableId, { state: 'ACCEPTED' })
     notify(c, a.lenderId, `${appId}: doanh nghiệp chấp thuận đề nghị`, 'Tiến hành ký hợp đồng và giải ngân trên kênh của tổ chức tài chính.')
+    emit(c, a.lenderId, 'offer.accepted', { applicationId: appId, receivableId: a.receivableId, offer: a.offer })
     log(c, 'Doanh nghiệp chấp thuận đề nghị', appId, authNote(c))
   },
   fundApp(c, appId: string) {
@@ -632,6 +658,7 @@ export function fundApplication(c: Ctx, a: FundingApplication, source = 'thao t�
   patchApp(c, a.id, { state: 'FUNDED', fundedAt: iso(c.now), fundedAmount: amt })
   patchRecv(c, a.receivableId, { state: 'FUNDED' })
   notify(c, r.sellerId, `${a.id} đã giải ngân`, `${vnd(amt)} ₫ từ ${orgName(c, a.lenderId)}.`)
+  emit(c, r.sellerId, 'application.funded', { applicationId: a.id, amount: amt })
   log(c, 'Ghi nhận giải ngân', a.id, `${vnd(amt)} ₫ — ${source}`)
   return true
 }
@@ -652,12 +679,14 @@ export function runSweep(c: Ctx): number {
     c.s.rfqs = c.s.rfqs.map((x) => (x.id === q.id ? { ...x, state: 'EXPIRED' } : x))
     c.s.consents = c.s.consents.map((k) => (k.purpose === `Gói tóm tắt RFQ ${q.id}` && !k.revokedAt ? { ...k, revokedAt: today } : k))
     notify(c, q.sellerId, `${q.id} đã hết hạn`, 'Yêu cầu báo giá hết hạn; quyền xem gói tóm tắt đã thu hồi.', '/marketplace?tab=rfq')
+    for (const l of new Set(q.productIds.map((p) => c.s.products.find((x) => x.id === p)?.lenderId).filter(Boolean) as string[])) emit(c, l, 'rfq.closed', { rfqId: q.id, reason: 'expired' })
     log(c, 'RFQ hết hạn', q.id, 'Tự động')
     n++
   }
   for (const a of c.s.applications.filter((x) => x.state === 'OFFERED' && x.offer && x.offer.expiresAt < today)) {
     patchApp(c, a.id, { state: 'WITHDRAWN' })
     patchRecv(c, a.receivableId, { state: 'BUYER_CONFIRMED' })
+    emit(c, a.lenderId, 'application.withdrawn', { applicationId: a.id, reason: 'offer_expired' })
     log(c, 'Đề nghị tài trợ hết hạn chấp thuận', a.id, 'Tự động')
     n++
   }
@@ -665,6 +694,8 @@ export function runSweep(c: Ctx): number {
     patchRecv(c, r.id, { state: 'OVERDUE' })
     notify(c, r.buyerId, `${r.code} quá hạn thanh toán`, `Hạn thanh toán ${r.dueDate}.`, '/invoices')
     notify(c, r.sellerId, `${r.code} quá hạn thanh toán`, `Bên mua chưa thanh toán đến hạn ${r.dueDate}.`, '/invoices')
+    const fa = c.s.applications.find((x) => x.receivableId === r.id && x.state === 'FUNDED')
+    if (fa) emit(c, fa.lenderId, 'receivable.overdue', { applicationId: fa.id, receivableId: r.id, dueDate: r.dueDate })
     log(c, 'Khoản phải thu quá hạn', r.code, 'Tự động')
     n++
   }
