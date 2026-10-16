@@ -16,8 +16,9 @@ export function viewFor(s: State, actorId: string, now = new Date()): State {
 
   // Nhân sự FCC chỉ thấy hồ sơ cần thẩm định (ESG, sản phẩm, tổ chức), không thấy chứng từ/hồ sơ tài trợ
   if (isFcc) {
+    // external: dữ liệu công khai FCC tự tra cứu hoặc crawl (để xử lý khiếu nại)
     return {
-      orgs: s.orgs, products: s.products, sources: s.sources, listed: [], limits: [], profiles: [], esg: s.esg, external: [], connections: [], ledger: [],
+      orgs: s.orgs, products: s.products, sources: s.sources, listed: [], limits: [], profiles: [], esg: s.esg, external: s.external, connections: [], ledger: [],
       // chỉ các khoản có cờ bất thường hoặc đã đối chiếu thuế, đã rút gọn (không mô tả, không chứng từ, không số/ký hiệu hóa đơn)
       receivables: s.receivables.filter((r) => (r.flags?.length ?? 0) > 0 || r.taxCheck).map((r) => ({ ...r, description: '', files: undefined, fingerprint: '', docs: { xml: false, contract: false, delivery: false }, disputeReason: undefined })),
       rfqs: [], applications: [], earlyOffers: [], consents: [],

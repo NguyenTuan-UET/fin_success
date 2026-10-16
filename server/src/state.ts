@@ -1,7 +1,7 @@
 import pg from 'pg'
 import { createHash } from 'node:crypto'
 import { SOURCES } from './reference'
-import type { AppData, AuditEvent } from '@fcc/domain/types'
+import type { AppData, AuditEvent, DataSource } from '@fcc/domain/types'
 
 export interface State extends AppData {
   audit: AuditEvent[]
@@ -182,6 +182,20 @@ END $f$;
 DROP TRIGGER IF EXISTS fee_charges_no_change ON fee_charges;
 CREATE TRIGGER fee_charges_no_change BEFORE UPDATE OR DELETE ON fee_charges FOR EACH ROW EXECUTE FUNCTION fee_charges_guard();
 CREATE TABLE IF NOT EXISTS api_usage (org_id text NOT NULL, period text NOT NULL, calls bigint NOT NULL DEFAULT 0, PRIMARY KEY (org_id, period));
+-- WP10: nguồn dữ liệu, hàng đợi crawl, bản chụp nguồn
+CREATE TABLE IF NOT EXISTS data_sources (id text PRIMARY KEY, doc jsonb NOT NULL, updated_at timestamptz NOT NULL DEFAULT now());
+CREATE TABLE IF NOT EXISTS crawl_jobs (
+  id bigserial PRIMARY KEY, source_id text NOT NULL, org_id text NOT NULL, tax_code text NOT NULL,
+  status text NOT NULL DEFAULT 'queued' CHECK (status IN ('queued', 'running', 'done', 'manual_needed', 'failed')),
+  reason text, attempts int NOT NULL DEFAULT 0, result jsonb, error text, created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(),
+  next_attempt_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS crawl_jobs_open ON crawl_jobs (source_id, org_id) WHERE status IN ('queued', 'running');
+CREATE TABLE IF NOT EXISTS source_snapshots (
+  id text PRIMARY KEY, source_id text NOT NULL, org_id text NOT NULL, tax_code text NOT NULL, url text NOT NULL, status_code int, content_hash text NOT NULL,
+  object_key text, parser_version text NOT NULL, fetched_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS source_hosts (host text PRIMARY KEY, last_request_at timestamptz, blocked_until timestamptz, robots_txt text, robots_at timestamptz);
 -- WP9: quyết định duyệt bút toán, dự báo dòng tiền đã lưu
 CREATE TABLE IF NOT EXISTS journal_decisions (
   org_id text NOT NULL, ref text NOT NULL, status text NOT NULL CHECK (status IN ('approved', 'rejected')), lines jsonb, note text, decided_by text NOT NULL, decided_at timestamptz NOT NULL DEFAULT now(),
@@ -239,7 +253,8 @@ export class Database {
     state.audit = audit.rows.map((r) => r.doc)
     this.auditIds = new Set(audit.rows.map((r) => r.id))
     this.lastHash = audit.rows[0]?.hash ?? GENESIS
-    state.sources = SOURCES
+    await this.seedSources(SOURCES)
+    state.sources = await this.dataSources()
     return state as unknown as State
   }
 
@@ -607,6 +622,53 @@ export class Database {
   }
   async useSseTicket(ticketHash: string) {
     return (await this.pool.query<{ sessionHash: string }>('DELETE FROM sse_tickets WHERE ticket_hash = $1 AND expires_at > now() RETURNING session_hash AS "sessionHash"', [ticketHash])).rows[0]?.sessionHash
+  }
+
+  // ---- nguồn dữ liệu và crawl ----
+  async dataSources() {
+    return (await this.pool.query<{ doc: DataSource }>('SELECT doc FROM data_sources ORDER BY id')).rows.map((r) => r.doc)
+  }
+  async dataSource(id: string) {
+    return (await this.pool.query<{ doc: DataSource }>('SELECT doc FROM data_sources WHERE id = $1', [id])).rows[0]?.doc
+  }
+  async seedSources(list: DataSource[]) {
+    for (const d of list) await this.pool.query('INSERT INTO data_sources (id, doc) VALUES ($1, $2) ON CONFLICT (id) DO NOTHING', [d.id, JSON.stringify(d)])
+  }
+  async saveSource(d: DataSource) {
+    await this.pool.query('UPDATE data_sources SET doc = $2, updated_at = now() WHERE id = $1', [d.id, JSON.stringify(d)])
+  }
+  /** Xếp một việc crawl; đã có việc đang chờ/chạy cho cùng nguồn + tổ chức thì không xếp thêm. */
+  async enqueueCrawl(j: { sourceId: string; orgId: string; taxCode: string }) {
+    return (await this.pool.query('INSERT INTO crawl_jobs (source_id, org_id, tax_code) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING', [j.sourceId, j.orgId, j.taxCode])).rowCount === 1
+  }
+  async claimCrawl(limit: number, now: Date) {
+    return (await this.pool.query<{ id: string; sourceId: string; orgId: string; taxCode: string; attempts: number }>(
+      `UPDATE crawl_jobs SET status = 'running', attempts = attempts + 1, updated_at = now()
+       WHERE id IN (SELECT id FROM crawl_jobs WHERE status = 'queued' AND next_attempt_at <= $2 ORDER BY id LIMIT $1 FOR UPDATE SKIP LOCKED)
+       RETURNING id, source_id AS "sourceId", org_id AS "orgId", tax_code AS "taxCode", attempts`, [limit, now])).rows
+  }
+  async finishCrawl(id: string, r: { status: 'done' | 'manual_needed' | 'failed' | 'queued'; reason?: string; result?: unknown; error?: string; retryAt?: Date }) {
+    await this.pool.query(`UPDATE crawl_jobs SET status = $2, reason = $3, result = $4, error = $5, updated_at = now(), next_attempt_at = COALESCE($6, next_attempt_at) WHERE id = $1`, [id, r.status, r.reason ?? null, r.result === undefined ? null : JSON.stringify(r.result), r.error ?? null, r.retryAt ?? null])
+  }
+  async crawlJobs(filter: { status?: string; orgId?: string }, limit = 100) {
+    return (await this.pool.query(`SELECT id, source_id AS "sourceId", org_id AS "orgId", tax_code AS "taxCode", status, reason, attempts, result, error, created_at AS "createdAt", updated_at AS "updatedAt" FROM crawl_jobs WHERE ($1::text IS NULL OR status = $1) AND ($2::text IS NULL OR org_id = $2) ORDER BY id DESC LIMIT $3`, [filter.status ?? null, filter.orgId ?? null, limit])).rows
+  }
+  async addSnapshot(x: { id: string; sourceId: string; orgId: string; taxCode: string; url: string; statusCode?: number; contentHash: string; objectKey?: string; parserVersion: string }) {
+    await this.pool.query('INSERT INTO source_snapshots (id, source_id, org_id, tax_code, url, status_code, content_hash, object_key, parser_version) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)', [x.id, x.sourceId, x.orgId, x.taxCode, x.url, x.statusCode ?? null, x.contentHash, x.objectKey ?? null, x.parserVersion])
+  }
+  async snapshot(id: string) {
+    return (await this.pool.query('SELECT id, source_id AS "sourceId", org_id AS "orgId", url, status_code AS "statusCode", content_hash AS "contentHash", object_key AS "objectKey", parser_version AS "parserVersion", fetched_at AS "fetchedAt" FROM source_snapshots WHERE id = $1', [id])).rows[0]
+  }
+  async host(host: string) {
+    return (await this.pool.query<{ lastRequestAt: Date | null; blockedUntil: Date | null; robotsTxt: string | null; robotsAt: Date | null }>('SELECT last_request_at AS "lastRequestAt", blocked_until AS "blockedUntil", robots_txt AS "robotsTxt", robots_at AS "robotsAt" FROM source_hosts WHERE host = $1', [host])).rows[0]
+  }
+  async touchHost(host: string, p: { lastRequestAt?: Date; blockedUntil?: Date | null; robotsTxt?: string; robotsAt?: Date }) {
+    await this.pool.query(
+      `INSERT INTO source_hosts (host, last_request_at, blocked_until, robots_txt, robots_at) VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (host) DO UPDATE SET last_request_at = COALESCE($2, source_hosts.last_request_at), blocked_until = CASE WHEN $6 THEN $3 ELSE source_hosts.blocked_until END,
+         robots_txt = COALESCE($4, source_hosts.robots_txt), robots_at = COALESCE($5, source_hosts.robots_at)`,
+      [host, p.lastRequestAt ?? null, p.blockedUntil ?? null, p.robotsTxt ?? null, p.robotsAt ?? null, p.blockedUntil !== undefined],
+    )
   }
 
   // ---- bút toán, dự báo ----

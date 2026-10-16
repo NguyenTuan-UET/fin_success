@@ -44,7 +44,7 @@ export const PERMISSIONS: Record<string, MemberRole[]> = {
   respondRfq: ['analyst'], startReview: ['analyst'], makeOffer: ['analyst'], rejectApp: ['analyst'], fundApp: ['analyst'], confirmPayment: ['analyst'], confirmRefund: ['analyst'],
   upsertProduct: ['product_manager'], setProductStatus: ['product_manager'],
   // FCC
-  approveProduct: ['fcc_operations'], verifyOrg: ['fcc_operations'], decideKyc: ['fcc_operations'], resolveFlag: ['fcc_operations'], recordTaxCheck: ['fcc_operations'],
+  approveProduct: ['fcc_operations'], verifyOrg: ['fcc_operations'], decideKyc: ['fcc_operations'], resolveFlag: ['fcc_operations'], recordTaxCheck: ['fcc_operations'], addExternalRecord: ['fcc_operations', 'fcc_reviewer'], resolveExternal: ['fcc_operations', 'fcc_reviewer'], disputeExternal: ['approver'],
   issueEsg: ['fcc_reviewer'],
   // chỉ owner/fcc_admin: updateOrg, submitKyc (không liệt kê)
   ...Object.fromEntries(ALWAYS.map((a) => [a, ['approver', 'operator', 'analyst', 'product_manager', 'fcc_reviewer', 'fcc_operations', 'fcc_model_owner', 'fcc_auditor'] as MemberRole[]])),

@@ -32,6 +32,10 @@ export interface Org {
   createdAt: string
   /** Tổ chức tài chính chỉ được công bố sản phẩm sau khi FCC xác minh pháp nhân/giấy phép */
   verified?: boolean
+  /** Website của doanh nghiệp (do doanh nghiệp khai, đồng ý cho FCC đọc công khai để gợi ý bằng chứng ESG) */
+  website?: string
+  /** FCC đã xác minh ánh xạ MST ↔ mã chứng khoán của bên mua niêm yết (lần đầu bằng tay) */
+  listedVerified?: { by: string; at: string }
   /** Xác minh danh tính người đại diện (eKYC qua nhà cung cấp, hoặc FCC đối chiếu giấy tờ) */
   kyc?: OrgKyc
   /** Tổ chức tài chính giả lập (sim-bank) — phase hiện tại chưa kết nối ngân hàng thật */
@@ -380,6 +384,17 @@ export interface DataSource {
   rateLimit: string
   status: 'approved' | 'pending' | 'blocked'
   note: string
+  /** A: crawl tự động; B: tra cứu thủ công có hỗ trợ; C: bỏ (kết quả khảo sát) */
+  sourceClass?: 'A' | 'B' | 'C'
+  /** Tên adapter tự động (chỉ nguồn loại A) */
+  adapter?: string
+  /** Mẫu đường dẫn tra cứu thủ công, {taxCode} được thay bằng MST */
+  lookupUrl?: string
+  termsUrl?: string
+  /** Ghi chú khảo sát kỹ thuật/pháp lý */
+  survey?: string
+  approvedBy?: string
+  approvedAt?: string
 }
 
 export interface ExternalRecord {
@@ -391,7 +406,16 @@ export interface ExternalRecord {
   fetchedAt: string
   url: string
   contentHash: string
+  /** Doanh nghiệp đang khiếu nại sai lệch (hiển thị “Đang được xem xét”) */
   disputed?: boolean
+  disputeReason?: string
+  /** Kết quả xử lý khiếu nại của FCC */
+  resolution?: { outcome: 'upheld' | 'rejected'; note: string; at: string; by: string }
+  /** Nhân sự FCC tra cứu thủ công (nguồn không cho tự động) */
+  manual?: boolean
+  /** Bản chụp nguồn (source_snapshots) để truy xuất provenance */
+  snapshotId?: string
+  parserVersion?: string
 }
 
 // ---------------- Chung ----------------

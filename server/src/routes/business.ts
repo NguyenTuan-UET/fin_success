@@ -4,6 +4,7 @@ import type { Core } from '../core'
 import { actions, fundApplication } from '../service'
 import { HttpError, bad, notFound } from '../errors'
 import { identityProviderStatus } from '../integrations/identity-providers'
+import { enqueueForOrg } from '../crawl/engine'
 
 export interface BusinessOptions {
   ollamaKey?: string
@@ -45,6 +46,8 @@ export function businessRoutes(app: FastifyInstance, core: Core, opt: BusinessOp
       for (const k of Array.isArray(keys) ? keys : []) if (typeof k !== 'string' || !(await db.fileOf(k, a.activeOrgId))) throw bad('Giấy tờ chưa được tải lên bởi tổ chức này')
     }
     const result = await core.mutate({ kind: 'user', user: a, correlationId: req.id }, (c) => fn(c, ...args))
+    // khai/đổi website hoặc gửi RFQ → xếp việc đọc nguồn công khai theo MST của tổ chức (nguồn loại A đã phê duyệt)
+    if ((name === 'updateOrg' && 'website' in ((args[0] as object | undefined) ?? {})) || name === 'createRfq') await enqueueForOrg(core, a.activeOrgId).catch(() => undefined)
     return { result: result ?? null, ...core.snapshot(a) }
   })
 

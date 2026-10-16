@@ -12,6 +12,8 @@ import { businessRoutes } from './routes/business'
 import { v1Routes } from './routes/v1'
 import { ensureDefaultScorecard } from './assessments'
 import { chargeFromEvents, ensureFeeSchedule } from './billing'
+import { enqueueForOrg, processQueue, type CrawlOptions } from './crawl/engine'
+import './crawl/company-website'
 import { deliverWebhooks } from './integrations/partner'
 import { createMailer, deliverEmails, emailKind, type Mailer } from './integrations/mailer'
 
@@ -36,9 +38,11 @@ export interface AppOptions {
   now?: () => Date
   /** Gửi email (kiểm thử truyền bản giả); mặc định SMTP_URL hoặc chỉ ghi log */
   mailer?: Mailer
+  /** Tùy chọn crawler (kiểm thử: fetch giả, cho phép địa chỉ nội bộ, bỏ giãn cách) */
+  crawl?: CrawlOptions
 }
 
-export type FccApp = FastifyInstance & { db: Database; core: Core; sweep: () => Promise<void>; getState: () => State; deliverWebhooks: () => Promise<unknown>; deliverEmails: () => Promise<number>; routes: { method: string; url: string }[] }
+export type FccApp = FastifyInstance & { db: Database; core: Core; sweep: () => Promise<void>; getState: () => State; deliverWebhooks: () => Promise<unknown>; deliverEmails: () => Promise<number>; processCrawl: () => Promise<number>; routes: { method: string; url: string }[] }
 
 export async function buildApp(opt: AppOptions): Promise<FccApp> {
   const db = await Database.open(opt.dbUrl, opt.dbSchema)
@@ -83,6 +87,12 @@ export async function buildApp(opt: AppOptions): Promise<FccApp> {
 
   await ensureDefaultScorecard(db)
   await ensureFeeSchedule(db)
+  if (opt.devAutologin) {
+    // môi trường dev: tự phê duyệt nguồn loại A (website do doanh nghiệp khai) để thử luồng; production cần quản trị FCC phê duyệt có ghi chú
+    const cw = await db.dataSource('src-company-website')
+    if (cw && cw.status === 'pending') await db.saveSource({ ...cw, status: 'approved', approvedBy: 'dev-autoapprove', approvedAt: new Date().toISOString() })
+    core.getState().sources = await db.dataSources()
+  }
   core.onEvents((events) => chargeFromEvents(core, events))
   const { openSession } = authRoutes(app, core)
   orgRoutes(app, core, openSession)
@@ -136,6 +146,14 @@ export async function buildApp(opt: AppOptions): Promise<FccApp> {
       }
     }
   })
+  // đọc nguồn công khai: xử lý hàng đợi mỗi 15 giây; mỗi ngày xếp việc làm mới (30 ngày) cho tổ chức có địa chỉ
+  const crawlOnce = () => processQueue(core, opt.crawl).catch((e) => { app.log.error(e, 'crawl failed'); return 0 })
+  const crawlTimer = process.env.NODE_ENV === 'test' ? undefined : setInterval(() => void crawlOnce(), 15_000)
+  crawlTimer?.unref()
+  const refreshTimer = process.env.NODE_ENV === 'test' ? undefined : setInterval(() => void (async () => {
+    for (const o of core.getState().orgs) if (o.website) await enqueueForOrg(core, o.id).catch(() => undefined)
+  })(), 24 * 3600_000)
+  refreshTimer?.unref()
   const mailer = opt.mailer ?? createMailer(undefined, undefined, (m) => app.log.info(m))
   const deliverMail = () => deliverEmails(db, mailer, core.clock).catch((e) => { app.log.error(e, 'email delivery failed'); return 0 })
   const mailTimer = process.env.NODE_ENV === 'test' ? undefined : setInterval(() => void deliverMail(), 10_000)
@@ -146,9 +164,11 @@ export async function buildApp(opt: AppOptions): Promise<FccApp> {
     clearInterval(timer)
     if (hookTimer) clearInterval(hookTimer)
     if (mailTimer) clearInterval(mailTimer)
+    if (crawlTimer) clearInterval(crawlTimer)
+    if (refreshTimer) clearInterval(refreshTimer)
     await core.serial(async () => undefined)
     await db.close()
   })
 
-  return Object.assign(app, { db, core, sweep, getState: () => core.getState(), deliverWebhooks: deliver, deliverEmails: deliverMail, routes }) as FccApp
+  return Object.assign(app, { db, core, sweep, getState: () => core.getState(), deliverWebhooks: deliver, deliverEmails: deliverMail, processCrawl: crawlOnce, routes }) as FccApp
 }

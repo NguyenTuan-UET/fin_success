@@ -17,6 +17,8 @@ import { provisionSimBanks } from '../sim/provision'
 import { assertCanAssess, assess, canSeeAssessment, OFFICIAL_VALID_DAYS, shape, type Kind } from '../assessments'
 import { DEFAULT_SCORECARD, type ScorecardParams } from '@fcc/domain/credit'
 import { uid } from '../core'
+import { enqueueForOrg, getAdapter, processQueue } from '../crawl/engine'
+import type { DataSource } from '@fcc/domain/types'
 import { bankStatement, computeAndStoreForecast, forecastAccuracy, journalFor, parseRegime } from '../accounting'
 import { toCsv, type JournalEntry } from '@fcc/domain/journal'
 import { billingRun, chargeReport, chargeScoring, feeSourceLabel, scheduleAt } from '../billing'
@@ -333,6 +335,54 @@ export const ENDPOINTS: Endpoint[] = [
       if (orgOf(core, s.a!.activeOrgId)?.type !== 'fcc') throw forbidden('Chỉ nhân sự FCC')
       return core.db.verifyAudit()
     } },
+
+  // ---- nguồn dữ liệu công khai, crawl, tra cứu thủ công, khiếu nại ----
+  { method: 'GET', path: '/v1/operations/data-sources', tag: 'Dữ liệu công khai', summary: 'Danh mục nguồn: loại A/B/C, trạng thái phê duyệt, kết quả khảo sát (FCC)', auth: 'user',
+    run: async (s, core) => {
+      if (orgOf(core, s.a!.activeOrgId)?.type !== 'fcc') throw forbidden('Chỉ nhân sự FCC')
+      return core.db.dataSources()
+    } },
+  { method: 'POST', path: '/v1/operations/data-sources/{id}/review', tag: 'Dữ liệu công khai', summary: 'Phê duyệt/chặn nguồn, đặt loại A/B/C và adapter (quản trị FCC, cần MFA). Chưa phê duyệt thì không chạy', auth: 'user', body: { status: 'approved|pending|blocked', sourceClass: 'A|B|C', note: 'string' },
+    run: async (s, core) => {
+      if (s.a!.role !== 'fcc_admin') throw forbidden('Chỉ quản trị FCC')
+      core.requireStepUp(s.a!)
+      const src = await core.db.dataSource(P(s, 'id'))
+      if (!src) throw notFound('Không tìm thấy nguồn')
+      const status = String(B(s).status)
+      const cls = B(s).sourceClass === undefined ? src.sourceClass : String(B(s).sourceClass)
+      if (!['approved', 'pending', 'blocked'].includes(status)) throw bad('status không hợp lệ')
+      if (cls !== undefined && !['A', 'B', 'C'].includes(String(cls))) throw bad('sourceClass phải là A, B hoặc C')
+      if (status === 'approved' && cls === 'C') throw bad('Nguồn loại C (bỏ) không thể phê duyệt')
+      if (status === 'approved' && cls === 'A' && !getAdapter(src.adapter)) throw bad('Nguồn loại A cần adapter đã cài')
+      const note = String(B(s).note ?? '').trim()
+      if (status !== 'pending' && !note) throw bad('Cần ghi chú căn cứ phê duyệt/chặn (điều khoản sử dụng, ý kiến pháp chế)')
+      const next: DataSource = { ...src, status: status as DataSource['status'], sourceClass: cls as DataSource['sourceClass'], note: note || src.note, approvedBy: status === 'approved' ? s.a!.id : undefined, approvedAt: status === 'approved' ? core.clock().toISOString() : undefined }
+      await core.db.saveSource(next)
+      await core.serial(async () => { await core.commit({ ...core.getState(), sources: await core.db.dataSources() }) })
+      await core.audit(s.a!.activeOrgId, s.a!.id, 'Duyệt nguồn dữ liệu', src.id, `${status}${cls ? ` · loại ${cls}` : ''}: ${note}`, s.req.id)
+      return next
+    } },
+  { method: 'GET', path: '/v1/operations/crawl-jobs', tag: 'Dữ liệu công khai', summary: 'Việc crawl và hàng đợi ngoại lệ/tra cứu thủ công (?status=)', auth: 'user',
+    run: async (s, core) => {
+      if (orgOf(core, s.a!.activeOrgId)?.type !== 'fcc') throw forbidden('Chỉ nhân sự FCC')
+      return core.db.crawlJobs({ status: s.query.status })
+    } },
+  { method: 'POST', path: '/v1/operations/crawl-jobs', tag: 'Dữ liệu công khai', summary: 'Xếp việc crawl cho một tổ chức (nguồn loại A đã phê duyệt) và chạy ngay', auth: 'user', body: { orgId: 'string' },
+    run: async (s, core) => {
+      if (orgOf(core, s.a!.activeOrgId)?.type !== 'fcc' || !['fcc_admin', 'fcc_operations'].includes(s.a!.role)) throw forbidden('Chỉ vận hành FCC')
+      const n = await enqueueForOrg(core, String(B(s).orgId))
+      const ran = await processQueue(core)
+      return { queued: n, processed: ran }
+    } },
+  { method: 'POST', path: '/v1/organizations/{id}/external-records', tag: 'Dữ liệu công khai', summary: 'FCC ghi kết quả tra cứu thủ công từ nguồn công khai (kèm đường dẫn nguồn)', auth: 'user', action: 'addExternalRecord', args: (s) => [P(s, 'id'), B(s)], body: { sourceId: 'string', field: 'string', value: 'string', url: 'string', note: 'string' } },
+  { method: 'GET', path: '/v1/organizations/{id}/external-profile', tag: 'Dữ liệu công khai', summary: 'Dữ liệu công khai về tổ chức: giá trị, nguồn, liên kết gốc, ngày lấy, nhãn “Nguồn công khai – tham khảo”, trạng thái khiếu nại', auth: 'user',
+    run: (s, core) => {
+      const id = P(s, 'id')
+      const v = view(core, s.a!.activeOrgId)
+      return v.external.filter((e) => e.orgId === id).map((e) => ({ ...e, source: core.getState().sources.find((x) => x.id === e.sourceId)?.name, label: 'Nguồn công khai – tham khảo', status: e.disputed ? 'Đang được xem xét' : e.resolution ? `Đã xử lý khiếu nại: ${e.resolution.outcome === 'upheld' ? 'chấp nhận' : 'giữ nguyên'}` : undefined }))
+    } },
+  { method: 'POST', path: '/v1/external-records/{id}/disputes', tag: 'Dữ liệu công khai', summary: 'Doanh nghiệp khiếu nại sai lệch dữ liệu công khai về mình', auth: 'user', action: 'disputeExternal', args: (s) => [P(s, 'id'), B(s).reason], body: { reason: 'string' } },
+  { method: 'POST', path: '/v1/external-records/{id}/resolution', tag: 'Dữ liệu công khai', summary: 'FCC xử lý khiếu nại (upheld gỡ bản ghi; rejected giữ nguyên)', auth: 'user', action: 'resolveExternal', args: (s) => [P(s, 'id'), B(s).outcome, B(s).note], body: { outcome: 'upheld|rejected', note: 'string' } },
 
   // ---- ngân hàng giả lập, bút toán, dự báo ----
   { method: 'POST', path: '/v1/bank/link', tag: 'Kế toán & dòng tiền', summary: 'Liên kết tài khoản với ngân hàng GIẢ LẬP (phase này chưa kết nối ngân hàng thật); cần khai số dư trước', auth: 'user', action: 'linkBank', args: (s) => [s.a!.activeOrgId] },

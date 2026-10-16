@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type {
   AccountingConnection, Consent, CreditProfile, SignatureEvidence, EarlyPaymentOffer, EsgAssessment, EsgDocument, EsgIndicatorResult, FinancialYear,
-  FinancingProduct, FundingApplication, LedgerItem, ListedSnapshot, Org, Receivable, ReceivableState, Rfq, RfqResponse,
+  ExternalRecord, FinancingProduct, FundingApplication, LedgerItem, ListedSnapshot, Org, Receivable, ReceivableState, Rfq, RfqResponse,
 } from '@fcc/domain/types'
 import { iso } from '@fcc/domain/util'
 import { applicationScoreOf, buyerScoreOf, esgOf, supplierScoreOf } from '@fcc/domain/engine'
@@ -516,7 +516,7 @@ export const actions: Record<string, Action> = {
   },
 
   /** Cập nhật hồ sơ tổ chức của chính mình (MST không đổi được). */
-  updateOrg(c, patch: Partial<Pick<Org, 'name' | 'shortName' | 'vsic' | 'industryLabel' | 'industryGroup' | 'province' | 'foundedYear' | 'employees' | 'listedSymbol' | 'exchange'>>) {
+  updateOrg(c, patch: Partial<Pick<Org, 'name' | 'shortName' | 'vsic' | 'industryLabel' | 'industryGroup' | 'province' | 'foundedYear' | 'employees' | 'listedSymbol' | 'exchange' | 'website'>>) {
     const o = c.actor
     const next: Org = { ...o }
     const text = (k: 'name' | 'shortName' | 'vsic' | 'industryLabel' | 'province', max: number) => {
@@ -538,9 +538,19 @@ export const actions: Record<string, Action> = {
       if (!Number.isInteger(patch.employees) || patch.employees < 0) throw bad('Số lao động không hợp lệ')
       next.employees = patch.employees
     }
+    if (patch.website !== undefined) {
+      const w = String(patch.website).trim()
+      if (w) {
+        let u: URL
+        try { u = new URL(w) } catch { throw bad('Địa chỉ website không hợp lệ (cần https://…)') }
+        if (!['http:', 'https:'].includes(u.protocol) || u.username || u.password || w.length > 200) throw bad('Địa chỉ website không hợp lệ (cần https://…)')
+        next.website = u.toString()
+      } else next.website = undefined
+    }
     if (o.type === 'buyer' && patch.listedSymbol !== undefined) {
       const sym = String(patch.listedSymbol).trim().toUpperCase()
       if (sym && !/^[A-Z0-9]{2,6}$/.test(sym)) throw bad('Mã chứng khoán không hợp lệ')
+      if ((sym || undefined) !== o.listedSymbol) next.listedVerified = undefined // đổi mã chứng khoán thì FCC phải xác minh lại ánh xạ
       next.listedSymbol = sym || undefined
       next.exchange = sym && ['HOSE', 'HNX', 'UPCOM'].includes(String(patch.exchange)) ? patch.exchange : undefined
     }
@@ -591,6 +601,50 @@ export const actions: Record<string, Action> = {
     c.s.orgs = c.s.orgs.map((x) => (x.id === orgId ? { ...x, kyc } : x))
     notify(c, orgId, approve ? 'Người đại diện đã được xác minh' : 'Hồ sơ xác minh chưa đạt', approve ? 'FCC đã đối chiếu giấy tờ người đại diện.' : `Lý do: ${note}`, '/settings')
     log(c, approve ? 'FCC xác minh người đại diện' : 'FCC từ chối hồ sơ xác minh', orgId, note?.trim() || o.kyc.representativeName)
+  },
+
+  // ===== Dữ liệu công khai từ nguồn ngoài (hiển thị, khiếu nại) =====
+  /** Nhân sự FCC ghi kết quả tra cứu thủ công từ nguồn công khai (nguồn không cho tự động), kèm đường dẫn và ghi chú. */
+  addExternalRecord(c, orgId: string, input: { sourceId: string; field: string; value: string; url: string; note?: string }) {
+    requireType(c, 'fcc')
+    const org = c.s.orgs.find((o) => o.id === orgId)
+    if (!org || org.type === 'fcc') throw notFound('Không tìm thấy tổ chức')
+    const src = c.s.sources.find((x) => x.id === input?.sourceId)
+    if (!src || src.kind !== 'crawl') throw bad('Chọn nguồn công khai đã đăng ký')
+    if (src.status === 'blocked' || src.sourceClass === 'C') throw forbidden('Nguồn này đã bị loại, không ghi nhận dữ liệu')
+    const field = String(input.field ?? '').trim()
+    const value = String(input.value ?? '').trim()
+    if (!field || field.length > 100 || !value || value.length > 1000) throw bad('Cần tên trường và giá trị')
+    if (!/^https?:\/\//.test(String(input.url ?? ''))) throw bad('Cần đường dẫn nguồn (https://…) để truy xuất')
+    const rec: ExternalRecord = { id: uid('X'), orgId, sourceId: src.id, field, value: input.note?.trim() ? `${value} — ${input.note.trim().slice(0, 200)}` : value, fetchedAt: c.now.toISOString(), url: input.url, contentHash: createHash('sha256').update(`${field}|${value}|${input.url}`).digest('hex'), manual: true }
+    c.s.external = [rec, ...c.s.external]
+    notify(c, orgId, 'Có dữ liệu công khai mới về doanh nghiệp bạn', `${field} — nguồn ${src.name}. Bạn có thể xem và khiếu nại nếu sai lệch.`, '/settings')
+    log(c, 'FCC ghi nhận dữ liệu công khai (tra cứu thủ công)', rec.id, `${orgName(c, orgId)} · ${field} · ${src.name}`)
+    return rec
+  },
+  /** Doanh nghiệp khiếu nại sai lệch dữ liệu công khai về mình: hiển thị “Đang được xem xét”. */
+  disputeExternal(c, recordId: string, reason: string) {
+    const r = c.s.external.find((x) => x.id === recordId)
+    if (!r) throw notFound('Không tìm thấy bản ghi')
+    requireSelf(c, r.orgId)
+    if (r.disputed) throw conflict('Bản ghi đang được xem xét')
+    if (!reason?.trim() || reason.trim().length < 10) throw bad('Nêu rõ lý do khiếu nại (tối thiểu 10 ký tự)')
+    c.s.external = c.s.external.map((x) => (x.id === recordId ? { ...x, disputed: true, disputeReason: reason.trim().slice(0, 1000), resolution: undefined } : x))
+    for (const f of c.s.orgs.filter((x) => x.type === 'fcc')) notify(c, f.id, 'Khiếu nại dữ liệu công khai', `${orgName(c, r.orgId)}: ${r.field}`, '/admin')
+    log(c, 'Khiếu nại dữ liệu công khai', recordId, reason.trim().slice(0, 200))
+  },
+  /** FCC xử lý khiếu nại: upheld → xóa bản ghi sai; rejected → giữ nguyên kèm lý do. */
+  resolveExternal(c, recordId: string, outcome: 'upheld' | 'rejected', note: string) {
+    requireType(c, 'fcc')
+    const r = c.s.external.find((x) => x.id === recordId)
+    if (!r) throw notFound('Không tìm thấy bản ghi')
+    if (!r.disputed) throw conflict('Bản ghi không có khiếu nại đang mở')
+    if (!['upheld', 'rejected'].includes(outcome) || !note?.trim()) throw bad('Cần kết quả (upheld|rejected) và ghi chú')
+    c.s.external = outcome === 'upheld'
+      ? c.s.external.filter((x) => x.id !== recordId)
+      : c.s.external.map((x) => (x.id === recordId ? { ...x, disputed: false, resolution: { outcome, note: note.trim().slice(0, 500), at: c.now.toISOString(), by: c.userId ?? 'system' } } : x))
+    notify(c, r.orgId, outcome === 'upheld' ? 'Khiếu nại dữ liệu công khai được chấp nhận' : 'Khiếu nại dữ liệu công khai chưa được chấp nhận', note.trim(), '/settings')
+    log(c, outcome === 'upheld' ? 'FCC chấp nhận khiếu nại, gỡ bản ghi' : 'FCC giữ bản ghi sau khiếu nại', recordId, note.trim())
   },
 
   // ===== Thanh toán sớm =====

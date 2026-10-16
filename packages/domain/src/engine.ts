@@ -58,8 +58,6 @@ export function supplierScoreOf(s: S, sellerId: string): ScoreResult {
     const apps = s.applications.filter((a) => mine.some((r) => r.id === a.receivableId))
     const esg = esgOf(s, sellerId)
     const e6 = esg?.assessment.indicators.find((i) => i.code === 'E6')?.finalLevel
-    const ext = s.external.filter((e) => e.orgId === sellerId && !e.disputed)
-    const legal = ext.find((e) => e.field === 'Sự kiện pháp lý')
     return scoreSupplier({
       org,
       profile,
@@ -68,7 +66,7 @@ export function supplierScoreOf(s: S, sellerId: string): ScoreResult {
       topCustomerRating: profile.topCustomerId ? buyerScoreOf(s, profile.topCustomerId).rating : undefined,
       fccBehavior: { disputes: mine.filter((r) => r.state === 'BUYER_DISPUTED').length, returned: apps.filter((a) => a.state === 'REJECTED').length, total: mine.length },
       esgE6Level: e6,
-      legalEventsFromCrawl: legal ? (/khắc phục/.test(legal.value) ? 'minor_resolved' : 'major') : profile.legalEvents,
+      // Dữ liệu công khai (crawl/tra cứu) CHỈ để hiển thị ở phase này; chưa dùng để tính điểm hay cờ knock-out (cần nguồn ổn định + quy trình khiếu nại + phiên bản bộ chấm điểm duyệt).
     })
   })()
 }
