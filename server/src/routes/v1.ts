@@ -11,6 +11,7 @@ import { HttpError, bad, forbidden, notFound } from '../errors'
 import { enqueueEvents, newIntegrationKey, partnerAuth, SCOPES, verifySignature, type PartnerAuth, type Scope } from '../integrations/partner'
 import { isAdminRole } from '../auth/roles'
 import type { State } from '../state'
+import { provisionSimBanks } from '../sim/provision'
 
 type Json = Record<string, unknown>
 interface Src {
@@ -229,18 +230,40 @@ export const ENDPOINTS: Endpoint[] = [
     } },
   { method: 'GET', path: '/v1/partner-endpoint/deliveries', tag: 'Tích hợp đối tác', summary: 'Lịch sử gửi webhook', auth: 'user', run: async (s, core) => core.db.webhookDeliveries(s.a!.activeOrgId) },
 
+  // ---- vận hành: tổ chức tài chính giả lập ----
+  { method: 'POST', path: '/v1/operations/sim-banks/provision', tag: 'Vận hành FCC', summary: 'Cấp phát 3 tổ chức tài chính giả lập (sim-bank); trả khóa tích hợp và khóa ký (chỉ hiển thị một lần)', auth: 'user',
+    body: { endpoint: 'URL gốc của sim-bank, ví dụ http://127.0.0.1:8790' },
+    run: async (s, core) => {
+      if (s.a!.role !== 'fcc_admin') throw forbidden('Chỉ quản trị FCC')
+      core.requireStepUp(s.a!)
+      const endpoint = String(B(s).endpoint ?? '')
+      if (!/^https?:\/\//.test(endpoint)) throw bad('Cần endpoint của sim-bank')
+      return { institutions: await provisionSimBanks(core, endpoint) }
+    } },
+
   // ---- API đối tác (khóa tích hợp) ----
   { method: 'GET', path: '/v1/partner/rfqs', tag: 'API đối tác', summary: 'RFQ gửi tới tổ chức kèm gói tóm tắt được chia sẻ', auth: 'partner', scope: 'packages:read',
     run: (s, core) => {
       const v = view(core, s.p!.orgId)
       const mine = new Set(v.products.filter((p) => p.lenderId === s.p!.orgId).map((p) => p.id))
-      return page(v.rfqs.filter((q) => q.productIds.some((p) => mine.has(p))).map((q) => ({ ...q, receivable: v.receivables.find((r) => r.id === q.receivableId) })), s.query)
+      // gói tóm tắt: khoản phải thu + điểm hồ sơ (quyền chia sẻ của RFQ gồm credit_score)
+      return page(v.rfqs.filter((q) => q.productIds.some((p) => mine.has(p))).map((q) => ({ ...q, receivable: v.receivables.find((r) => r.id === q.receivableId), score: applicationScoreOf(core.getState(), q.receivableId) })), s.query)
     } },
   { method: 'GET', path: '/v1/partner/applications', tag: 'API đối tác', summary: 'Hồ sơ tài trợ gửi tới tổ chức (gói đầy đủ theo quyền chia sẻ)', auth: 'partner', scope: 'packages:read',
     run: (s, core) => {
       const v = view(core, s.p!.orgId)
-      return page(v.applications.filter((a) => a.lenderId === s.p!.orgId).map((a) => ({ ...a, receivable: v.receivables.find((r) => r.id === a.receivableId), score: applicationScoreOf(core.getState(), a.receivableId) })), s.query)
+      const st = core.getState()
+      return page(v.applications.filter((a) => a.lenderId === s.p!.orgId).map((a) => ({
+        ...a,
+        receivable: v.receivables.find((r) => r.id === a.receivableId),
+        product: st.products.find((p) => p.id === a.productId),
+        // báo giá sơ bộ của chính tổ chức này trong RFQ đã được chọn
+        quote: a.rfqId ? st.rfqs.find((q) => q.id === a.rfqId)?.responses.find((x) => x.lenderId === s.p!.orgId) : undefined,
+        score: applicationScoreOf(st, a.receivableId),
+      })), s.query)
     } },
+  { method: 'GET', path: '/v1/partner/products', tag: 'API đối tác', summary: 'Sản phẩm của tổ chức', auth: 'partner', scope: 'products:write',
+    run: (s, core) => core.getState().products.filter((p) => p.lenderId === s.p!.orgId) },
   { method: 'POST', path: '/v1/partner/products', tag: 'API đối tác', summary: 'Đăng/sửa sản phẩm', auth: 'partner', scope: 'products:write', action: 'upsertProduct', args: (s) => [B(s)] },
   { method: 'POST', path: '/v1/partner/products/{id}/status', tag: 'API đối tác', summary: 'Tạm dừng/mở lại sản phẩm', auth: 'partner', scope: 'products:write', action: 'setProductStatus', args: (s) => [P(s, 'id'), B(s).status] },
   { method: 'POST', path: '/v1/partner/rfqs/{id}/responses', tag: 'API đối tác', summary: 'Trả báo giá/từ chối RFQ', auth: 'partner', scope: 'rfqs:respond', action: 'respondRfq', args: (s) => [P(s, 'id'), B(s)] },

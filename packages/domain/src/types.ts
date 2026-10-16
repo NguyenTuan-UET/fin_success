@@ -24,6 +24,8 @@ export interface Org {
   verified?: boolean
   /** Xác minh danh tính người đại diện (eKYC qua nhà cung cấp, hoặc FCC đối chiếu giấy tờ) */
   kyc?: OrgKyc
+  /** Tổ chức tài chính giả lập (sim-bank) — phase hiện tại chưa kết nối ngân hàng thật */
+  simulated?: boolean
 }
 
 export interface OrgKyc {

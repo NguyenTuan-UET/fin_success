@@ -1,0 +1,21 @@
+{
+  "name": "fcc-sim-bank",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Ngân hàng giả lập cho FCC: 3 tổ chức tài chính hư cấu đi qua đúng API đối tác và webhook như ngân hàng thật.",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "NODE_ENV=test vitest run"
+  },
+  "dependencies": {
+    "fastify": "^5.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0",
+    "vitest": "^3.0.0"
+  }
+}
