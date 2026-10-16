@@ -233,8 +233,15 @@ describe('luồng tài trợ chuỗi cung ứng — không có dữ liệu mẫu
     expect((await act(admin, 'updateIndicator', id, 'E1', { selfDeclared: 'sửa hộ' })).status).toBe(403)
     expect((await act(S.token, 'updateIndicator', id, 'E1', { selfDeclared: 'x' })).status).toBe(403) // doanh nghiệp khác
     expect((await getState(admin)).esg.some((x: Json) => x.id === id)).toBe(true)
+    // mức ≥ 2 cần bằng chứng gắn với chỉ tiêu
+    expect((await act(admin, 'updateIndicator', id, 'E1', { finalLevel: 3, reviewerNote: 'Đã đối chiếu hóa đơn' })).status).toBe(422)
+    expect((await act(S2.token, 'addEsgDocument', id, { id: 'd1', name: 'hoa-don-dien.pdf', mime: 'application/pdf', docType: 'Hóa đơn điện', indicatorCodes: ['E1'] })).status).toBe(200)
     expect((await act(admin, 'updateIndicator', id, 'E1', { finalLevel: 3, reviewerNote: 'Đã đối chiếu hóa đơn' })).status).toBe(200)
     expect((await act(S2.token, 'issueEsg', id, true)).status).toBe(403)
+    expect((await act(admin, 'issueEsg', id, true)).status).toBe(422) // độ bao phủ mới 1/18
+    for (const code of ['E2', 'E3', 'E4', 'E5', 'E6', 'S1', 'S2', 'S3', 'S4', 'S5', 'S6', 'G1', 'G2', 'G3', 'G4', 'G5', 'G6']) {
+      expect((await act(admin, 'updateIndicator', id, code, { finalLevel: 1 })).status, code).toBe(200)
+    }
     expect((await act(admin, 'issueEsg', id, true)).status).toBe(200)
     expect((await getState(S2.token)).esg.find((x: Json) => x.id === id).status).toBe('official')
   })

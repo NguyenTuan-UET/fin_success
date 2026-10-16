@@ -1,0 +1,146 @@
+{
+  "summary": {
+    "model": "gemma4:31b",
+    "files": 10,
+    "fieldsScored": 43,
+    "pass": 36,
+    "accuracy": 0.837,
+    "onInvoicesWithData": {
+      "files": 4,
+      "accuracy": 0.87
+    },
+    "fieldFP": 0
+  },
+  "rows": [
+    {
+      "file": "inv01_goldengate.jpg",
+      "ms": 2439,
+      "confidence": 0.95,
+      "cells": {
+        "KyHieu": "PASS",
+        "So": "PASS",
+        "NgayLap": "FAIL",
+        "NBan_MST": "PASS",
+        "NMua_MST": "ok-empty",
+        "TgTTTBSo": "PASS"
+      }
+    },
+    {
+      "file": "inv02_fpt_dieuchinh.jpg",
+      "ms": 2597,
+      "confidence": 0.9,
+      "cells": {
+        "KyHieu": "FAIL",
+        "So": "ok-empty",
+        "NgayLap": "FAIL",
+        "NBan_MST": "FAIL",
+        "NMua_MST": "PASS",
+        "TgTTTBSo": "PASS"
+      }
+    },
+    {
+      "file": "inv03_ubot_1c21taa.png",
+      "ms": 1241,
+      "confidence": 0.9,
+      "cells": {
+        "KyHieu": "FAIL",
+        "So": "PASS",
+        "NgayLap": "PASS",
+        "NBan_MST": "ok-empty",
+        "NMua_MST": "ok-empty",
+        "TgTTTBSo": "ok-empty"
+      }
+    },
+    {
+      "file": "inv04_tvpl_2022.jpg",
+      "ms": 1187,
+      "confidence": 0.9,
+      "cells": {
+        "KyHieu": "PASS",
+        "So": "PASS",
+        "NgayLap": "PASS",
+        "NBan_MST": "ok-empty",
+        "NMua_MST": "ok-empty",
+        "TgTTTBSo": "ok-empty"
+      }
+    },
+    {
+      "file": "inv05_luatminhkhue.jpg",
+      "ms": 1658,
+      "confidence": 1,
+      "cells": {
+        "KyHieu": "PASS",
+        "So": "PASS",
+        "NgayLap": "PASS",
+        "NBan_MST": "ok-empty",
+        "NMua_MST": "ok-empty",
+        "TgTTTBSo": "ok-empty"
+      }
+    },
+    {
+      "file": "inv06_easyinvoice_songngu.jpg",
+      "ms": 1367,
+      "confidence": 0.9,
+      "cells": {
+        "KyHieu": "PASS",
+        "So": "PASS",
+        "NgayLap": "ok-empty",
+        "NBan_MST": "PASS",
+        "NMua_MST": "ok-empty",
+        "TgTTTBSo": "ok-empty"
+      }
+    },
+    {
+      "file": "inv07_mobifone.png",
+      "ms": 1363,
+      "confidence": 0.9,
+      "cells": {
+        "KyHieu": "PASS",
+        "So": "PASS",
+        "NgayLap": "PASS",
+        "NBan_MST": "ok-empty",
+        "NMua_MST": "ok-empty",
+        "TgTTTBSo": "ok-empty"
+      }
+    },
+    {
+      "file": "inv08_ketoanthienung.png",
+      "ms": 3238,
+      "confidence": 1,
+      "cells": {
+        "KyHieu": "PASS",
+        "So": "PASS",
+        "NgayLap": "PASS",
+        "NBan_MST": "PASS",
+        "NMua_MST": "PASS",
+        "TgTTTBSo": "PASS"
+      }
+    },
+    {
+      "file": "inv09_viettel_068W023.png",
+      "ms": 2453,
+      "confidence": 1,
+      "cells": {
+        "KyHieu": "PASS",
+        "So": "PASS",
+        "NgayLap": "PASS",
+        "NBan_MST": "PASS",
+        "NMua_MST": "PASS",
+        "TgTTTBSo": "FAIL"
+      }
+    },
+    {
+      "file": "inv10_viettel_051W000.png",
+      "ms": 2076,
+      "confidence": 0.95,
+      "cells": {
+        "KyHieu": "PASS",
+        "So": "PASS",
+        "NgayLap": "PASS",
+        "NBan_MST": "FAIL",
+        "NMua_MST": "PASS",
+        "TgTTTBSo": "PASS"
+      }
+    }
+  ]
+}

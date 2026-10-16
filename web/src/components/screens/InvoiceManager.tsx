@@ -30,6 +30,7 @@ export function InvoiceManager() {
   const [sel, setSel] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [reviseTo, setReviseTo] = useState("");
+  const [amend, setAmend] = useState<{ amount: string; dueDate: string; note: string } | null>(null);
 
   const mine = useMemo(() => data.receivables.filter((r) => r.sellerId === org.id && r.state !== "CANCELLED"), [data.receivables, org.id]);
   const list = useMemo(() => {
@@ -161,6 +162,8 @@ export function InvoiceManager() {
                 <div><div className="muted">Nguồn</div><div>{{ xml: "XML hóa đơn điện tử", ocr: "OCR/AI", manual: "Nhập tay", accounting: "Phần mềm kế toán" }[s.source]}</div></div>
               </div>
               {s.disputeReason && <div className="err">Bên mua tranh chấp: {s.disputeReason}</div>}
+              {s.taxCheck && <div className={s.taxCheck.status === "verified" ? "okmsg" : "err"}>Đối chiếu cơ quan thuế: {{ verified: "hợp lệ", mismatch: "không khớp", cancelled: "hóa đơn đã hủy" }[s.taxCheck.status]}{s.taxCheck.note ? ` — ${s.taxCheck.note}` : ""}</div>}
+              {(s.flags ?? []).map((f) => <div key={f.code} className={f.resolvedAt ? "muted" : "err"} style={{ fontSize: 12.5 }}>{f.resolvedAt ? "✓ Đã xem xét" : "⚑ Cờ bất thường"}: {f.detail}{f.resolutionNote ? ` — ${f.resolutionNote}` : ""}</div>)}
               {s.files?.length ? (
                 <div className="muted" style={{ fontSize: 12.5 }}>Chứng từ gốc lưu bất biến (SHA-256): {s.files.map((f) => f.name).join(", ")}</div>
               ) : null}
@@ -208,6 +211,21 @@ export function InvoiceManager() {
                 </div>
               )}
               {s.state === "BUYER_PENDING" && <div className="muted">Đang chờ {orgName(data.orgs, s.buyerId)} xác nhận.</div>}
+              {["BUYER_PENDING", "BUYER_CONFIRMED"].includes(s.state) && !data.applications.some((a) => a.receivableId === s.id && !["REJECTED", "WITHDRAWN"].includes(a.state)) && (
+                amend ? (
+                  <div className="stack-sm">
+                    <strong style={{ fontSize: 13 }}>Hóa đơn điều chỉnh/thay thế</strong>
+                    <label className="field"><span>Số tiền mới (đ)</span><input className="input num" inputMode="numeric" value={amend.amount} onChange={(e) => setAmend({ ...amend, amount: e.target.value.replace(/\D/g, "") })} /></label>
+                    <label className="field"><span>Hạn thanh toán mới</span><input className="input num" type="date" value={amend.dueDate} onChange={(e) => setAmend({ ...amend, dueDate: e.target.value })} /></label>
+                    <label className="field"><span>Lý do (bắt buộc)</span><input className="input" value={amend.note} onChange={(e) => setAmend({ ...amend, note: e.target.value })} /></label>
+                    <div className="muted">Xác nhận cũ của bên mua sẽ mất hiệu lực; RFQ đang mở bị đóng.</div>
+                    <div className="row" style={{ gap: 8 }}>
+                      <button className="btn bs" onClick={() => setAmend(null)}>Hủy</button>
+                      <button className="btn bp" disabled={busy || !amend.note.trim()} onClick={() => run(async () => { await act("POST", `/v1/receivables/${s.id}/amendment`, { ...(amend.amount && Number(amend.amount) !== s.amount ? { amount: Number(amend.amount) } : {}), ...(amend.dueDate && amend.dueDate !== s.dueDate ? { dueDate: amend.dueDate } : {}), note: amend.note }); setAmend(null); }, "Đã điều chỉnh; bên mua cần xác nhận lại")}>Điều chỉnh</button>
+                    </div>
+                  </div>
+                ) : <button className="btn bs" onClick={() => setAmend({ amount: String(s.amount), dueDate: s.dueDate, note: "" })}>Điều chỉnh hóa đơn…</button>
+              )}
             </div>
             <div className="dark stack-sm">
               <span className="d-title"><Sparkles size={18} color="#DDF1C4" aria-hidden="true" />Chọn hóa đơn nào để tài trợ?</span>

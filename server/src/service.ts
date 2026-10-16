@@ -10,6 +10,8 @@ import type {
 import { iso } from '@fcc/domain/util'
 import { applicationScoreOf, buyerScoreOf, esgOf, supplierScoreOf } from '@fcc/domain/engine'
 import { matchProduct } from '@fcc/domain/marketplace'
+import { computeEsg } from '@fcc/domain/esg'
+import { invoiceFlags, openFlags } from '@fcc/domain/fraud'
 import { bad, conflict, forbidden, notFound, unprocessable } from './errors'
 import type { State } from './state'
 import type { MemberRole } from './auth/roles'
@@ -175,8 +177,14 @@ export const actions: Record<string, Action> = {
         ? input.files.slice(0, 10).filter((f) => /^[0-9a-f]{64}$/.test(f?.key)).map((f) => ({ key: f.key, name: String(f.name ?? '').slice(0, 200), kind: (['invoice', 'contract', 'delivery'] as const).find((k) => k === f.kind) ?? ('other' as const) }))
         : undefined,
     }
+    const flags = invoiceFlags(r, c.s.receivables, c.now)
+    if (flags.length) r.flags = flags
     c.s.receivables = [r, ...c.s.receivables]
     log(c, 'Tạo khoản phải thu', r.code, `${orgName(c, r.buyerId)} · ${vnd(r.amount)} ₫ · nguồn ${r.source}`)
+    if (flags.length) {
+      log(c, 'Hóa đơn có cờ bất thường', r.code, flags.map((f) => f.code).join(', '))
+      for (const f of c.s.orgs.filter((x) => x.type === 'fcc')) notify(c, f.id, `Hóa đơn ${r.code} có cờ bất thường`, flags.map((x) => x.detail).join(' '), '/admin')
+    }
     return r
   },
   sendToBuyer(c, id: string) {
@@ -205,6 +213,51 @@ export const actions: Record<string, Action> = {
     patchRecv(c, id, { amount, version: r.version + 1, state: 'BUYER_PENDING', description: `${r.description} (điều chỉnh: ${note.trim()})` })
     notify(c, r.buyerId, `${r.code} đã điều chỉnh — cần xác nhận lại`, note, '/invoices')
     log(c, 'Tạo phiên bản mới sau tranh chấp', r.code, `v${r.version + 1}: ${note}`)
+  },
+  /**
+   * Điều chỉnh số tiền/hạn thanh toán sau khi đã gửi hoặc được xác nhận (hóa đơn điều chỉnh/thay thế).
+   * Tăng phiên bản; xác nhận cũ mất hiệu lực và bên mua phải xác nhận lại. Không điều chỉnh khi đã có hồ sơ tài trợ.
+   */
+  reviseReceivable(c, id: string, patch: { amount?: number; dueDate?: string; note: string }) {
+    const r = recv(c, id)
+    requireSelf(c, r.sellerId)
+    requireState('Khoản phải thu', r.state, ['BUYER_PENDING', 'BUYER_CONFIRMED'])
+    if (openApplicationFor(c, id)) throw conflict('Khoản phải thu đang có hồ sơ tài trợ — rút hồ sơ trước khi điều chỉnh')
+    if (!patch?.note?.trim()) throw bad('Cần ghi chú lý do điều chỉnh (hóa đơn điều chỉnh/thay thế)')
+    const next: Partial<Receivable> = {}
+    if (patch.amount !== undefined) { positiveInt(patch.amount, 'Số tiền'); next.amount = patch.amount }
+    if (patch.dueDate !== undefined) {
+      if (!isDate(patch.dueDate) || patch.dueDate <= r.issueDate) throw bad('Hạn thanh toán không hợp lệ')
+      next.dueDate = patch.dueDate
+    }
+    if (next.amount === undefined && next.dueDate === undefined) throw bad('Không có thay đổi')
+    // RFQ đang mở dựa trên phiên bản cũ phải đóng
+    for (const q of c.s.rfqs.filter((x) => x.receivableId === id && ['OPEN', 'RESPONDED'].includes(x.state))) {
+      c.s.rfqs = c.s.rfqs.map((x) => (x.id === q.id ? { ...x, state: 'CANCELLED' } : x))
+      c.s.consents = c.s.consents.map((k) => (k.purpose === `Gói tóm tắt RFQ ${q.id}` && !k.revokedAt ? { ...k, revokedAt: iso(c.now) } : k))
+    }
+    patchRecv(c, id, { ...next, version: r.version + 1, state: 'BUYER_PENDING', confirmedAt: undefined, description: `${r.description} (điều chỉnh v${r.version + 1}: ${patch.note.trim()})`.slice(0, 500) })
+    notify(c, r.buyerId, `${r.code} đã điều chỉnh — cần xác nhận lại`, patch.note, '/invoices')
+    log(c, 'Điều chỉnh hóa đơn (xác nhận cũ mất hiệu lực)', r.code, `v${r.version + 1}: ${patch.note.trim()}`)
+  },
+  /** Vận hành FCC xử lý cờ bất thường (đã xem xét), kèm ghi chú. */
+  resolveFlag(c, receivableId: string, code: string, note: string) {
+    requireType(c, 'fcc')
+    const r = recv(c, receivableId)
+    if (!note?.trim()) throw bad('Cần ghi chú xử lý')
+    if (!openFlags(r).some((f) => f.code === code)) throw notFound('Không có cờ chưa xử lý với mã này')
+    patchRecv(c, receivableId, { flags: r.flags!.map((f) => (f.code === code && !f.resolvedAt ? { ...f, resolvedAt: iso(c.now), resolvedBy: c.userId ?? 'system', resolutionNote: note.trim().slice(0, 500) } : f)) })
+    log(c, 'FCC xử lý cờ hóa đơn', r.code, `${code}: ${note.trim()}`)
+  },
+  /** Ghi nhận kết quả đối chiếu hóa đơn với cơ quan thuế (tra cứu thủ công có hỗ trợ khi cổng có CAPTCHA). */
+  recordTaxCheck(c, receivableId: string, input: { status: 'verified' | 'mismatch' | 'cancelled'; note?: string; evidenceKey?: string }) {
+    requireType(c, 'fcc')
+    const r = recv(c, receivableId)
+    if (!['verified', 'mismatch', 'cancelled'].includes(input?.status)) throw bad('Kết quả đối chiếu không hợp lệ')
+    if (input.status !== 'verified' && !input.note?.trim()) throw bad('Cần ghi chú khi hóa đơn không khớp hoặc đã hủy')
+    patchRecv(c, receivableId, { taxCheck: { status: input.status, at: iso(c.now), by: c.userId ?? 'system', method: 'manual_lookup', note: input.note?.trim().slice(0, 500), evidenceKey: /^[0-9a-f]{64}$/.test(String(input.evidenceKey)) ? input.evidenceKey : undefined } })
+    if (input.status !== 'verified') notify(c, r.sellerId, `Hóa đơn ${r.code}: đối chiếu thuế ${input.status === 'cancelled' ? 'phát hiện đã hủy' : 'không khớp'}`, input.note ?? '', '/invoices')
+    log(c, 'Đối chiếu hóa đơn với cơ quan thuế', r.code, `${input.status}${input.note ? `: ${input.note}` : ''}`)
   },
   cancelReceivable(c, id: string) {
     const r = recv(c, id)
@@ -534,6 +587,24 @@ export const actions: Record<string, Action> = {
     if (keys.some((k) => REVIEWER_FIELDS.includes(k)) && !isFcc) throw forbidden('Chỉ người thẩm định FCC mới được xác nhận mức/ghi chú thẩm định')
     if (keys.some((k) => OWNER_FIELDS.includes(k)) && isFcc) throw forbidden('Người thẩm định không sửa dữ liệu tự khai/đề xuất AI của doanh nghiệp')
     if ('finalLevel' in patch && patch.finalLevel !== undefined && ![0, 1, 2, 3, 4].includes(patch.finalLevel)) throw bad('Mức chỉ tiêu phải từ 0 đến 4')
+    const cur = a.indicators.find((i) => i.code === code)
+    // đề xuất AI mức ≥ 2 bắt buộc có trích dẫn tài liệu của chính hồ sơ này (SPEC F17)
+    if (patch.aiLevel !== undefined && patch.aiLevel >= 2) {
+      const cites = patch.aiCitations ?? []
+      if (!cites.length || !cites.every((k) => a.documents.some((d) => d.id === k.documentId))) throw unprocessable('Đề xuất AI mức ≥ 2 phải trích dẫn tài liệu đã tải lên')
+    }
+    if (isFcc && 'finalLevel' in patch && patch.finalLevel !== undefined) {
+      const lvl = patch.finalLevel
+      // mức ≥ 2 cần ít nhất một bằng chứng trong 12 tháng liên kết với chỉ tiêu (SPEC F16, F17)
+      if (lvl >= 2) {
+        const cutoff = c.now.getTime() - 365 * DAY
+        if (!a.documents.some((d) => d.indicatorCodes.includes(code) && new Date(d.uploadedAt).getTime() >= cutoff)) throw unprocessable('Mức ≥ 2 cần ít nhất một bằng chứng trong 12 tháng gắn với chỉ tiêu này')
+      }
+      // khác đề xuất AI phải ghi lý do
+      const note = (patch.reviewerNote ?? cur?.reviewerNote ?? '').trim()
+      if (cur?.aiLevel !== undefined && lvl !== cur.aiLevel && !note) throw bad('Mức khác đề xuất của AI: cần ghi lý do')
+    }
+    if (isFcc && patch.na === true && !(patch.naReason ?? cur?.naReason)?.trim()) throw bad('Chỉ tiêu không áp dụng cần nêu lý do')
     const has = a.indicators.some((i) => i.code === code)
     const indicators = has ? a.indicators.map((i) => (i.code === code ? { ...i, ...patch } : i)) : [...a.indicators, { code, ...patch }]
     c.s.esg = c.s.esg.map((x) => (x.id === a.id ? { ...x, indicators, status: x.status === 'official' || x.status === 'draft' ? 'in_review' : x.status } : x))
@@ -558,6 +629,13 @@ export const actions: Record<string, Action> = {
     const a = esgAccess(c, assessmentId, 'any')
     if (official && c.actor.type !== 'fcc') throw forbidden('Chỉ người thẩm định FCC mới được phát hành điểm ESG chính thức')
     if (!official && c.actor.type === 'fcc') throw forbidden('Người thẩm định chỉ phát hành điểm chính thức')
+    if (official) {
+      const r = computeEsg(a.indicators, a.industryGroup)
+      if (!r.official) throw unprocessable(`Độ bao phủ ${Math.round(r.coverage * 100)}% dưới 80% — chưa phát hành điểm chính thức`)
+      // cờ trọng yếu phải được người thẩm định xử lý (có ghi chú) trước khi phát hành
+      const unresolved = r.flags.filter((f) => !a.indicators.find((i) => i.code === f.code)?.reviewerNote?.trim())
+      if (unresolved.length) throw unprocessable(`Cờ trọng yếu chưa xử lý: ${unresolved.map((f) => f.code).join(', ')} — ghi chú thẩm định trước khi phát hành`)
+    }
     c.s.esg = c.s.esg.map((x) => (x.id === a.id ? { ...x, status: official ? 'official' : 'provisional', issuedAt: iso(c.now), validUntil: iso(new Date(c.now.getTime() + 365 * DAY)) } : x))
     log(c, official ? 'Phát hành điểm ESG chính thức' : 'Lưu điểm ESG tạm tính', assessmentId, '')
   },

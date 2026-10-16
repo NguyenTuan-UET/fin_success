@@ -27,7 +27,7 @@ export const isAdminRole = (r: MemberRole) => r === 'owner' || r === 'fcc_admin'
 export const MFA_ROLES: MemberRole[] = ['owner', 'approver', 'analyst', 'product_manager', 'fcc_admin', 'fcc_reviewer', 'fcc_operations', 'fcc_model_owner']
 
 const OPERATOR: string[] = [
-  'createReceivable', 'sendToBuyer', 'reviseDisputed', 'cancelReceivable', 'ensureEsg', 'addEsgDocument', 'updateEsgMetrics',
+  'createReceivable', 'sendToBuyer', 'reviseDisputed', 'reviseReceivable', 'cancelReceivable', 'ensureEsg', 'addEsgDocument', 'updateEsgMetrics',
   'updateIndicator', 'setEsgIndustry', 'upsertFinancialYear', 'updateProfile', 'saveCashProfile', 'importLedger', 'refreshListed',
   'addCollateral', 'removeCollateral', 'importJournal',
 ]
@@ -44,7 +44,7 @@ export const PERMISSIONS: Record<string, MemberRole[]> = {
   respondRfq: ['analyst'], startReview: ['analyst'], makeOffer: ['analyst'], rejectApp: ['analyst'], fundApp: ['analyst'],
   upsertProduct: ['product_manager'], setProductStatus: ['product_manager'],
   // FCC
-  approveProduct: ['fcc_operations'], verifyOrg: ['fcc_operations'], decideKyc: ['fcc_operations'],
+  approveProduct: ['fcc_operations'], verifyOrg: ['fcc_operations'], decideKyc: ['fcc_operations'], resolveFlag: ['fcc_operations'], recordTaxCheck: ['fcc_operations'],
   issueEsg: ['fcc_reviewer'],
   // chỉ owner/fcc_admin: updateOrg, submitKyc (không liệt kê)
   ...Object.fromEntries(ALWAYS.map((a) => [a, ['approver', 'operator', 'analyst', 'product_manager', 'fcc_reviewer', 'fcc_operations', 'fcc_model_owner', 'fcc_auditor'] as MemberRole[]])),

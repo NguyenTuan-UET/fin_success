@@ -18,7 +18,9 @@ export function viewFor(s: State, actorId: string, now = new Date()): State {
   if (isFcc) {
     return {
       orgs: s.orgs, products: s.products, sources: s.sources, listed: [], limits: [], profiles: [], esg: s.esg, external: [], connections: [], ledger: [],
-      receivables: [], rfqs: [], applications: [], earlyOffers: [], consents: [],
+      // chỉ các khoản có cờ bất thường hoặc đã đối chiếu thuế, đã rút gọn (không mô tả, không chứng từ, không số/ký hiệu hóa đơn)
+      receivables: s.receivables.filter((r) => (r.flags?.length ?? 0) > 0 || r.taxCheck).map((r) => ({ ...r, description: '', files: undefined, fingerprint: '', docs: { xml: false, contract: false, delivery: false }, disputeReason: undefined })),
+      rfqs: [], applications: [], earlyOffers: [], consents: [],
       notifications: s.notifications.filter((n) => n.orgId === actorId).slice(0, 200),
       audit: s.audit.slice(0, 300),
     }

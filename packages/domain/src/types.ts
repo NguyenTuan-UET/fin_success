@@ -5,6 +5,15 @@ export type OrgType = 'buyer' | 'supplier' | 'lender' | 'fcc'
 export type IndustryGroup = 'manufacturing' | 'trade' | 'agri' | 'tech'
 export type DataStatus = 'self_declared' | 'extracted' | 'verified' | 'public_reference'
 
+export interface InvoiceFlag {
+  code: 'AMOUNT_ANOMALY' | 'NEW_BUYER_LARGE' | 'FUTURE_ISSUE_DATE' | 'BURST_SAME_BUYER' | 'ROUND_LARGE_MANUAL' | 'NO_SOURCE_DOCUMENT'
+  detail: string
+  severity: 'high' | 'medium' | 'low'
+  resolvedAt?: string
+  resolvedBy?: string
+  resolutionNote?: string
+}
+
 export interface Org {
   id: string
   name: string
@@ -158,6 +167,12 @@ export interface Receivable {
   fingerprint: string
   docs: { xml: boolean; contract: boolean; delivery: boolean }
   source: 'xml' | 'ocr' | 'manual' | 'accounting'
+  /** Cờ gian lận/bất thường theo luật; hồ sơ có cờ chưa xử lý vào hàng đợi FCC operations (không tự từ chối) */
+  flags?: InvoiceFlag[]
+  /** Kết quả đối chiếu hóa đơn với cơ quan thuế (tự động hoặc tra cứu thủ công có hỗ trợ) */
+  taxCheck?: { status: 'verified' | 'mismatch' | 'cancelled'; at: string; by: string; method: 'manual_lookup' | 'provider'; note?: string; evidenceKey?: string }
+  /** Hóa đơn điều chỉnh/thay thế: khoản phải thu gốc */
+  replacesId?: string
   /** Chứng từ gốc đã tải lên kho tệp (bất biến, định danh theo SHA-256) */
   files?: { key: string; name: string; kind: 'invoice' | 'contract' | 'delivery' | 'other' }[]
   disputeReason?: string

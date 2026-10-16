@@ -46,6 +46,7 @@ export default function AdminPage() {
   const lendersPending = data.orgs.filter((o) => o.type === "lender" && !o.verified);
   const kycPending = data.orgs.filter((o) => o.kyc?.status === "pending");
   const productsPending = data.products.filter((p) => p.status === "pending_review");
+  const flagged = data.receivables.filter((r) => (r.flags ?? []).some((f) => !f.resolvedAt));
   const esgPending = data.esg.filter((e) => e.source === "assessed" && e.status !== "official");
 
   return (
@@ -78,6 +79,23 @@ export default function AdminPage() {
               <button className="btn bp sm" disabled={busy} onClick={() => run(() => act("POST", `/v1/financing-products/${p.id}/review`, { approve: true }), "Đã duyệt")}>Duyệt</button>
               <button className="btn bs sm" disabled={busy} onClick={() => { const note = prompt("Lý do chưa duyệt"); if (note) void run(() => act("POST", `/v1/financing-products/${p.id}/review`, { approve: false, note }), "Đã từ chối"); }}>Từ chối</button>
             </span>
+          </div>
+        ))}
+      </section>
+
+      <section className="card flush">
+        <div className="ch"><h2 className="ct">Hóa đơn có cờ bất thường</h2><span className="muted">{flagged.length} cần xem xét · FCC không thấy chứng từ, chỉ thông tin tối thiểu</span></div>
+        {flagged.length === 0 && <div className="empty">Không có hóa đơn nào cần xem xét.</div>}
+        {flagged.map((r) => (
+          <div key={r.id} className="stack-sm" style={{ padding: "12px 16px", borderTop: "1px solid var(--line-2)" }}>
+            <div className="between"><span><strong className="num">{r.code}</strong> · {data.orgs.find((o) => o.id === r.sellerId)?.shortName} → {data.orgs.find((o) => o.id === r.buyerId)?.shortName} · {r.amount.toLocaleString("vi-VN")} đ</span>
+              <span className="row" style={{ gap: 6 }}>
+                <button className="btn bs sm" disabled={busy} onClick={() => { const note = prompt("Kết quả tra cứu cơ quan thuế (ghi chú)"); if (note) void run(() => act("POST", `/v1/receivables/${r.id}/tax-check`, { status: /hủy/i.test(note) ? "cancelled" : /không khớp|sai/i.test(note) ? "mismatch" : "verified", note }), "Đã ghi nhận đối chiếu thuế"); }}>Ghi kết quả đối chiếu thuế</button>
+              </span></div>
+            {(r.flags ?? []).filter((f) => !f.resolvedAt).map((f) => (
+              <div key={f.code} className="between soft"><span><span className={`chip ${f.severity === "high" ? "c-bad" : f.severity === "medium" ? "c-warn" : "c-neu"}`}>{f.code}</span> {f.detail}</span>
+                <button className="btn bp sm" disabled={busy} onClick={() => { const note = prompt("Ghi chú xử lý"); if (note) void run(() => act("POST", `/v1/receivables/${r.id}/flags/${f.code}/resolve`, { note }), "Đã xử lý cờ"); }}>Đã xem xét</button></div>
+            ))}
           </div>
         ))}
       </section>
