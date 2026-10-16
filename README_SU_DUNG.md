@@ -1,172 +1,204 @@
-# FCC — hướng dẫn sử dụng nhanh
+# FCC — Hướng dẫn sử dụng (dành cho người dùng thử)
 
-FCC (Fast Cash Connect) giúp **nhà cung cấp (SME)** nhận tiền sớm cho hóa đơn đã giao, dựa trên uy tín của **bên mua**, thông qua **tổ chức tài chính**. FCC chấm điểm, kết nối và theo dõi; FCC **không giữ tiền, không cho vay, không quyết định tín dụng**.
+**FCC (Fast Cash Connect)** là nền tảng giúp **nhà cung cấp** (doanh nghiệp nhỏ và vừa) nhận tiền sớm cho hóa đơn đã giao hàng. Khoản tiền này do **tổ chức tài chính** ứng trước, căn cứ vào uy tín của **bên mua**. FCC làm nhiệm vụ chấm điểm, kết nối và theo dõi. FCC **không giữ tiền, không cho vay và không quyết định tín dụng**.
 
-> Phiên bản hiện tại không kết nối ngân hàng thật: phía ngân hàng do **ngân hàng giả lập** (`sim-bank/`) đóng vai. Mọi số liệu điểm và xếp hạng chỉ là tham khảo.
-
-Tài liệu đầy đủ: [document/HUONG_DAN_SU_DUNG.md](document/HUONG_DAN_SU_DUNG.md) (đã làm/chưa làm, chi tiết từng vai trò) · [README.md](README.md) (cài đặt, kiến trúc) · [document/VAN_HANH.md](document/VAN_HANH.md) (triển khai).
+> **Đây là bản thử nghiệm.**
+> - Các tổ chức tài chính trong hệ thống là **giả lập**: báo giá và giải ngân đều là mô phỏng, **không có tiền thật**.
+> - Điểm số và xếp hạng chỉ để **tham khảo**.
+> - Vui lòng **không nhập thông tin thật** của doanh nghiệp hay cá nhân. Dùng tên, mã số thuế và số liệu giả.
 
 ---
 
-## 1. Bắt đầu
+## 1. Truy cập hệ thống
 
-### 1.1. Chạy hệ thống trên máy
+1. Mở **đường dẫn** do ban tổ chức gửi cho bạn bằng trình duyệt (Chrome hoặc Edge, máy tính hoặc điện thoại).
+2. Đăng nhập bằng **email và mật khẩu** được cấp, hoặc bấm **Đăng ký tổ chức** để tự tạo tổ chức thử nghiệm:
+   - chọn loại: *nhà cung cấp*, *bên mua* hoặc *tổ chức tài chính*;
+   - điền thông tin (mã số thuế gồm 10 hoặc 13 chữ số; có thể điền số giả nhưng phải đúng định dạng và **không trùng** với tổ chức khác);
+   - tạo tài khoản chủ tổ chức (mật khẩu dài, khó đoán).
+3. Nếu quên mật khẩu, bấm **Quên mật khẩu** ở màn hình đăng nhập để nhận liên kết đặt lại qua email.
 
-Cần Node ≥ 22.13. Mở hai terminal:
+### Xác thực 2 bước (MFA)
 
-```bash
-# Terminal 1 — backend (http://127.0.0.1:8787)
-cd server
-npm install
-scripts/pg-local.sh start          # PostgreSQL cục bộ
-cp .env.example .env               # lần đầu; điền OLLAMA_API_KEY để dùng AI
-npm start
+Các thao tác quan trọng (xác nhận hóa đơn, gửi yêu cầu báo giá, chọn báo giá, chấp thuận đề nghị, giải ngân…) cần thêm **mã 6 số** từ ứng dụng xác thực trên điện thoại (Google Authenticator, Microsoft Authenticator…). Cách bật, làm một lần:
 
-# Terminal 2 — giao diện (http://localhost:3000)
-cd web
-npm install
-npm run dev
-```
+1. Cài ứng dụng xác thực trên điện thoại.
+2. Bấm **Bảo mật** ở góc trên bên phải.
+3. Quét mã QR và nhập mã 6 số để bật.
+4. Từ đó, khi hệ thống hỏi, bạn nhập mã 6 số hiện trong ứng dụng. Mã đổi sau mỗi 30 giây và **mỗi mã chỉ dùng một lần**: nếu bị báo sai, hãy chờ mã mới.
 
-Cơ sở dữ liệu khởi động **trống**: không có doanh nghiệp, hóa đơn hay sản phẩm mẫu.
+---
 
-### 1.2. Hai chế độ vào hệ thống
+## 2. Làm quen với giao diện
 
-| Chế độ | Cách vào |
+- **Menu bên trái** thay đổi theo vai trò của bạn.
+- **Chuông** ở góc trên: thông báo mới (cũng có thể gửi qua email).
+- **Biểu tượng trợ lý** (AI): hỏi về số liệu của chính bạn, ví dụ "hóa đơn nào nên tài trợ?". Trợ lý chỉ giải thích dữ liệu hệ thống đang có, và từ chối câu hỏi ngoài phạm vi.
+- Những từ có **gạch chân** (5C, ESG…): rê chuột vào để xem giải thích.
+- Một số nút ghi **(cần MFA)**: bạn sẽ được hỏi mã 6 số.
+- Thông báo màu xanh/đỏ ở góc màn hình cho biết thao tác thành công hay lỗi. Nếu lỗi, đọc kỹ nội dung, thường có chỉ dẫn cách sửa.
+
+### Vai trò và quyền
+
+| Vai trò trong tổ chức | Làm được |
 | --- | --- |
-| **Dev** (mặc định, chỉ localhost) | Không đăng nhập. Mở `/supplier`, `/buyer`, `/lender`, `/admin`; mỗi vai trò một tab trình duyệt |
-| **Đăng nhập thật** (`FCC_ENV=staging` hoặc `production`) | Vào `/login` → **Đăng ký tổ chức** (chọn loại tổ chức, điền thông tin, tạo tài khoản chủ tổ chức) rồi đăng nhập bằng email/mật khẩu |
+| **Chủ tổ chức** | Toàn quyền, kể cả sửa hồ sơ tổ chức, mời và phân quyền thành viên |
+| **Người phê duyệt** (nhà cung cấp, bên mua) | Xác nhận, cam kết, chia sẻ dữ liệu |
+| **Người lập hồ sơ** (nhà cung cấp, bên mua) | Nhập hóa đơn và hồ sơ; **không** được phê duyệt hay cam kết |
+| **Chuyên viên thẩm định** (tổ chức tài chính) | Báo giá, thẩm định, đề nghị, giải ngân, thu hồi |
+| **Quản lý sản phẩm** (tổ chức tài chính) | Đăng và sửa sản phẩm |
+| **Nhân sự FCC** | Xác minh, duyệt, thẩm định, phát hành điểm |
+| **Kiểm toán** | Chỉ xem, không sửa được |
 
-Ở chế độ đăng nhập thật, vào **Bảo mật** (`/security`) để bật **MFA**: quét mã bằng ứng dụng Authenticator. Các hành động nhạy cảm sẽ yêu cầu nhập mã 6 số: xác nhận hóa đơn, gửi RFQ, chọn báo giá, chấp thuận đề nghị, giải ngân, phát hành điểm.
-
-### 1.3. Dữ liệu để thử
-
-| Cần | Dùng |
-| --- | --- |
-| BCTC bên mua thật | Khai mã `HPG` hoặc `CTD` ở Cài đặt của bên mua → nhờ FCC xác minh → bấm nạp (xem 3.2) |
-| BCTC, hóa đơn, chứng từ của nhà cung cấp | Ảnh mẫu giả lập ở `ocr_lab/samples/` (BCTC công ty "Phú Gia", hóa đơn GTGT, hóa đơn điện 12 tháng, thông báo BHXH): tải lên để AI đọc |
-| Ngân hàng phản hồi tự động | Chạy `sim-bank/` (xem mục 5) |
+Mời thêm người: **Cài đặt → Thành viên & vai trò**, nhập email, chọn vai trò, bấm **Mời thành viên** (chỉ chủ tổ chức).
 
 ---
 
-## 2. Vai trò và quyền
+## 3. Dành cho nhà cung cấp
 
-| Loại tổ chức | Vai trò trong tổ chức | Làm được |
-| --- | --- | --- |
-| Nhà cung cấp, bên mua | **Chủ tổ chức** | Toàn quyền, mời thành viên, sửa hồ sơ |
-| | **Người phê duyệt** | Xác nhận, cam kết (gửi RFQ, chọn báo giá, chấp thuận), chia sẻ dữ liệu |
-| | **Người lập hồ sơ** | Nhập hóa đơn, hồ sơ, ESG; không được phê duyệt hay cam kết |
-| Tổ chức tài chính | **Chủ tổ chức** | Toàn quyền |
-| | **Chuyên viên thẩm định** | Báo giá, thẩm định, đề nghị, giải ngân, thu hồi |
-| | **Quản lý sản phẩm** | Đăng và sửa sản phẩm |
-| FCC | **Quản trị**, **Thẩm định tín dụng/ESG**, **Vận hành**, **Chủ mô hình chấm điểm** | Xem mục 4 |
-| | **Kiểm toán** | Chỉ đọc; mọi lần truy cập được ghi lại |
+### 3.1. Chuẩn bị hồ sơ (làm một lần)
+1. Vào **Cài đặt → Hồ sơ tổ chức**: điền năm thành lập, số lao động, ngành nghề, tỉnh/thành, (tùy chọn) website. Bấm **Lưu hồ sơ**.
+2. Phần **Xác minh người đại diện**: nhập họ tên, tải ảnh giấy tờ (dùng ảnh giả), bấm **Nộp hồ sơ xác minh**. Nhân sự FCC sẽ xem và duyệt.
 
-Mời thành viên và đổi vai trò ở **Cài đặt → Thành viên & vai trò** (chỉ chủ tổ chức).
+### 3.2. Tạo khoản phải thu (hóa đơn)
+1. Vào **Hóa đơn → Tải hóa đơn OCR/AI**.
+2. Chọn một trong ba cách: tải **tệp XML** của hóa đơn, tải **ảnh/PDF** để AI đọc, hoặc chọn **Nhập tay**.
+3. **Kiểm tra kỹ** các con số AI đọc được (ký hiệu, số hóa đơn, ngày, bên mua, số tiền). AI có thể đọc sai. Sửa rồi mới lưu.
+4. Tải thêm chứng từ gốc nếu có: hợp đồng, biên bản giao hàng.
+5. Bấm **Gửi người mua xác nhận**.
+6. Nếu bên mua **tranh chấp**, vào lại hóa đơn, bấm **Điều chỉnh & gửi lại**.
+7. Hóa đơn còn ở trạng thái nháp có thể **Hủy hóa đơn nháp**.
+
+Hệ thống có thể gắn **cờ** cho hóa đơn có dấu hiệu bất thường để nhân sự FCC xem xét. Cờ không tự động từ chối hóa đơn.
+
+### 3.3. Xin tài trợ
+1. Khi bên mua đã xác nhận, vào **Marketplace**.
+2. Xem các sản phẩm phù hợp kèm **chi phí ước tính**. Chọn **tối đa 3 sản phẩm**.
+3. Bấm **Gửi yêu cầu báo giá (n/3)**. Hệ thống chỉ chia sẻ gói tóm tắt (điểm tín dụng, ESG) cho các tổ chức bạn chọn, trong 5 ngày.
+4. Khi có báo giá, so sánh rồi bấm **Chọn & gửi hồ sơ** ở báo giá bạn muốn (cần MFA). Các bên còn lại sẽ bị thu hồi quyền xem.
+5. Theo dõi ở **Hồ sơ tài trợ**. Khi tổ chức tài chính ra **đề nghị chính thức**, vào **Giải ngân & thu hồi** và bấm **Chấp thuận đề nghị (cần MFA)** trước hạn.
+6. Sau khi giải ngân, màn hình **Giải ngân & thu hồi** cho thấy tiền về và tiến độ thu hồi. Khi bên mua trả tiền, số tiền được trừ theo thứ tự **phí → lãi → gốc**. Nếu trả dư, phần dư được hoàn cho bạn. Khi đủ, hồ sơ chuyển sang **Đã tất toán**.
+
+### 3.4. Điểm tín dụng
+- Vào **Hồ sơ tài trợ** (phần chấm điểm): nhập **BCTC** từng năm rồi bấm **Lưu BCTC**, khai tài sản bảo đảm (nếu có), bấm **Chấm điểm & lưu**.
+- Bạn sẽ thấy điểm, hạng và **lý do từng chỉ tiêu**. Càng nhiều dữ liệu, độ bao phủ càng cao.
+- Không đồng ý với kết quả: bấm **Yêu cầu xem xét lại** và nêu lý do.
+
+### 3.5. ESG & Xanh
+Đây là phần doanh nghiệp tự khai trên hệ thống:
+1. Vào **ESG & Xanh**, chọn **nhóm ngành**.
+2. Với mỗi chỉ tiêu, chọn **mức từ 0 đến 3**, hoặc "không áp dụng" kèm lý do.
+3. **Tải bằng chứng** (chứng nhận, hóa đơn điện/nước, hợp đồng lao động, báo cáo môi trường…). Mức từ 2 trở lên bắt buộc có bằng chứng.
+4. Bấm **AI đề xuất mức** để AI đọc bằng chứng và gợi ý. Nếu bạn chọn khác gợi ý, phải ghi lý do.
+5. Điểm lúc này là **tạm tính**. Điểm **chính thức** do nhân sự FCC thẩm định và phát hành, khi bao phủ đạt từ 80% và các cờ quan trọng đã xử lý.
+
+### 3.6. Kế toán và dòng tiền
+Vào **Kế toán**:
+- **Nhập công nợ CSV** (có nút **Tải file mẫu**).
+- Xem **bút toán đề xuất**: bấm **Duyệt** hoặc **Từ chối** từng dòng, rồi **Xuất bút toán đã duyệt**.
+- **Liên kết ngân hàng (giả lập)** để xem sao kê giả.
+- Xem **dự báo dòng tiền** theo 3 kịch bản, **Thêm khoản chi**, **Lưu dự báo**.
+
+### 3.7. Dữ liệu công khai về doanh nghiệp bạn
+Trong **Cài đặt → Dữ liệu công khai về tổ chức** là các thông tin hệ thống thu thập từ nguồn công khai (luôn có nhãn *Nguồn công khai – tham khảo*, kèm đường dẫn nguồn và ngày lấy). Nếu sai, bấm **Khiếu nại** và ghi rõ thông tin đúng là gì. Dữ liệu này **không** ảnh hưởng điểm số.
 
 ---
 
-## 3. Luồng sử dụng chính
+## 4. Dành cho bên mua
 
-```
-Nhà cung cấp: hóa đơn → bên mua xác nhận → RFQ → báo giá → thẩm định → đề nghị → chấp thuận → giải ngân → bên mua trả → thu hồi → tất toán
-```
+1. Vào **Xác nhận hóa đơn**: danh sách hóa đơn nhà cung cấp gửi cho bạn. Với mỗi hóa đơn, bấm **Xác nhận** (cần MFA), hoặc **tranh chấp** và nêu lý do.
+2. Khi đến hạn trả tiền, bấm **Ghi nhận đã thanh toán**: nhập số tiền, ngày, mã giao dịch, bấm **Ghi nhận**. Có thể trả một phần.
+   - Đây chỉ là bên mua **tự báo**. Hồ sơ chỉ **tất toán** khi tổ chức tài chính xác nhận đã nhận tiền.
+3. **Thanh toán sớm**: bấm **Đề nghị trả sớm** để đề nghị với nhà cung cấp, rồi **Ghi nhận đã trả** khi đã trả.
+4. **Bên mua niêm yết chứng khoán:** ở **Cài đặt**, điền **mã chứng khoán** (ví dụ HPG hoặc CTD để thử). Nhờ nhân sự FCC **xác minh** mã. Sau đó vào phần chấm điểm và bấm nạp dữ liệu, bạn sẽ thấy báo cáo tài chính của công ty niêm yết và điểm bên mua. Nếu bị từ chối, nghĩa là FCC chưa xác minh hoặc mã khác với mã đã khai.
+5. **ESG chuỗi cung ứng** và **Kế toán** dùng tương tự nhà cung cấp.
 
-### 3.1. Nhà cung cấp
+---
 
-1. **Cài đặt:** khai hồ sơ tổ chức (năm thành lập, số lao động, ngành…), nhập website nếu muốn, nộp **KYC** (họ tên người đại diện + tải CCCD và giấy đăng ký kinh doanh).
-2. **Hóa đơn → thêm khoản phải thu:**
-   - tải **XML** hóa đơn, hoặc **ảnh/PDF** cho AI đọc, hoặc nhập tay;
-   - **luôn kiểm tra lại** các số AI đọc được trước khi lưu;
-   - đính chứng từ gốc (hóa đơn, hợp đồng, biên bản giao hàng);
-   - gửi cho bên mua xác nhận. Nếu bị tranh chấp thì sửa rồi gửi lại. Hệ thống có thể gắn **cờ** hóa đơn bất thường để FCC kiểm tra, không tự từ chối.
-3. **Marketplace:** xem sản phẩm phù hợp kèm chi phí ước tính; chọn tối đa **3 sản phẩm** để gửi **RFQ**; so sánh báo giá và **chọn báo giá** (MFA).
-4. **Hồ sơ tài trợ:** theo dõi thẩm định. Khi có đề nghị chính thức, **chấp thuận trước hạn** (MFA).
-5. **Giải ngân & thu hồi:** xem tiền về; khi thu hồi, tiền trừ theo thứ tự **phí → lãi → gốc**; phần dư được hoàn.
-6. **Chấm điểm & ESG:** xem điểm 5C và lý do từng chỉ tiêu. Không đồng ý thì gửi **yêu cầu xem xét lại**. Khai ESG (mục 3.4).
-7. **Kế toán:** nhập CSV công nợ, xem bút toán đề xuất, sao kê giả lập, dự báo dòng tiền 3 kịch bản.
-8. **Dữ liệu công khai:** xem thông tin FCC có về doanh nghiệp bạn (luôn có nhãn *Nguồn công khai – tham khảo*); sai thì bấm **Khiếu nại** kèm lý do. Dữ liệu này **không** đưa vào điểm.
+## 5. Dành cho tổ chức tài chính
 
-### 3.2. Bên mua
+1. Sau khi đăng ký, **chờ nhân sự FCC xác minh**. Chưa xác minh thì chưa đăng sản phẩm hay báo giá được.
+2. **Marketplace → sản phẩm của bạn:** điền loại sản phẩm, điều kiện, mức phí, thời gian xử lý; bấm **Lưu nháp** rồi **Gửi FCC duyệt**. Sản phẩm mới hoặc sau khi sửa phải được FCC duyệt mới hiển thị. Có thể **Tạm dừng** hoặc **Mở lại**.
+3. **Thẩm định hồ sơ:**
+   - Phần *RFQ chờ báo giá*: bấm **Gửi báo giá** (lãi, % ứng trước) hoặc **Từ chối**.
+   - Phần *Hàng đợi hồ sơ*: bấm **Bắt đầu thẩm định**. Xem điểm hồ sơ, điểm nhà cung cấp, điểm bên mua, chứng từ, tài sản bảo đảm và dữ liệu công khai nếu được chia sẻ. Sau đó bấm **Gửi đề nghị tài trợ** hoặc **Từ chối** (kèm lý do).
+4. Khi nhà cung cấp chấp thuận, bấm **Ghi nhận giải ngân** (cần MFA).
+5. **Thu hồi:** ô **Số tiền về**: nhập đúng số còn phải thu để tất toán (hệ thống gợi ý số này), chọn loại *Thanh toán của bên mua* hoặc *Thanh lý tài sản bảo đảm*, bấm **Ghi nhận tiền về (cần MFA)**. Nếu có phần dư, bấm **Ghi nhận đã hoàn**.
+6. **Giám sát & EWS:** danh sách cảnh báo sớm theo từng hồ sơ.
 
-1. **Xác nhận hoặc tranh chấp** hóa đơn nhà cung cấp gửi (MFA).
-2. **Ghi nhận đã thanh toán:** nhập số tiền, ngày, mã giao dịch. Đây chỉ là bên mua tự báo; hồ sơ tất toán khi **tổ chức tài chính xác nhận tiền về**.
-3. **Thanh toán sớm:** tạo đề nghị cho nhà cung cấp, ghi nhận khi đã trả.
-4. **Bên mua niêm yết** (muốn có điểm từ dữ liệu thị trường): khai mã chứng khoán ở Cài đặt → **FCC xác minh** mã thuộc đúng MST (Quản trị → *Nguồn dữ liệu công khai*) → bên mua vào mục chấm điểm và bấm **Nạp dữ liệu từ vnstock**. Ý kiến kiểm toán và diện cảnh báo do FCC nhập tay có nguồn.
+---
 
-### 3.3. Tổ chức tài chính
+## 6. Dành cho nhân sự FCC
 
-1. Đăng ký tổ chức, rồi **chờ FCC xác minh**. Chưa xác minh thì chưa đăng sản phẩm hay báo giá được.
-2. **Sản phẩm:** tạo và sửa sản phẩm (điều kiện, biểu giá, SLA, ưu đãi xanh). Sản phẩm mới hoặc đã sửa phải được FCC duyệt.
-3. **Thẩm định:**
-   - *RFQ chờ báo giá*: trả báo giá (lãi, % ứng trước) hoặc từ chối.
-   - *Hàng đợi hồ sơ*: **bắt đầu thẩm định**, xem điểm hồ sơ, điểm nhà cung cấp, điểm bên mua, chứng từ, tài sản bảo đảm khai báo, dữ liệu công khai được chia sẻ; rồi **ra đề nghị chính thức** hoặc **từ chối**.
-4. **Giải ngân:** **Ghi nhận giải ngân** (MFA).
-5. **Thu hồi:** nhập số tiền về (đúng số còn phải thu để tất toán); có thể chọn loại *thanh lý tài sản bảo đảm*. Nếu có phần dư, ghi nhận **đã hoàn**.
-6. **Giám sát:** cảnh báo sớm theo luật.
-7. **Tích hợp (API):** Cài đặt → tạo **khóa tích hợp** theo phạm vi và đặt địa chỉ nhận webhook. Tài liệu API ở `/v1/openapi.json`; gọi `/v1/partner/*` với `Authorization: Bearer fcck_...`. Webhook gửi tới bạn có header `x-fcc-signature` dạng `t=<unix>,v1=<HMAC>`; lệch thời gian quá ±5 phút thì bị từ chối.
-
-### 3.4. ESG
-
-ESG **không có dữ liệu cài sẵn**; doanh nghiệp tự khai trên giao diện (không dùng Google Form):
-
-1. Vào **ESG**, chọn **nhóm ngành**.
-2. Với từng chỉ tiêu: chọn **mức 0–3**, hoặc **không áp dụng** kèm lý do.
-3. Tải **bằng chứng** (chứng nhận ISO 14001/45001, hóa đơn điện/nước, hợp đồng lao động, báo cáo môi trường…).
-4. **AI đề xuất mức** và trích dẫn tài liệu. Nếu bạn chọn khác đề xuất, phải ghi lý do.
-5. Điểm ban đầu là **tạm tính**. **FCC reviewer** thẩm định rồi **phát hành điểm chính thức** (MFA). Điều kiện phát hành: bao phủ ≥ 80% và các cờ trọng yếu đã xử lý.
-
-### 3.5. Nhân sự FCC (`/admin`)
+Vào mục **Quản trị**. Menu gồm: **Bảng điều khiển**, **Người dùng & quyền**, **Thẩm định ESG**, **Nguồn dữ liệu công khai**, **Bảo mật & gian lận**, **Cài đặt hệ thống**.
 
 | Việc | Ở đâu |
 | --- | --- |
-| Chỉ số vận hành, ngoại lệ đang mở | Bảng điều khiển |
-| Xác minh tổ chức tài chính, duyệt KYC, duyệt sản phẩm | Hàng đợi xác minh |
-| Xử lý cờ hóa đơn, ghi kết quả đối chiếu thuế (nhập tay từ tra cứu) | Cờ hóa đơn |
-| Phát hành điểm tín dụng, xử lý yêu cầu xem xét lại, duyệt phiên bản bộ chấm điểm (cần **hai người khác nhau**) | Chấm điểm |
-| Thẩm định và phát hành điểm ESG | **Thẩm định ESG** (`/admin/esg`) |
-| Duyệt nguồn dữ liệu công khai, ghi kết quả tra cứu thủ công, xử lý khiếu nại, xác minh mã chứng khoán, nhập ý kiến kiểm toán | **Nguồn dữ liệu công khai** (`/admin/sources`) |
-| Biểu phí, doanh thu theo 6 nguồn, tính phí hằng tháng | Biểu phí và doanh thu |
-| Nhật ký và kiểm tra toàn vẹn | Nhật ký |
+| Xem số liệu vận hành (người dùng, giá trị tài trợ, tỷ lệ phê duyệt, tranh chấp, thời gian từng bước) | Bảng điều khiển |
+| Xác minh tổ chức tài chính, duyệt hồ sơ người đại diện, duyệt sản phẩm | Bảng điều khiển → hàng đợi xác minh |
+| Xử lý hóa đơn bị gắn cờ, ghi kết quả đối chiếu thuế (ghi chú kết quả tra cứu) | Bảng điều khiển |
+| Phát hành điểm tín dụng chính thức, xử lý yêu cầu xem xét lại | Bảng điều khiển |
+| Thẩm định và **Phát hành chính thức** điểm ESG (cần MFA) | Thẩm định ESG |
+| Duyệt nguồn dữ liệu, ghi kết quả tra cứu thủ công, xử lý khiếu nại, xác minh mã chứng khoán của bên mua, nhập ý kiến kiểm toán | Nguồn dữ liệu công khai |
+| Biểu phí và doanh thu | Bảng điều khiển |
+
+Lưu ý: nhân sự FCC không xem chứng từ hay hồ sơ tài trợ của doanh nghiệp.
 
 ---
 
-## 4. Dữ liệu công khai: quy tắc cần nhớ
+## 7. Kịch bản thử nghiệm gợi ý (một vòng đầy đủ)
 
-- Nguồn **chưa được FCC phê duyệt thì không chạy**.
-- Tự động chỉ đọc **website do chính doanh nghiệp khai** (tìm chứng nhận công bố). Tôn trọng robots.txt, 1 yêu cầu/5 giây; gặp CAPTCHA hoặc đăng nhập thì dừng và chuyển sang tra cứu thủ công.
-- Nguồn nhà nước (thuế, đăng ký kinh doanh, hóa đơn điện tử, tòa án, BHXH) **không tự động hóa được**: FCC tra cứu thủ công và ghi kèm đường dẫn nguồn.
-- Mọi bản ghi truy được về bản chụp gốc và **không đưa vào điểm tín dụng**.
+Cần ít nhất 3 tab trình duyệt (hoặc 3 người): nhà cung cấp, bên mua, tổ chức tài chính, thêm 1 người của FCC.
+
+| Bước | Ai làm | Việc | Kết quả mong đợi |
+| --- | --- | --- | --- |
+| 1 | Nhà cung cấp | Điền hồ sơ tổ chức, nhập BCTC, bấm **Chấm điểm & lưu** | Có điểm và hạng, kèm lý do từng chỉ tiêu |
+| 2 | FCC | Xác minh tổ chức tài chính | Tổ chức tài chính đăng sản phẩm được |
+| 3 | Tổ chức tài chính | Tạo sản phẩm, **Gửi FCC duyệt** | Sau khi FCC duyệt, sản phẩm hiện ở Marketplace của nhà cung cấp |
+| 4 | Nhà cung cấp | Tạo hóa đơn, **Gửi người mua xác nhận** | Hóa đơn hiện ở bên mua |
+| 5 | Bên mua | **Xác nhận** hóa đơn (MFA) | Hóa đơn chuyển sang đã xác nhận |
+| 6 | Nhà cung cấp | Chọn sản phẩm, **Gửi yêu cầu báo giá** | Tổ chức tài chính thấy RFQ |
+| 7 | Tổ chức tài chính | **Gửi báo giá** | Nhà cung cấp thấy báo giá |
+| 8 | Nhà cung cấp | **Chọn & gửi hồ sơ** | Hồ sơ vào hàng đợi thẩm định |
+| 9 | Tổ chức tài chính | **Bắt đầu thẩm định** → **Gửi đề nghị tài trợ** | Nhà cung cấp thấy đề nghị chính thức |
+| 10 | Nhà cung cấp | **Chấp thuận đề nghị** (MFA) | Trạng thái đã chấp thuận |
+| 11 | Tổ chức tài chính | **Ghi nhận giải ngân** (MFA) | Hồ sơ chuyển sang đã giải ngân |
+| 12 | Bên mua | **Ghi nhận đã thanh toán** | Có ghi nhận bên mua đã báo trả |
+| 13 | Tổ chức tài chính | **Ghi nhận tiền về** đúng số còn phải thu | Hồ sơ **Đã tất toán** ở cả hai phía |
+
+Thử thêm các tình huống:
+- Bên mua **tranh chấp** hóa đơn → nhà cung cấp điều chỉnh và gửi lại.
+- Bên mua trả **một phần**, rồi trả nốt.
+- Tổ chức tài chính **từ chối** hồ sơ hoặc từ chối báo giá.
+- Nhập hóa đơn trùng với hóa đơn đã có (hệ thống phải từ chối).
+- Người **lập hồ sơ** thử bấm các nút cam kết (phải bị chặn).
+- Nhà cung cấp **khiếu nại** dữ liệu công khai, hoặc **yêu cầu xem xét lại** điểm.
 
 ---
 
-## 5. Thử cùng ngân hàng giả lập
+## 8. Câu hỏi thường gặp
 
-```bash
-cd server && npx tsx scripts/provision-sim-bank.ts   # khi backend đang tắt; ghi sim-bank/config.local.json
-cd server && npm start                               # chạy lại backend
-cd sim-bank && npm install && npm start              # http://127.0.0.1:8790 (bảng điều khiển)
-```
-
-Sau đó đi một vòng: nhà cung cấp tạo hóa đơn → bên mua xác nhận → gửi RFQ → ngân hàng giả lập **tự báo giá** theo hạng → chọn báo giá → ngân hàng ra đề nghị → chấp thuận → giải ngân sau khoảng 30 giây. Trên bảng điều khiển có thể ép kịch bản cho từng hồ sơ: từ chối, trễ giải ngân, bên mua trả một phần, không có tiền về, gửi giải ngân trùng hoặc sai chữ ký. Chi tiết: [sim-bank/README.md](sim-bank/README.md).
-
----
-
-## 6. Hỏi nhanh
-
-| Câu hỏi | Trả lời |
+| Tình huống | Cách xử lý |
 | --- | --- |
-| Không đăng nhập được | Dev: mở thẳng `/supplier`, `/buyer`, `/lender`, `/admin`. Đăng nhập thật: backend phải chạy ở `FCC_ENV=staging/production`; giao diện phải trỏ đúng backend (`FCC_API_URL`) |
-| Báo "cần MFA" | Vào `/security`, bật MFA, rồi nhập mã 6 số khi được hỏi |
+| Không đăng nhập được | Kiểm tra email và mật khẩu; thử **Quên mật khẩu**. Nếu vẫn không được, báo ban tổ chức |
+| Báo "cần MFA" hoặc mã sai | Bật MFA ở **Bảo mật** (mục 1). Nếu mã sai, chờ mã mới (mỗi mã dùng một lần) |
 | Tổ chức tài chính không đăng được sản phẩm | Chờ FCC xác minh tổ chức; sản phẩm mới cũng phải được FCC duyệt |
-| Điểm bên mua báo "Thiếu BCTC" | Bên mua chưa có BCTC: nhập tay, tải lên, hoặc (nếu niêm yết) nạp từ vnstock sau khi FCC xác minh |
-| Nạp vnstock bị từ chối | FCC chưa xác minh mã chứng khoán, hoặc mã khác với mã đã khai |
-| Hồ sơ chưa tất toán dù bên mua đã bấm thanh toán | Bên mua chỉ tự báo; tổ chức tài chính phải **ghi nhận tiền về** đúng số còn phải thu |
-| AI không trả lời | Kiểm tra `OLLAMA_API_KEY` trong `server/.env`. Khi AI lỗi, hệ thống báo lỗi để nhập tay, không tự điền số |
-| Mất khóa mã hóa | Mất `FCC_DATA_KEY` (hoặc `server/data/data.key` ở dev) là mất toàn bộ tệp chứng từ; hãy cất riêng |
+| Điểm bên mua báo "Thiếu BCTC" | Chưa có báo cáo tài chính: nhập, tải lên, hoặc (bên mua niêm yết) nạp dữ liệu sau khi FCC xác minh |
+| Bên mua đã bấm thanh toán nhưng hồ sơ chưa tất toán | Bình thường: tổ chức tài chính phải **ghi nhận tiền về** đúng số còn phải thu |
+| Số AI đọc từ hóa đơn bị sai | Sửa tay trước khi lưu. AI chỉ là gợi ý |
+| Không thấy nút cần bấm | Vai trò của bạn không có quyền đó (ví dụ người lập hồ sơ không được xác nhận), hoặc bước trước chưa xong |
+| Không thấy dữ liệu mới | Tải lại trang |
+| Màn hình lỗi, trống, hoặc chậm bất thường | Chụp ảnh màn hình kèm ngày giờ, báo ban tổ chức |
 
-## 7. Lưu ý an toàn
+---
 
-- Chế độ dev không đăng nhập: chỉ chạy trên máy mình, không đưa ra Internet.
-- Chưa nhập dữ liệu doanh nghiệp thật cho đến khi có quyết định về AI (nội bộ hay dịch vụ ngoài), HTTPS và sao lưu (xem [VAN_HANH.md](document/VAN_HANH.md)).
-- Khóa API và mật khẩu chỉ nằm trong các tệp `.env*` (đã gitignore). Không dán vào chat hay commit.
+## 9. Báo lỗi và góp ý
+
+Khi báo lỗi, vui lòng gửi:
+1. **Bạn đang dùng vai trò nào** (nhà cung cấp, bên mua, tổ chức tài chính, FCC).
+2. **Bạn đang ở màn hình nào** và **đã bấm gì**.
+3. **Điều bạn mong đợi** và **điều thực tế xảy ra**.
+4. **Ảnh chụp màn hình** (có cả nội dung thông báo lỗi) và **ngày giờ** xảy ra.
+5. Trình duyệt và thiết bị (Chrome trên Windows, Safari trên iPhone…).
+
+**Lưu ý an toàn:** không chia sẻ mật khẩu hay mã 6 số; không tải lên giấy tờ hay số liệu thật; đăng xuất khi dùng máy chung (nút **Đăng xuất** ở góc trên bên phải).
