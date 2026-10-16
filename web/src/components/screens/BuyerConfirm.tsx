@@ -19,6 +19,7 @@ export function BuyerConfirm() {
   const [sel, setSel] = useState<string | null>(null);
   const [dispute, setDispute] = useState<{ id: string; reason: string } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [payFor, setPayFor] = useState<{ r: Receivable; amount: string; paidAt: string; reference: string } | null>(null);
   const [offerFor, setOfferFor] = useState<Receivable | null>(null);
   const [disc, setDisc] = useState("1");
   const [payBy, setPayBy] = useState("");
@@ -125,7 +126,7 @@ export function BuyerConfirm() {
                     <td style={{ display: "flex", gap: 6 }}>
                       {canEarly && <button className="btn bs sm" onClick={() => { setOfferFor(r); setPayBy(addDays(today(), 7)); }}>Đề nghị trả sớm</button>}
                       {["BUYER_CONFIRMED", "FUNDED", "OVERDUE"].includes(r.state) && (
-                        <button className="btn bp sm" disabled={busy} onClick={() => run(() => act("POST", `/v1/receivables/${r.id}/buyer-payment`), `Đã ghi nhận thanh toán ${r.code}`)}>Ghi nhận đã thanh toán</button>
+                        <button className="btn bp sm" disabled={busy} onClick={() => setPayFor({ r, amount: String(r.amount), paidAt: today(), reference: "" })}>Ghi nhận đã thanh toán</button>
                       )}
                     </td>
                   </tr>
@@ -177,6 +178,21 @@ export function BuyerConfirm() {
             <div className="row" style={{ justifyContent: "flex-end", gap: 8 }}>
               <button className="btn bs" onClick={() => setDispute(null)}>Hủy</button>
               <button className="btn bp" disabled={!dispute.reason.trim() || busy} onClick={() => run(async () => { await act("POST", `/v1/receivables/${dispute.id}/buyer-decision`, { confirm: false, reason: dispute.reason }); setDispute(null); }, "Đã gửi yêu cầu giải trình")}>Gửi</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {payFor && (
+        <div className="modal-scrim" role="dialog" aria-modal="true">
+          <div className="card modal">
+            <h2 className="ct">Ghi nhận thanh toán {payFor.r.code}</h2>
+            <div className="muted">{payFor.r.state === "BUYER_CONFIRMED" ? "Khoản chưa tài trợ: thanh toán trực tiếp cho nhà cung cấp, FCC chỉ ghi nhận." : "Khoản đã tài trợ: tiền chuyển cho tổ chức tài chính; họ xác nhận tiền về thì mới tất toán và đối soát với số bạn báo."}</div>
+            <label className="field"><span>Số tiền đã trả (đ)</span><input className="input num" inputMode="numeric" value={payFor.amount} onChange={(e) => setPayFor({ ...payFor, amount: e.target.value.replace(/\D/g, "") })} /></label>
+            <label className="field"><span>Ngày trả</span><input className="input num" type="date" max={today()} value={payFor.paidAt} onChange={(e) => setPayFor({ ...payFor, paidAt: e.target.value })} /></label>
+            <label className="field"><span>Số chứng từ chuyển khoản</span><input className="input" value={payFor.reference} onChange={(e) => setPayFor({ ...payFor, reference: e.target.value })} /></label>
+            <div className="row" style={{ justifyContent: "flex-end", gap: 8 }}>
+              <button className="btn bs" onClick={() => setPayFor(null)}>Hủy</button>
+              <button className="btn bp" disabled={busy || !(Number(payFor.amount) > 0)} onClick={() => run(async () => { await act("POST", `/v1/receivables/${payFor.r.id}/buyer-payment`, { amount: Number(payFor.amount), paidAt: payFor.paidAt, reference: payFor.reference || undefined }); setPayFor(null); }, `Đã ghi nhận thanh toán ${payFor.r.code}`)}>Ghi nhận</button>
             </div>
           </div>
         </div>

@@ -7,6 +7,7 @@ import { cx, date, daysFromNow, dec, vnd } from "@/lib/format";
 import { APP_STATE_LABEL, orgName } from "@/lib/model";
 import { useData } from "@/lib/session";
 import { Term } from "@/components/ui/Term";
+import { SettlementPanel } from "./SettlementPanel";
 import { useToast } from "@/components/providers/Toast";
 
 const STEPS = [
@@ -112,6 +113,7 @@ export function Disbursement() {
               {a.state === "ACCEPTED" && <div className="okmsg">Đã chấp thuận — chờ tổ chức tài chính giải ngân (mục tiêu T+1).</div>}
               {a.state === "FUNDED" && <div className="okmsg">Đã nhận {vnd(a.fundedAmount ?? o?.advanceVnd ?? 0)} đ ngày {date(a.fundedAt)}.</div>}
               {a.state === "SETTLED" && <div className="muted">Đã tất toán ngày {date(a.settledAt)}.</div>}
+              <SettlementPanel app={a} />
             </div>
 
             <aside className="stack grow-2">

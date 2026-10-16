@@ -215,14 +215,29 @@ describe('luồng tài trợ chuỗi cung ứng — không có dữ liệu mẫu
     expect(s.notifications.some((n: Json) => n.title.includes('đã giải ngân'))).toBe(true)
   })
 
-  it('bên mua thanh toán → tất toán; nhật ký có dấu vết', async () => {
+  it('bên mua báo thanh toán → tổ chức tài chính xác nhận tiền về → tất toán và hoàn phần dư; nhật ký có dấu vết', async () => {
     expect((await act(S.token, 'markBuyerPaid', rec.id)).status).toBe(403)
     const r = await act(B.token, 'markBuyerPaid', rec.id)
-    expect(r.status).toBe(200)
-    expect(r.body.state.receivables.find((x: Receivable) => x.id === rec.id).state).toBe('SETTLED')
-    expect((await getState(L1.token)).applications.find((a: FundingApplication) => a.id === fa.id).state).toBe('SETTLED')
+    expect(r.status, JSON.stringify(r.body)).toBe(200)
+    // khoản đã tài trợ: bên mua báo chưa đủ để tất toán — chờ tổ chức tài chính xác nhận tiền về
+    expect(r.body.state.receivables.find((x: Receivable) => x.id === rec.id).state).toBe('FUNDED')
+    expect((await act(L2.token, 'confirmPayment', fa.id, { amount: 1 })).status).toBe(403) // không phải tổ chức tài chính của hồ sơ
+    expect((await act(L1.token, 'confirmPayment', fa.id, { amount: -5 })).status).toBe(400)
+    const paid = await act(L1.token, 'confirmPayment', fa.id, { amount: rec.amount })
+    expect(paid.status, JSON.stringify(paid.body)).toBe(200)
+    expect(paid.body.result.settled).toBe(true)
+    expect(paid.body.result.surplus).toBeGreaterThan(0)
+    const st = await getState(S.token)
+    expect(st.receivables.find((x: Receivable) => x.id === rec.id).state).toBe('SETTLED')
+    const done = st.applications.find((a: FundingApplication) => a.id === fa.id)
+    expect(done.state).toBe('SETTLED')
+    expect(done.refundDue).toBe(paid.body.result.surplus)
+    // hoàn phần dư cho nhà cung cấp
+    expect((await act(L1.token, 'confirmRefund', fa.id, { amount: done.refundDue + 1 })).status).toBe(400)
+    expect((await act(L1.token, 'confirmRefund', fa.id, { amount: done.refundDue })).status).toBe(200)
+    expect((await getState(S.token)).applications.find((a: FundingApplication) => a.id === fa.id).refundPaid).toBe(done.refundDue)
     const logged = (await getState(S.token)).audit.map((e: Json) => e.action)
-    for (const a of ['Tạo khoản phải thu', 'Bên mua xác nhận', 'Chọn báo giá & gửi hồ sơ', 'Ghi nhận giải ngân', 'Ghi nhận thanh toán của bên mua']) expect(logged).toContain(a)
+    for (const a of ['Tạo khoản phải thu', 'Bên mua xác nhận', 'Chọn báo giá & gửi hồ sơ', 'Ghi nhận giải ngân', 'Bên mua báo đã thanh toán', 'Ghi nhận tiền về', 'Ghi nhận hoàn phần dư cho nhà cung cấp']) expect(logged).toContain(a)
   })
 
   it('ESG: doanh nghiệp tải bằng chứng, chỉ nhân sự FCC xác nhận mức và phát hành chính thức', async () => {

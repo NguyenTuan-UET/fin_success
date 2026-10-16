@@ -12,6 +12,7 @@ import { applicationScoreOf, buyerScoreOf, esgOf, supplierScoreOf } from '@fcc/d
 import { matchProduct } from '@fcc/domain/marketplace'
 import { computeEsg } from '@fcc/domain/esg'
 import { invoiceFlags, openFlags } from '@fcc/domain/fraud'
+import { allocationOf, balanceAt, reconcile, type SettlementEvent } from '@fcc/domain/settlement'
 import { bad, conflict, forbidden, notFound, unprocessable } from './errors'
 import type { State } from './state'
 import type { MemberRole } from './auth/roles'
@@ -267,20 +268,81 @@ export const actions: Record<string, Action> = {
     patchRecv(c, id, { state: 'CANCELLED' })
     log(c, 'Hủy khoản phải thu', r.code, '')
   },
-  markBuyerPaid(c, id: string) {
+  /**
+   * Bên mua ghi nhận đã thanh toán (một phần hoặc đủ). Khoản đã được tài trợ: tiền đi vào tài khoản của tổ chức tài chính nên
+   * chỉ khi tổ chức tài chính xác nhận (confirmPayment) mới tất toán; hai số được đối soát. Khoản chưa tài trợ: tất toán ngay.
+   */
+  markBuyerPaid(c, id: string, input?: { amount?: number; paidAt?: string; reference?: string }) {
     const r = recv(c, id)
-    const a = c.s.applications.find((x) => x.receivableId === id && x.state === 'FUNDED')
-    // Bên mua tự ghi nhận, hoặc tổ chức tài chính đã giải ngân ghi nhận theo sự kiện đối soát
-    if (!(c.actor.id === r.buyerId || (a && c.actor.id === a.lenderId))) throw forbidden('Chỉ bên mua hoặc tổ chức tài chính đã giải ngân mới ghi nhận thanh toán')
+    requireSelf(c, r.buyerId)
     requireState('Khoản phải thu', r.state, ['FUNDED', 'BUYER_CONFIRMED', 'OVERDUE'])
-    patchRecv(c, id, { state: 'SETTLED', paidAt: iso(c.now), paidAmount: r.amount })
-    if (a) {
-      patchApp(c, a.id, { state: 'SETTLED', settledAt: iso(c.now) })
-      notify(c, a.lenderId, `${r.code} đã tất toán`, `Bên mua thanh toán ${vnd(r.amount)} ₫ vào tài khoản chuyên dùng.`)
-      emit(c, a.lenderId, 'receivable.paid', { applicationId: a.id, receivableId: r.id, amount: r.amount })
+    const a = c.s.applications.find((x) => x.receivableId === id && x.state === 'FUNDED')
+    if (!a) {
+      patchRecv(c, id, { state: 'SETTLED', paidAt: iso(c.now), paidAmount: r.amount })
+      notify(c, r.sellerId, `${r.code} đã được thanh toán`, 'Khoản phải thu đã tất toán.')
+      log(c, 'Ghi nhận thanh toán của bên mua', r.code, 'Thanh toán trực tiếp cho nhà cung cấp')
+      return
     }
-    notify(c, r.sellerId, `${r.code} đã được thanh toán`, 'Khoản phải thu đã tất toán.')
-    log(c, 'Ghi nhận thanh toán của bên mua', r.code, a ? `Tất toán ${a.id}` : 'Thanh toán trực tiếp')
+    const amount = input?.amount === undefined ? r.amount - (a.settlements ?? []).filter((e) => e.type === 'buyer_reported').reduce((t, e) => t + e.amount, 0) : input.amount
+    positiveInt(amount, 'Số tiền thanh toán')
+    const at = input?.paidAt && isDate(input.paidAt) ? `${input.paidAt}T00:00:00.000Z` : c.now.toISOString()
+    const ev: SettlementEvent = { id: uid('SE'), type: 'buyer_reported', amount, at, source: 'buyer', reference: input?.reference?.slice(0, 100) }
+    const settlements = [...(a.settlements ?? []), ev]
+    patchApp(c, a.id, { settlements })
+    notify(c, a.lenderId, `${r.code}: bên mua báo đã thanh toán ${vnd(amount)} ₫`, 'Đối chiếu tài khoản và xác nhận tiền về để tất toán.', '/invoices')
+    emit(c, a.lenderId, 'receivable.paid', { applicationId: a.id, receivableId: r.id, amount, paidAt: at, reference: ev.reference })
+    log(c, 'Bên mua báo đã thanh toán', r.code, `${vnd(amount)} ₫ — chờ ${orgName(c, a.lenderId)} xác nhận tiền về`)
+  },
+  /** Tổ chức tài chính xác nhận tiền về (thanh toán của bên mua hoặc thanh lý tài sản bảo đảm). Tính dư nợ theo phí → lãi → gốc; đủ thì tất toán và có phần dư hoàn cho nhà cung cấp. */
+  confirmPayment(c, appId: string, input: { amount: number; paidAt?: string; kind?: 'payment' | 'collateral'; reference?: string; externalEventId?: string }) {
+    const a = app(c, appId)
+    requireSelf(c, a.lenderId)
+    requireState('Hồ sơ', a.state, ['FUNDED'])
+    const r = recv(c, a.receivableId)
+    const product = c.s.products.find((p) => p.id === a.productId)
+    if (!a.offer || !a.fundedAt) throw conflict('Hồ sơ chưa có thông tin giải ngân')
+    positiveInt(input?.amount, 'Số tiền')
+    if (input.externalEventId && (a.settlements ?? []).some((e) => e.externalEventId === input.externalEventId)) return { duplicate: true }
+    const at = input.paidAt && isDate(input.paidAt) ? `${input.paidAt}T00:00:00.000Z` : c.now.toISOString()
+    if (at < a.fundedAt) throw bad('Ngày thu tiền không được trước ngày giải ngân')
+    const prior = a.settlements ?? []
+    const ev: SettlementEvent = { id: uid('SE'), type: input.kind === 'collateral' ? 'collateral_liquidated' : 'payment_received', amount: input.amount, at, source: 'lender', externalEventId: input.externalEventId, reference: input.reference?.slice(0, 100) }
+    ev.allocation = allocationOf(a.offer, a.fundedAt, r.dueDate, prior, ev, product?.pricing.latePenaltyPct)
+    const settlements = [...prior, ev]
+    const bal = balanceAt(a.offer, a.fundedAt, r.dueDate, settlements, at > c.now.toISOString() ? at : c.now.toISOString(), product?.pricing.latePenaltyPct)
+    const patch: Partial<FundingApplication> = { settlements, outstanding: bal.outstanding }
+    if (bal.settled) {
+      patch.state = 'SETTLED'
+      patch.settledAt = iso(c.now)
+      patch.refundDue = bal.surplus
+      patch.settlements = bal.surplus > 0 ? [...settlements, { id: uid('SE'), type: 'refund_due', amount: bal.surplus, at: c.now.toISOString(), source: 'system', note: 'Phần thu vượt dư nợ, hoàn cho nhà cung cấp' }] : settlements
+      patchRecv(c, r.id, { state: 'SETTLED', paidAt: iso(c.now), paidAmount: bal.received })
+      notify(c, r.sellerId, `${r.code} đã tất toán`, bal.surplus > 0 ? `Phần còn lại ${vnd(bal.surplus)} ₫ sẽ được ${orgName(c, a.lenderId)} hoàn cho bạn.` : 'Khoản tài trợ đã tất toán.', '/invoices')
+      emit(c, a.lenderId, 'application.settled', { applicationId: a.id, surplus: bal.surplus })
+    } else {
+      notify(c, r.sellerId, `${r.code}: đã thu ${vnd(input.amount)} ₫`, `Dư nợ còn ${vnd(bal.outstanding)} ₫.`, '/invoices')
+    }
+    patchApp(c, a.id, patch)
+    log(c, ev.type === 'collateral_liquidated' ? 'Ghi nhận thanh lý tài sản bảo đảm' : 'Ghi nhận tiền về', a.id, `${vnd(input.amount)} ₫ — phí ${vnd(ev.allocation.fees)}, lãi ${vnd(ev.allocation.interest)}, gốc ${vnd(ev.allocation.principal)}${bal.settled ? ' · tất toán' : ` · còn ${vnd(bal.outstanding)} ₫`}`)
+    return { settled: bal.settled, outstanding: bal.outstanding, surplus: bal.surplus }
+  },
+  /** Tổ chức tài chính xác nhận đã hoàn phần dư cho nhà cung cấp. */
+  confirmRefund(c, appId: string, input: { amount: number; reference?: string; externalEventId?: string }) {
+    const a = app(c, appId)
+    requireSelf(c, a.lenderId)
+    requireState('Hồ sơ', a.state, ['SETTLED'])
+    positiveInt(input?.amount, 'Số tiền hoàn')
+    if (input.externalEventId && (a.settlements ?? []).some((e) => e.externalEventId === input.externalEventId)) return { duplicate: true }
+    const due = a.refundDue ?? 0
+    const paid = a.refundPaid ?? 0
+    if (due <= 0) throw conflict('Hồ sơ không có phần dư phải hoàn')
+    if (paid + input.amount > due) throw bad(`Số tiền hoàn vượt phần dư còn lại (${vnd(due - paid)} ₫)`)
+    const ev: SettlementEvent = { id: uid('SE'), type: 'refund_paid', amount: input.amount, at: c.now.toISOString(), source: 'lender', externalEventId: input.externalEventId, reference: input.reference?.slice(0, 100) }
+    patchApp(c, a.id, { settlements: [...(a.settlements ?? []), ev], refundPaid: paid + input.amount })
+    const r = recv(c, a.receivableId)
+    notify(c, r.sellerId, `${r.code}: đã hoàn ${vnd(input.amount)} ₫`, `${orgName(c, a.lenderId)} đã hoàn phần còn lại.`, '/invoices')
+    log(c, 'Ghi nhận hoàn phần dư cho nhà cung cấp', a.id, `${vnd(input.amount)} ₫ (còn ${vnd(due - paid - input.amount)} ₫)`)
+    return { remaining: due - paid - input.amount }
   },
 
   // ===== RFQ =====
@@ -731,6 +793,9 @@ function putResponse(c: Ctx, q: Rfq, resp: RfqResponse) {
 }
 
 /** Ghi nhận giải ngân — idempotent: gọi lại khi đã FUNDED không đổi gì. */
+/** Đối soát bên mua ↔ tổ chức tài chính của một hồ sơ. */
+export const reconciliationOf = (a: FundingApplication) => reconcile(a.settlements ?? [])
+
 export function fundApplication(c: Ctx, a: FundingApplication, source = 'thao tác của tổ chức tài chính') {
   if (a.state === 'FUNDED' || a.state === 'SETTLED') return false
   requireState('Hồ sơ', a.state, ['ACCEPTED'])

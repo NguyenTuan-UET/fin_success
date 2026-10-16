@@ -41,7 +41,7 @@ export const PERMISSIONS: Record<string, MemberRole[]> = {
   submitDirect: ['approver'], acceptOffer: ['approver'], revokeConsent: ['approver'], createEarlyOffer: ['approver'],
   acceptEarlyOffer: ['approver'], payEarlyOffer: ['approver'], grantConsent: ['approver'],
   // tổ chức tài chính
-  respondRfq: ['analyst'], startReview: ['analyst'], makeOffer: ['analyst'], rejectApp: ['analyst'], fundApp: ['analyst'],
+  respondRfq: ['analyst'], startReview: ['analyst'], makeOffer: ['analyst'], rejectApp: ['analyst'], fundApp: ['analyst'], confirmPayment: ['analyst'], confirmRefund: ['analyst'],
   upsertProduct: ['product_manager'], setProductStatus: ['product_manager'],
   // FCC
   approveProduct: ['fcc_operations'], verifyOrg: ['fcc_operations'], decideKyc: ['fcc_operations'], resolveFlag: ['fcc_operations'], recordTaxCheck: ['fcc_operations'],
@@ -56,7 +56,7 @@ PERMISSIONS.setEsgIndustry = [...PERMISSIONS.setEsgIndustry, 'fcc_reviewer']
 
 /** Hành động nhạy cảm: cần MFA trong STEP_UP_MS gần nhất (SPEC mục 2: chia sẻ dữ liệu, chọn báo giá, phát hành điểm…). */
 export const STEP_UP_ACTIONS = new Set([
-  'buyerDecision', 'acceptOffer', 'selectQuote', 'createRfq', 'submitDirect', 'grantConsent', 'issueEsg', 'fundApp', 'markBuyerPaid',
+  'buyerDecision', 'acceptOffer', 'selectQuote', 'createRfq', 'submitDirect', 'grantConsent', 'issueEsg', 'fundApp', 'markBuyerPaid', 'confirmPayment', 'confirmRefund',
   'payEarlyOffer', 'decideKyc',
 ])
 export const STEP_UP_MS = 10 * 60_000

@@ -9,6 +9,7 @@ import { APP_STATE_LABEL, orgName, ratingTone } from "@/lib/model";
 import { useData } from "@/lib/session";
 import { useScores } from "@/lib/scores";
 import { Bar, Disclaimer } from "@/components/ui/basic";
+import { SettlementPanel } from "./SettlementPanel";
 import { Term } from "@/components/ui/Term";
 import { useToast } from "@/components/providers/Toast";
 
@@ -212,6 +213,7 @@ export function LenderAppraisal() {
             )}
             {a.state === "FUNDED" && <div className="okmsg">Đã giải ngân {vnd(a.fundedAmount ?? a.offer?.advanceVnd ?? 0)} đ ngày {date(a.fundedAt)}. Theo dõi thu hồi ở Giám sát & EWS.</div>}
             {a.state === "SETTLED" && <div className="muted">Đã tất toán ngày {date(a.settledAt)}.</div>}
+            <SettlementPanel app={a} />
             {a.state === "REJECTED" && <div className="muted">Hồ sơ đã bị từ chối.</div>}
           </div>
           <div className="dark stack-sm">

@@ -1,6 +1,7 @@
 // Kiểu dữ liệu nghiệp vụ FCC (xem document/SPEC_FCC_MVP.md mục 12).
 // Tiền luôn là số nguyên VND.
 
+import type { SettlementEvent } from './settlement'
 export type OrgType = 'buyer' | 'supplier' | 'lender' | 'fcc'
 export type IndustryGroup = 'manufacturing' | 'trade' | 'agri' | 'tech'
 export type DataStatus = 'self_declared' | 'extracted' | 'verified' | 'public_reference'
@@ -259,6 +260,13 @@ export interface FundingApplication {
   fundedAt?: string
   fundedAmount?: number
   settledAt?: string
+  /** Sự kiện tiền (chỉ thêm): bên mua báo đã trả, tổ chức tài chính xác nhận đã nhận, thanh lý tài sản, hoàn phần dư */
+  settlements?: SettlementEvent[]
+  /** Dư nợ còn phải thu hồi sau các khoản đã xác nhận (VND) */
+  outstanding?: number
+  /** Phần thừa phải hoàn cho nhà cung cấp, và phần đã hoàn */
+  refundDue?: number
+  refundPaid?: number
   submittedAt: string
   decidedAt?: string
 }

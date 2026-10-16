@@ -22,7 +22,7 @@ export interface SimConfig {
 }
 
 /** Hành vi ép cho một hồ sơ/RFQ cụ thể (bảng điều khiển kịch bản). */
-export type Behavior = 'auto' | 'approve' | 'reject' | 'decline_quote' | 'delay_disbursement' | 'hold'
+export type Behavior = 'auto' | 'approve' | 'reject' | 'decline_quote' | 'delay_disbursement' | 'hold' | 'partial_payment' | 'no_payment'
 export interface LogEntry {
   at: string
   slug: string
@@ -150,6 +150,13 @@ export function createSimBank(cfg: SimConfig, deps: { fetch?: typeof fetch; now?
     note(inst.slug, 'application', `${appId}: đề nghị ứng ${advanceVnd.toLocaleString('vi-VN')} ₫, ${offer.ratePct}%/năm`)
   }
 
+  /** Gửi một sự kiện tiền có chữ ký tới /v1/partner/events. */
+  async function sendEvent(inst: InstitutionConfig, id: string, type: string, data: Json) {
+    const body = JSON.stringify({ id, type, data })
+    const t = Math.floor(now().getTime() / 1000)
+    return api(inst, 'POST', '/v1/partner/events', body, { 'x-fcc-signature': sign(inst.signingSecret, body, t) })
+  }
+
   async function sendFunded(inst: InstitutionConfig, appId: string) {
     const body = JSON.stringify({ id: `disb-${appId}`, type: 'application.funded', data: { applicationId: appId, contractRef: `HD-${inst.slug.toUpperCase()}-${appId.slice(-6)}` } })
     lastFunded.set(inst.slug, body)
@@ -173,6 +180,34 @@ export function createSimBank(cfg: SimConfig, deps: { fetch?: typeof fetch; now?
     else schedule(run, delay)
   }
 
+  /** Bên mua báo đã thanh toán → ngân hàng đối chiếu tài khoản rồi xác nhận tiền về (có thể một phần hoặc không về theo kịch bản). */
+  function onBuyerPaid(inst: InstitutionConfig, data: Json) {
+    const appId = String(data.applicationId)
+    const forced = overrides.get(appId)
+    if (forced === 'no_payment' || forced === 'hold') return note(inst.slug, 'payment', `${appId}: bên mua báo đã trả nhưng chưa thấy tiền về (theo kịch bản)`)
+    const amount = forced === 'partial_payment' ? Math.floor(Number(data.amount) * 0.6) : Number(data.amount)
+    const delay = (cfg.disburseDelaySec ?? profileOf(inst.slug).disburseDelaySec) * 1000
+    const run = () => {
+      const p = sendEvent(inst, `pay-${appId}-${data.paidAt ?? 'x'}-${amount}`, 'application.payment_received', { applicationId: appId, amount, paidAt: String(data.paidAt ?? '').slice(0, 10) || undefined, reference: `FT${String(data.reference ?? appId).slice(-8)}` })
+        .then(() => note(inst.slug, 'payment', `${appId}: xác nhận tiền về ${amount.toLocaleString('vi-VN')} ₫`))
+        .catch((e) => note(inst.slug, 'payment', `${appId}: lỗi xác nhận tiền về — ${(e as Error).message}`, false))
+      pending.push(p)
+    }
+    if (delay === 0) run()
+    else schedule(run, delay)
+  }
+
+  /** Tất toán có phần dư → hoàn cho nhà cung cấp rồi báo FCC. */
+  function onSettled(inst: InstitutionConfig, data: Json) {
+    const appId = String(data.applicationId)
+    const surplus = Number(data.surplus ?? 0)
+    if (!(surplus > 0)) return note(inst.slug, 'settlement', `${appId}: tất toán, không có phần dư`)
+    const p = sendEvent(inst, `refund-${appId}`, 'application.refund_paid', { applicationId: appId, amount: surplus, reference: `HOAN-${appId.slice(-6)}` })
+      .then(() => note(inst.slug, 'settlement', `${appId}: đã hoàn phần dư ${surplus.toLocaleString('vi-VN')} ₫ cho nhà cung cấp`))
+      .catch((e) => note(inst.slug, 'settlement', `${appId}: lỗi hoàn phần dư — ${(e as Error).message}`, false))
+    pending.push(p)
+  }
+
   async function handle(slug: string, evt: Json) {
     const inst = bySlug.get(slug)!
     if (!isAuto(slug)) return note(slug, evt.type, 'Tự động đang tắt — chờ người thao tác qua FCC')
@@ -183,6 +218,10 @@ export function createSimBank(cfg: SimConfig, deps: { fetch?: typeof fetch; now?
         return onApplication(inst, evt.data)
       case 'offer.accepted':
         return onAccepted(inst, evt.data)
+      case 'receivable.paid':
+        return onBuyerPaid(inst, evt.data)
+      case 'application.settled':
+        return onSettled(inst, evt.data)
       default:
         return note(slug, evt.type, JSON.stringify(evt.data).slice(0, 200))
     }
@@ -223,6 +262,15 @@ export function createSimBank(cfg: SimConfig, deps: { fetch?: typeof fetch; now?
     if (!b.slug || !bySlug.has(b.slug)) return { error: 'slug không hợp lệ' }
     cfg.auto = { ...cfg.auto, [b.slug]: !!b.auto }
     return { ok: true, auto: cfg.auto }
+  })
+  /** Tổ chức tài chính phát mại tài sản bảo đảm bù thiếu hụt (kịch bản vỡ nợ). */
+  app.post('/control/collateral', async (req) => {
+    const b = JSON.parse(String(req.body ?? '{}')) as { slug?: string; applicationId?: string; amount?: number; paidAt?: string }
+    const inst = b.slug ? bySlug.get(b.slug) : undefined
+    if (!inst || !b.applicationId || !(Number(b.amount) > 0)) return { error: 'Cần slug, applicationId, amount' }
+    await sendEvent(inst, `liq-${b.applicationId}-${b.amount}`, 'application.collateral_liquidated', { applicationId: b.applicationId, amount: Number(b.amount), paidAt: b.paidAt, reference: 'Phát mại tài sản' })
+    note(inst.slug, 'collateral', `${b.applicationId}: thanh lý tài sản bảo đảm ${Number(b.amount).toLocaleString('vi-VN')} ₫`)
+    return { ok: true }
   })
   /** Gửi lại sự kiện giải ngân gần nhất: trùng (FCC phải bỏ qua) hoặc sai chữ ký (FCC phải từ chối). */
   app.post('/control/replay', async (req) => {

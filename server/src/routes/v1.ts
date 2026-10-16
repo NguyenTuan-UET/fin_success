@@ -6,7 +6,8 @@ import { matchProduct, rankMatches } from '@fcc/domain/marketplace'
 import { ewsAlerts } from '@fcc/domain/ews'
 import { applicationScoreOf, buyerScoreOf, esgOf, supplierScoreOf } from '@fcc/domain/engine'
 import type { Authed, Core } from '../core'
-import { actions, fundApplication, matchContextFor } from '../service'
+import { actions, fundApplication, matchContextFor, reconciliationOf } from '../service'
+import { balanceAt } from '@fcc/domain/settlement'
 import { viewFor } from '../views'
 import { HttpError, bad, forbidden, notFound } from '../errors'
 import { enqueueEvents, newIntegrationKey, partnerAuth, SCOPES, verifySignature, type PartnerAuth, type Scope } from '../integrations/partner'
@@ -90,7 +91,7 @@ export const ENDPOINTS: Endpoint[] = [
   { method: 'POST', path: '/v1/receivables/{id}/flags/{code}/resolve', tag: 'Vận hành FCC', summary: 'FCC xử lý cờ bất thường của hóa đơn', auth: 'user', action: 'resolveFlag', args: (s) => [P(s, 'id'), P(s, 'code'), B(s).note], body: { note: 'string' } },
   { method: 'POST', path: '/v1/receivables/{id}/tax-check', tag: 'Vận hành FCC', summary: 'Ghi nhận kết quả đối chiếu hóa đơn với cơ quan thuế', auth: 'user', action: 'recordTaxCheck', args: (s) => [P(s, 'id'), B(s)], body: { status: 'verified|mismatch|cancelled', note: 'string', evidenceKey: 'khóa tệp ảnh chụp (tùy chọn)' } },
   { method: 'POST', path: '/v1/receivables/{id}/cancel', tag: 'Khoản phải thu', summary: 'Hủy khoản phải thu', auth: 'user', action: 'cancelReceivable', args: (s) => [P(s, 'id')] },
-  { method: 'POST', path: '/v1/receivables/{id}/buyer-payment', tag: 'Bên mua', summary: 'Bên mua ghi nhận đã thanh toán (cần MFA)', auth: 'user', action: 'markBuyerPaid', args: (s) => [P(s, 'id')] },
+  { method: 'POST', path: '/v1/receivables/{id}/buyer-payment', tag: 'Bên mua', summary: 'Bên mua ghi nhận đã thanh toán, một phần hoặc đủ (cần MFA). Khoản đã tài trợ: chờ tổ chức tài chính xác nhận tiền về', auth: 'user', action: 'markBuyerPaid', args: (s) => [P(s, 'id'), B(s)], body: { amount: 'integer (mặc định: phần chưa báo)', paidAt: 'YYYY-MM-DD', reference: 'string' } },
   { method: 'GET', path: '/v1/receivables/{id}/matches', tag: 'Marketplace', summary: 'Sản phẩm phù hợp/chưa phù hợp kèm chi phí ước tính (theo biểu giá công bố)', auth: 'user',
     run: (s, core) => {
       const st = core.getState()
@@ -125,6 +126,17 @@ export const ENDPOINTS: Endpoint[] = [
     body: { advanceVnd: 'integer', ratePct: 'number', feesVnd: 'integer', tenorDays: 'integer', conditions: 'string', expiresAt: 'YYYY-MM-DD' } },
   { method: 'POST', path: '/v1/funding-applications/{id}/reject', tag: 'Hồ sơ tài trợ', summary: 'Từ chối hồ sơ', auth: 'user', action: 'rejectApp', args: (s) => [P(s, 'id'), B(s).reason], body: { reason: 'string' } },
   { method: 'POST', path: '/v1/funding-applications/{id}/accept', tag: 'Hồ sơ tài trợ', summary: 'Doanh nghiệp chấp thuận đề nghị (cần MFA)', auth: 'user', action: 'acceptOffer', args: (s) => [P(s, 'id')] },
+  { method: 'POST', path: '/v1/funding-applications/{id}/payments', tag: 'Hồ sơ tài trợ', summary: 'Tổ chức tài chính xác nhận tiền về (thanh toán hoặc thanh lý tài sản): thu theo phí → lãi → gốc, đủ thì tất toán, phần dư hoàn cho nhà cung cấp', auth: 'user', action: 'confirmPayment', args: (s) => [P(s, 'id'), B(s)], body: { amount: 'integer', paidAt: 'YYYY-MM-DD', kind: 'payment|collateral', reference: 'string' } },
+  { method: 'POST', path: '/v1/funding-applications/{id}/refunds', tag: 'Hồ sơ tài trợ', summary: 'Tổ chức tài chính xác nhận đã hoàn phần dư cho nhà cung cấp', auth: 'user', action: 'confirmRefund', args: (s) => [P(s, 'id'), B(s)], body: { amount: 'integer', reference: 'string' } },
+  { method: 'GET', path: '/v1/funding-applications/{id}/settlement', tag: 'Hồ sơ tài trợ', summary: 'Sự kiện tiền, dư nợ, phần dư phải hoàn và trạng thái đối soát', auth: 'user',
+    run: (s, core) => {
+      const a = view(core, s.a!.activeOrgId).applications.find((x) => x.id === P(s, 'id'))
+      const full = core.getState().applications.find((x) => x.id === P(s, 'id'))
+      if (!a || !full || !('offer' in a)) throw notFound('Không tìm thấy hồ sơ')
+      const r = core.getState().receivables.find((x) => x.id === full.receivableId)
+      const bal = full.offer && full.fundedAt && r ? balanceAt(full.offer, full.fundedAt, r.dueDate, full.settlements ?? [], core.clock().toISOString(), core.getState().products.find((p) => p.id === full.productId)?.pricing.latePenaltyPct) : null
+      return { events: full.settlements ?? [], balance: bal, refundDue: full.refundDue ?? 0, refundPaid: full.refundPaid ?? 0, reconciliation: reconciliationOf(full) }
+    } },
   { method: 'POST', path: '/v1/funding-applications/{id}/fund', tag: 'Hồ sơ tài trợ', summary: 'Tổ chức tài chính ghi nhận giải ngân (cần MFA)', auth: 'user', action: 'fundApp', args: (s) => [P(s, 'id')] },
 
   // ---- sản phẩm ----
@@ -418,20 +430,33 @@ export const ENDPOINTS: Endpoint[] = [
       }
       const handler = PARTNER_EVENTS[String(type)]
       if (!handler) throw bad(`Loại sự kiện chưa hỗ trợ: ${type}. Hỗ trợ: ${Object.keys(PARTNER_EVENTS).join(', ')}`)
-      const result = await handler(core, s.p!, data ?? {}, s.req.id)
+      const result = await handler(core, s.p!, data ?? {}, s.req.id, id)
       const body = { ok: true, id, type, result }
       await core.db.putIdempotent(key, JSON.stringify(body))
       return body
     } },
 ]
 
-/** Sự kiện tiền đối tác gửi vào. WP8 bổ sung thanh toán/tất toán/quá hạn/xử lý tài sản bảo đảm. */
-export const PARTNER_EVENTS: Record<string, (core: Core, p: PartnerAuth, data: Json, correlationId: string) => Promise<unknown>> = {
+/** Sự kiện tiền đối tác gửi vào (id sự kiện là externalEventId: gửi lại không ghi nhận hai lần). */
+async function partnerAction(core: Core, p: PartnerAuth, correlationId: string, action: string, data: Json, extra: Json) {
+  const id = String(data.applicationId ?? '')
+  const ap = core.getState().applications.find((x) => x.id === id)
+  if (!ap || ap.lenderId !== p.orgId) throw notFound('Không tìm thấy hồ sơ của tổ chức này')
+  const fn = actions[action]
+  const { applicationId: _a, ...rest } = data
+  void _a
+  return core.mutate({ kind: 'partner', orgId: p.orgId, role: 'analyst', keyId: p.keyId, correlationId }, (c) => fn(c, id, { ...rest, ...extra }))
+}
+
+export const PARTNER_EVENTS: Record<string, (core: Core, p: PartnerAuth, data: Json, correlationId: string, eventId: string) => Promise<unknown>> = {
   'application.funded': async (core, p, data, correlationId) => {
     const ap = core.getState().applications.find((x) => x.id === data.applicationId)
     if (!ap || ap.lenderId !== p.orgId) throw notFound('Không tìm thấy hồ sơ của tổ chức này')
     return { changed: await core.mutate({ kind: 'partner', orgId: p.orgId, role: 'analyst', keyId: p.keyId, correlationId }, (c) => fundApplication(c, ap, 'sự kiện từ hệ thống tổ chức tài chính')) }
   },
+  'application.payment_received': (core, p, data, cid, eventId) => partnerAction(core, p, cid, 'confirmPayment', data, { kind: 'payment', externalEventId: eventId }),
+  'application.collateral_liquidated': (core, p, data, cid, eventId) => partnerAction(core, p, cid, 'confirmPayment', data, { kind: 'collateral', externalEventId: eventId }),
+  'application.refund_paid': (core, p, data, cid, eventId) => partnerAction(core, p, cid, 'confirmRefund', data, { externalEventId: eventId }),
 }
 
 const fastifyPath = (p: string) => p.replace(/\{(\w+)\}/g, ':$1')

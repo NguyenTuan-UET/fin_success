@@ -108,12 +108,47 @@ describe('ngân hàng giả lập đi qua đúng API đối tác và webhook c�
     expect(audit?.actorUserId).toMatch(/^key:/)
     expect(sim.log.some((l) => l.kind === 'disbursement' && l.detail.includes('đã giải ngân'))).toBe(true)
 
+    // bên mua thanh toán → ngân hàng giả lập xác nhận tiền về → tất toán → hoàn phần dư
+    expect((await call('POST', `/v1/receivables/${rec}/buyer-payment`, { amount: 900_000_000 }, B)).status).toBe(200)
+    await pump()
+    const settled = fcc.getState().applications.find((x) => x.id === ap.id)!
+    expect(settled.state).toBe('SETTLED')
+    expect(settled.refundDue).toBeGreaterThan(0)
+    expect(settled.refundPaid).toBe(settled.refundDue)
+    expect(sim.log.some((l) => l.kind === 'settlement' && l.detail.includes('đã hoàn phần dư'))).toBe(true)
+
     // phát lại: FCC bỏ qua sự kiện trùng, từ chối chữ ký sai
     const slug = 'ankhang'
     const dup = await sim.app.inject({ method: 'POST', url: '/control/replay', payload: JSON.stringify({ slug, kind: 'duplicate' }), headers: { 'content-type': 'application/json' } })
     expect(dup.json()).toMatchObject({ status: 200, replay: true })
     const bad = await sim.app.inject({ method: 'POST', url: '/control/replay', payload: JSON.stringify({ slug, kind: 'bad_signature' }), headers: { 'content-type': 'application/json' } })
     expect(bad.json().status).toBe(401)
+  })
+
+  it('kịch bản: bên mua trả một phần → chưa tất toán; thanh lý tài sản bù thiếu hụt thì tất toán', async () => {
+    const S = await session('supplier')
+    const B = await session('buyer')
+    const rec = await confirmedReceivable(S, B, 1_000_000_000)
+    const pid = fcc.getState().products.find((p) => p.name === 'Bao thanh toán có truy đòi')!.id
+    const q = await call('POST', '/v1/rfqs', { receivableId: rec, productIds: [pid] }, S)
+    await pump()
+    const rfq = fcc.getState().rfqs.find((x) => x.id === q.body.result.id)!
+    await call('POST', `/v1/rfqs/${rfq.id}/select`, { lenderId: rfq.responses[0].lenderId }, S)
+    await pump()
+    const ap = fcc.getState().applications.find((a) => a.rfqId === rfq.id)!
+    await call('POST', `/v1/funding-applications/${ap.id}/accept`, {}, S)
+    await pump()
+    expect(fcc.getState().applications.find((a) => a.id === ap.id)!.state).toBe('FUNDED')
+    await sim.app.inject({ method: 'POST', url: '/control/scenario', payload: JSON.stringify({ id: ap.id, behavior: 'partial_payment' }), headers: { 'content-type': 'application/json' } })
+    await call('POST', `/v1/receivables/${rec}/buyer-payment`, {}, B)
+    await pump()
+    const partial = fcc.getState().applications.find((a) => a.id === ap.id)!
+    expect(partial.state).toBe('FUNDED')
+    expect(partial.outstanding).toBeGreaterThan(0)
+    const liq = await sim.app.inject({ method: 'POST', url: '/control/collateral', payload: JSON.stringify({ slug: 'ankhang', applicationId: ap.id, amount: partial.outstanding! + 1_000_000 }), headers: { 'content-type': 'application/json' } })
+    expect(liq.json().ok).toBe(true)
+    await pump()
+    expect(fcc.getState().applications.find((a) => a.id === ap.id)!.state).toBe('SETTLED')
   })
 
   it('kịch bản từ chối thẩm định; tắt tự động thì hồ sơ chờ người thao tác', async () => {
