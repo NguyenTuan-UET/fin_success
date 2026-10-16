@@ -182,6 +182,15 @@ END $f$;
 DROP TRIGGER IF EXISTS fee_charges_no_change ON fee_charges;
 CREATE TRIGGER fee_charges_no_change BEFORE UPDATE OR DELETE ON fee_charges FOR EACH ROW EXECUTE FUNCTION fee_charges_guard();
 CREATE TABLE IF NOT EXISTS api_usage (org_id text NOT NULL, period text NOT NULL, calls bigint NOT NULL DEFAULT 0, PRIMARY KEY (org_id, period));
+-- WP9: quyết định duyệt bút toán, dự báo dòng tiền đã lưu
+CREATE TABLE IF NOT EXISTS journal_decisions (
+  org_id text NOT NULL, ref text NOT NULL, status text NOT NULL CHECK (status IN ('approved', 'rejected')), lines jsonb, note text, decided_by text NOT NULL, decided_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (org_id, ref)
+);
+CREATE TABLE IF NOT EXISTS cashflow_forecasts (
+  id text PRIMARY KEY, org_id text NOT NULL, as_of date NOT NULL, horizon int NOT NULL, inputs_hash text NOT NULL, model_version text NOT NULL, opening numeric NOT NULL,
+  series jsonb NOT NULL, summary jsonb NOT NULL, expected_ar jsonb NOT NULL, created_at timestamptz NOT NULL DEFAULT now(), UNIQUE (org_id, as_of, inputs_hash)
+);
 CREATE TABLE IF NOT EXISTS email_outbox (
   id bigserial PRIMARY KEY, to_email text NOT NULL, subject text NOT NULL, body text NOT NULL, kind text NOT NULL,
   dedupe_key text UNIQUE, created_at timestamptz NOT NULL DEFAULT now(), attempts int NOT NULL DEFAULT 0,
@@ -598,6 +607,27 @@ export class Database {
   }
   async useSseTicket(ticketHash: string) {
     return (await this.pool.query<{ sessionHash: string }>('DELETE FROM sse_tickets WHERE ticket_hash = $1 AND expires_at > now() RETURNING session_hash AS "sessionHash"', [ticketHash])).rows[0]?.sessionHash
+  }
+
+  // ---- bút toán, dự báo ----
+  async journalDecisions(orgId: string) {
+    return (await this.pool.query<{ ref: string; status: string; lines: unknown; note: string | null; decidedBy: string; decidedAt: Date }>('SELECT ref, status, lines, note, decided_by AS "decidedBy", decided_at AS "decidedAt" FROM journal_decisions WHERE org_id = $1', [orgId])).rows
+  }
+  async decideJournal(orgId: string, ref: string, d: { status: 'approved' | 'rejected'; lines?: unknown; note?: string; by: string }) {
+    await this.pool.query(
+      `INSERT INTO journal_decisions (org_id, ref, status, lines, note, decided_by) VALUES ($1, $2, $3, $4, $5, $6)
+       ON CONFLICT (org_id, ref) DO UPDATE SET status = excluded.status, lines = excluded.lines, note = excluded.note, decided_by = excluded.decided_by, decided_at = now()`,
+      [orgId, ref, d.status, d.lines === undefined ? null : JSON.stringify(d.lines), d.note ?? null, d.by],
+    )
+  }
+  async saveForecast(f: { id: string; orgId: string; asOf: string; horizon: number; inputsHash: string; modelVersion: string; opening: number; series: unknown; summary: unknown; expectedAr: unknown }) {
+    return (await this.pool.query('INSERT INTO cashflow_forecasts (id, org_id, as_of, horizon, inputs_hash, model_version, opening, series, summary, expected_ar) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) ON CONFLICT (org_id, as_of, inputs_hash) DO NOTHING', [f.id, f.orgId, f.asOf, f.horizon, f.inputsHash, f.modelVersion, f.opening, JSON.stringify(f.series), JSON.stringify(f.summary), JSON.stringify(f.expectedAr)])).rowCount === 1
+  }
+  async latestForecast(orgId: string) {
+    return (await this.pool.query('SELECT id, as_of AS "asOf", horizon, inputs_hash AS "inputsHash", model_version AS "modelVersion", opening, series, summary, expected_ar AS "expectedAr", created_at AS "createdAt" FROM cashflow_forecasts WHERE org_id = $1 ORDER BY created_at DESC LIMIT 1', [orgId])).rows[0]
+  }
+  async forecastsOf(orgId: string, limit = 60) {
+    return (await this.pool.query('SELECT id, as_of AS "asOf", horizon, summary, expected_ar AS "expectedAr", created_at AS "createdAt" FROM cashflow_forecasts WHERE org_id = $1 ORDER BY created_at DESC LIMIT $2', [orgId, limit])).rows
   }
 
   // ---- phí và doanh thu ----

@@ -19,10 +19,12 @@ export function CashForecast({ forecast, openingCash, safeBalance }: { forecast:
   const SAFE_BALANCE = safeBalance / 1e6;
   const base = forecast.points.slice(0, n).map((p) => p.base / 1e6);
   const data = base;
+  const cons = forecast.points.slice(0, n).map((p) => p.conservative / 1e6);
+  const opt = forecast.points.slice(0, n).map((p) => p.optimistic / 1e6);
   const forecastDates = forecast.points.map((p) => dm(p.date));
-  const rawMax = Math.max(SAFE_BALANCE * 1.2, ...data, 100);
+  const rawMax = Math.max(SAFE_BALANCE * 1.2, ...data, ...opt, 100);
   const MAX = Math.ceil(rawMax / 500) * 500;
-  const lo = Math.min(0, ...data);
+  const lo = Math.min(0, ...data, ...cons);
   const y = (v: number) => TOP + (1 - (v - lo) / (MAX - lo)) * PLOT_H;
   const pts = data.map((v, i) => `${x(i, n).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
   const area = `M0,200 L${pts.replaceAll(" ", " L")} L${W},200 Z`;
@@ -93,6 +95,8 @@ export function CashForecast({ forecast, openingCash, safeBalance }: { forecast:
               strokeDasharray="5 4"
               vectorEffect="non-scaling-stroke"
             />
+            <polyline points={cons.map((v, i) => `${x(i, n).toFixed(1)},${y(v).toFixed(1)}`).join(" ")} fill="none" stroke="#B54708" strokeWidth="1.4" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />
+            <polyline points={opt.map((v, i) => `${x(i, n).toFixed(1)},${y(v).toFixed(1)}`).join(" ")} fill="none" stroke="#1A4F96" strokeWidth="1.4" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />
             <polyline points={pts} fill="none" stroke="#0A7A5C" strokeWidth="2.2" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
           </svg>
           <span
@@ -192,7 +196,15 @@ export function CashForecast({ forecast, openingCash, safeBalance }: { forecast:
       <div className="legend muted">
         <span>
           <span style={{ width: 16, height: 2, background: "var(--brand-fill)" }} />
-          Số dư dự báo
+          Cơ sở
+        </span>
+        <span>
+          <span style={{ width: 16, height: 0, borderTop: "2px dashed #B54708" }} />
+          Thận trọng
+        </span>
+        <span>
+          <span style={{ width: 16, height: 0, borderTop: "2px dashed #1A4F96" }} />
+          Lạc quan
         </span>
         <span>
           <span style={{ width: 16, height: 0, borderTop: "2px dashed var(--bad-strong)" }} />

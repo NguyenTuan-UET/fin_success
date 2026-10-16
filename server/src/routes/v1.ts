@@ -17,6 +17,8 @@ import { provisionSimBanks } from '../sim/provision'
 import { assertCanAssess, assess, canSeeAssessment, OFFICIAL_VALID_DAYS, shape, type Kind } from '../assessments'
 import { DEFAULT_SCORECARD, type ScorecardParams } from '@fcc/domain/credit'
 import { uid } from '../core'
+import { bankStatement, computeAndStoreForecast, forecastAccuracy, journalFor, parseRegime } from '../accounting'
+import { toCsv, type JournalEntry } from '@fcc/domain/journal'
 import { billingRun, chargeReport, chargeScoring, feeSourceLabel, scheduleAt } from '../billing'
 import { FEE_SOURCES, validateSchedule, type FeeSchedule } from '@fcc/domain/fees'
 
@@ -331,6 +333,45 @@ export const ENDPOINTS: Endpoint[] = [
       if (orgOf(core, s.a!.activeOrgId)?.type !== 'fcc') throw forbidden('Chỉ nhân sự FCC')
       return core.db.verifyAudit()
     } },
+
+  // ---- ngân hàng giả lập, bút toán, dự báo ----
+  { method: 'POST', path: '/v1/bank/link', tag: 'Kế toán & dòng tiền', summary: 'Liên kết tài khoản với ngân hàng GIẢ LẬP (phase này chưa kết nối ngân hàng thật); cần khai số dư trước', auth: 'user', action: 'linkBank', args: (s) => [s.a!.activeOrgId] },
+  { method: 'GET', path: '/v1/bank/statement', tag: 'Kế toán & dòng tiền', summary: 'Sao kê (?from=&to=) dựng từ sự kiện tiền trên FCC, ghi rõ nguồn giả lập', auth: 'user',
+    run: (s, core) => bankStatement(core, s.a!.activeOrgId, s.query.from ?? '2000-01-01', s.query.to ?? core.clock().toISOString().slice(0, 10)) },
+  { method: 'GET', path: '/v1/journal-entries', tag: 'Kế toán & dòng tiền', summary: 'Bút toán đề xuất theo chế độ ?regime=TT133|TT200, kèm trạng thái duyệt', auth: 'user', run: (s, core) => journalFor(core, s.a!.activeOrgId, parseRegime(s.query.regime)) },
+  { method: 'POST', path: '/v1/journal-entries/decision', tag: 'Kế toán & dòng tiền', summary: 'Kế toán duyệt hoặc từ chối một bút toán (có thể sửa dòng, phải cân Nợ/Có)', auth: 'user', body: { ref: 'string', status: 'approved|rejected', lines: 'JournalLine[] (tùy chọn)', note: 'string', regime: 'TT133|TT200' },
+    run: async (s, core) => {
+      if (!['owner', 'approver', 'operator'].includes(s.a!.role)) throw forbidden('Chỉ kế toán của doanh nghiệp')
+      const regime = parseRegime(String(B(s).regime ?? ''))
+      const cur = (await journalFor(core, s.a!.activeOrgId, regime)).entries.find((e) => e.ref === B(s).ref)
+      if (!cur) throw notFound('Không tìm thấy bút toán')
+      const status = B(s).status
+      if (status !== 'approved' && status !== 'rejected') throw bad('status phải là approved hoặc rejected')
+      const lines = (B(s).lines ?? undefined) as JournalEntry['lines'] | undefined
+      if (lines) {
+        const d = lines.reduce((t, l) => t + Number(l.debit || 0), 0)
+        const c = lines.reduce((t, l) => t + Number(l.credit || 0), 0)
+        if (!lines.length || d !== c || d <= 0) throw bad('Bút toán sau khi sửa phải cân Nợ = Có')
+        if (lines.some((l) => !/^\d{3,4}$/.test(String(l.account)))) throw bad('Số hiệu tài khoản không hợp lệ')
+      }
+      await core.db.decideJournal(s.a!.activeOrgId, String(B(s).ref), { status, lines, note: String(B(s).note ?? '').slice(0, 300) || undefined, by: s.a!.id })
+      await core.audit(s.a!.activeOrgId, s.a!.id, status === 'approved' ? 'Duyệt bút toán' : 'Từ chối bút toán', String(B(s).ref), lines ? 'có chỉnh sửa' : 'giữ nguyên đề xuất', s.req.id)
+      return { ok: true }
+    } },
+  { method: 'GET', path: '/v1/journal-entries/export.csv', tag: 'Kế toán & dòng tiền', summary: 'Xuất các bút toán đã duyệt (CSV nhập vào phần mềm kế toán); có thể phát sinh phí báo cáo', auth: 'user',
+    run: async (s, core) => {
+      const approved = (await journalFor(core, s.a!.activeOrgId, parseRegime(s.query.regime))).entries.filter((e) => e.status === 'approved')
+      await chargeReport(core, s.a!.activeOrgId, 'bút toán', `${s.a!.id}:${core.clock().getTime()}`)
+      s.reply.type('text/csv; charset=utf-8').header('content-disposition', 'attachment; filename="but-toan.csv"')
+      return toCsv(approved)
+    } },
+  { method: 'POST', path: '/v1/cashflow-forecasts', tag: 'Kế toán & dòng tiền', summary: 'Tính và lưu dự báo 7/30/90 ngày (ba kịch bản) từ số dư (sao kê nếu đã liên kết), công nợ và hóa đơn trên FCC', auth: 'user',
+    run: async (s, core) => {
+      const r = await computeAndStoreForecast(core, s.a!.activeOrgId)
+      return { stored: r.stored, asOf: r.forecast.asOf, opening: r.opening, modelVersion: r.modelVersion, inputsHash: r.inputsHash, summary: { minBase: r.forecast.minBase, shortfall: r.forecast.shortfall ?? null, inflow: r.forecast.inflow, outflow: r.forecast.outflow }, points: r.forecast.points, note: 'Dự báo – không phải cam kết' }
+    } },
+  { method: 'GET', path: '/v1/cashflow-forecasts/latest', tag: 'Kế toán & dòng tiền', summary: 'Dự báo đã lưu gần nhất', auth: 'user', run: async (s, core) => (await core.db.latestForecast(s.a!.activeOrgId)) ?? (() => { throw notFound('Chưa có dự báo đã lưu') })() },
+  { method: 'GET', path: '/v1/cashflow-forecasts/accuracy', tag: 'Kế toán & dòng tiền', summary: 'Sai số dự báo thu (ngày) trên các khoản phải thu đã thanh toán', auth: 'user', run: (s, core) => forecastAccuracy(core, s.a!.activeOrgId) },
 
   // ---- phí, hóa đơn phí, doanh thu ----
   { method: 'GET', path: '/v1/fee-schedule', tag: 'Phí', summary: 'Biểu phí đang hiệu lực (công khai cho người dùng trước khi phát sinh phí)', auth: 'user',

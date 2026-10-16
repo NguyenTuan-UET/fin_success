@@ -1,24 +1,18 @@
 "use client";
 
 import { useMemo } from "react";
-import { forecastCash, type Forecast } from "@fcc/domain/cashflow";
-import type { LedgerItem, Org } from "@fcc/domain/types";
+import { orgForecast, type Forecast } from "@fcc/domain/cashflow";
+import { statementFor } from "@fcc/domain/statement";
+import type { Org } from "@fcc/domain/types";
 import type { FccState } from "./session";
 
-/** Dự báo dòng tiền của tổ chức: công nợ đã nhập + khoản phải thu/phải trả trên FCC (chưa tất toán). */
-export function useCashForecast(data: FccState, org: Org): { forecast: Forecast | null; hasSetup: boolean; openingCash: number } {
+/** Dự báo dòng tiền của tổ chức (cùng công thức với máy chủ): số dư từ sao kê giả lập nếu đã liên kết ngân hàng, ngược lại số dư khai báo. */
+export function useCashForecast(data: FccState, org: Org): { forecast: Forecast | null; hasSetup: boolean; openingCash: number; bankLinked: boolean } {
   return useMemo(() => {
     const conn = data.connections.find((c) => c.orgId === org.id);
-    if (!conn) return { forecast: null, hasSetup: false, openingCash: 0 };
-    const fccItems: LedgerItem[] = data.receivables
-      .filter((r) => (r.sellerId === org.id || r.buyerId === org.id) && ["BUYER_CONFIRMED", "SUBMITTED", "UNDER_REVIEW", "OFFERED", "ACCEPTED", "FUNDED", "OVERDUE"].includes(r.state))
-      .map((r) => {
-        const ar = r.sellerId === org.id;
-        const other = data.orgs.find((o) => o.id === (ar ? r.buyerId : r.sellerId));
-        return { id: `fcc-${r.id}`, orgId: org.id, kind: ar ? "AR" : "AP", counterpartyName: other?.name ?? "", counterpartyTaxCode: other?.taxCode, docNo: r.code, amount: r.amount, paid: 0, dueDate: r.dueDate };
-      });
-    const own = data.ledger.filter((l) => l.orgId === org.id);
-    const forecast = forecastCash(conn, [...own, ...fccItems], data.applications, 90, new Date(), 0);
-    return { forecast, hasSetup: true, openingCash: conn.openingCash };
+    if (!conn) return { forecast: null, hasSetup: false, openingCash: 0, bankLinked: false };
+    const now = new Date();
+    const opening = conn.bankLinkedAt ? statementFor(data, org, conn, conn.bankLinkedAt.slice(0, 10), now.toISOString().slice(0, 10)).closing : conn.openingCash;
+    return { forecast: orgForecast(data, org, now, 90, opening), hasSetup: true, openingCash: opening, bankLinked: !!conn.bankLinkedAt };
   }, [data, org]);
 }

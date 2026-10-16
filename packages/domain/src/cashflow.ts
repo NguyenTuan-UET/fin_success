@@ -1,5 +1,5 @@
 // Dự báo dòng tiền v1 theo lịch, giải thích được — SPEC mục 7.3.
-import type { AccountingConnection, FundingApplication, LedgerItem } from './types'
+import type { AccountingConnection, AppData, FundingApplication, LedgerItem, Org } from './types'
 
 export interface ForecastPoint {
   day: number
@@ -109,4 +109,39 @@ export function forecastCash(conn: AccountingConnection, items: LedgerItem[], ap
     minBase,
     shortfall: shortBase ? { date: shortBase.date, value: shortBase.base, scenario: 'base' } : shortCons ? { date: shortCons.date, value: shortCons.conservative, scenario: 'conservative' } : undefined,
   }
+}
+
+const OPEN_FCC_STATES = ['BUYER_CONFIRMED', 'SUBMITTED', 'UNDER_REVIEW', 'OFFERED', 'ACCEPTED', 'FUNDED', 'OVERDUE']
+
+/**
+ * Dự báo cho một tổ chức: công nợ đã nhập + khoản phải thu/phải trả đang mở trên FCC, từ số dư đầu kỳ `opening` (mặc định số dư khai báo).
+ * Dùng chung cho giao diện và máy chủ để cùng đầu vào cho cùng kết quả.
+ */
+export function orgForecast(s: Pick<AppData, 'orgs' | 'receivables' | 'ledger' | 'connections' | 'applications'>, org: Org, now = new Date(), horizon = 90, opening?: number): Forecast | null {
+  const conn = s.connections.find((c) => c.orgId === org.id)
+  if (!conn) return null
+  const fcc: LedgerItem[] = s.receivables
+    .filter((r) => (r.sellerId === org.id || r.buyerId === org.id) && OPEN_FCC_STATES.includes(r.state))
+    .map((r) => {
+      const ar = r.sellerId === org.id
+      const other = s.orgs.find((o) => o.id === (ar ? r.buyerId : r.sellerId))
+      return { id: `fcc-${r.id}`, orgId: org.id, kind: ar ? 'AR' : 'AP', counterpartyName: other?.name ?? '', counterpartyTaxCode: other?.taxCode, docNo: r.code, amount: r.amount, paid: 0, dueDate: r.dueDate } as LedgerItem
+    })
+  const own = s.ledger.filter((l) => l.orgId === org.id)
+  const base = { ...conn, buyerDelayDays: { ...paymentDelays(s.receivables, s.orgs, org.id), ...conn.buyerDelayDays } }
+  return forecastCash(opening === undefined ? base : { ...base, openingCash: opening }, [...own, ...fcc], s.applications, horizon, now, 0)
+}
+
+/** Độ trễ thanh toán thực tế (ngày) của từng bên mua với nhà cung cấp này, từ lịch sử khoản đã thanh toán trên FCC; theo MST, '*' là chung. */
+export function paymentDelays(receivables: AppData['receivables'], orgs: Org[], sellerId: string): AccountingConnection['buyerDelayDays'] {
+  const by = new Map<string, number[]>()
+  for (const r of receivables) {
+    if (r.sellerId !== sellerId || !r.paidAt || !['SETTLED', 'EARLY_PAID'].includes(r.state)) continue
+    const tax = orgs.find((o) => o.id === r.buyerId)?.taxCode ?? ''
+    const d = Math.round((new Date(r.paidAt).getTime() - new Date(r.dueDate).getTime()) / DAY)
+    by.set(tax, [...(by.get(tax) ?? []), d])
+    by.set('*', [...(by.get('*') ?? []), d])
+  }
+  const pct = (xs: number[], p: number) => [...xs].sort((a, b) => a - b)[Math.min(xs.length - 1, Math.floor(p * xs.length))]
+  return Object.fromEntries([...by].map(([k, xs]) => [k, { median: Math.max(0, pct(xs, 0.5)), p80: Math.max(0, pct(xs, 0.8)) }]))
 }

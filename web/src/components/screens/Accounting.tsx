@@ -1,8 +1,9 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Download, FileInput, Trash2 } from "lucide-react";
 import type { LedgerItem } from "@fcc/domain/types";
+import { api } from "@/lib/api";
 import { date, daysFromNow, money, vnd } from "@/lib/format";
 import { useData } from "@/lib/session";
 import { useCashForecast } from "@/lib/cash";
@@ -47,13 +48,27 @@ export function Accounting({ role }: { role: Role }) {
   const { data, org, act } = useData();
   const toast = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
-  const { forecast, hasSetup, openingCash } = useCashForecast(data, org);
+  const { forecast, hasSetup, openingCash, bankLinked } = useCashForecast(data, org);
   const conn = data.connections.find((c) => c.orgId === org.id);
   const ledger = data.ledger.filter((l) => l.orgId === org.id);
   const [cash, setCash] = useState(String(conn?.openingCash ?? ""));
   const [outs, setOuts] = useState<{ name: string; amount: string; day: string }[]>((conn?.recurringMonthlyOut ?? []).map((o) => ({ name: o.name, amount: String(o.amount), day: String(o.day) })));
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  type JEntry = { ref: string; date: string; title: string; confidence: number; note?: string; status: string; lines: { account: string; accountName: string; debit: number; credit: number }[] };
+  const [regime, setRegime] = useState<"TT133" | "TT200">("TT133");
+  const [journal, setJournal] = useState<JEntry[]>([]);
+  const [statement, setStatement] = useState<{ lines: { date: string; description: string; amount: number; balance: number }[]; closing: number; source: string } | null>(null);
+  const [acc, setAcc] = useState<{ evaluated: number; meanAbsErrorDays: number | null; within5DaysPct: number | null } | null>(null);
+  const loadAcc = useCallback(() => {
+    if (role === "lender" || role === "admin") return;
+    api<JEntry[] | { entries: JEntry[] }>("GET", `/v1/journal-entries?regime=${regime}`).then((r) => setJournal((r as { entries: JEntry[] }).entries), () => setJournal([]));
+    api<typeof statement>("GET", "/v1/bank/statement").then(setStatement, () => setStatement(null));
+    api<typeof acc>("GET", "/v1/cashflow-forecasts/accuracy").then(setAcc, () => setAcc(null));
+  }, [regime, role]);
+  // tải dữ liệu phụ từ máy chủ khi mở màn hình và khi dữ liệu đổi
+   
+  useEffect(() => { loadAcc(); }, [loadAcc, data.applications.length, data.receivables.length]);
 
   if (role === "lender" || role === "admin") {
     return <section className="card empty">Kế toán và dòng tiền dành cho doanh nghiệp bán/mua. Tổ chức tài chính xem dữ liệu kế toán của doanh nghiệp khi doanh nghiệp chia sẻ trong hồ sơ.</section>;
@@ -150,6 +165,40 @@ export function Accounting({ role }: { role: Role }) {
           {forecast.shortfall && <div className="err">Thiếu hụt dự báo {money(-forecast.shortfall.value)} đ ngày {date(forecast.shortfall.date)} (kịch bản {forecast.shortfall.scenario === "base" ? "cơ sở" : "thận trọng"}). Xem gói tài trợ ở Marketplace.</div>}
         </section>
       )}
+
+      <section className="card stack">
+        <div className="between"><h2 className="ct">Ngân hàng & dự báo đã lưu</h2>
+          <span className="row" style={{ gap: 8 }}>
+            {!bankLinked && <button className="btn bs sm" disabled={busy || !hasSetup} title={hasSetup ? undefined : "Khai số dư trước"} onClick={() => run(async () => { await act("POST", "/v1/bank/link"); loadAcc(); }, "Đã liên kết tài khoản ngân hàng (giả lập)")}>Liên kết ngân hàng (giả lập)</button>}
+            <button className="btn bs sm" disabled={busy || !hasSetup} onClick={() => run(async () => { const r = await api<{ stored: boolean }>("POST", "/v1/cashflow-forecasts", {}); toast(r.stored ? "Đã lưu dự báo hôm nay" : "Dự báo hôm nay đã được lưu với cùng dữ liệu"); loadAcc(); }, "Hoàn tất")}>Lưu dự báo</button>
+          </span></div>
+        <div className="muted">{bankLinked ? "Số dư lấy từ sao kê của ngân hàng GIẢ LẬP (dựng từ sự kiện tiền trên FCC) cộng chi định kỳ bạn khai." : "Chưa liên kết ngân hàng: số dư là số bạn khai. Phase này chưa kết nối ngân hàng thật."}</div>
+        {statement && <div className="tw"><table>
+          <thead><tr><th>Ngày</th><th>Nội dung</th><th className="r">Biến động (đ)</th><th className="r">Số dư (đ)</th></tr></thead>
+          <tbody>{statement.lines.slice(-12).reverse().map((l, i) => <tr key={i}><td className="num">{date(l.date)}</td><td className="wrap">{l.description}</td><td className={`r num ${l.amount < 0 ? "t-warn" : "t-ok"}`}>{l.amount < 0 ? "−" : "+"}{vnd(Math.abs(l.amount))}</td><td className="r num">{vnd(l.balance)}</td></tr>)}</tbody></table>
+          <div className="muted" style={{ padding: "6px 0" }}>Nguồn: {statement.source}</div></div>}
+        {acc && <div className="soft">Sai số dự báo thu: {acc.evaluated ? `${acc.evaluated} khoản đã đo · lệch trung bình ${acc.meanAbsErrorDays} ngày · ${acc.within5DaysPct}% trong ±5 ngày` : "chưa có khoản nào đủ điều kiện đo (cần dự báo đã lưu và khoản phải thu đã thanh toán)"}.</div>}
+      </section>
+
+      <section className="card flush">
+        <div className="ch"><div><h2 className="ct">Bút toán đề xuất</h2><p className="muted">Gợi ý từ sự kiện tiền trên FCC kèm độ tin cậy; kế toán duyệt hoặc từ chối từng bút toán rồi xuất file nhập vào phần mềm kế toán.</p></div>
+          <span className="row" style={{ gap: 8 }}>
+            <select className="select" value={regime} onChange={(e) => setRegime(e.target.value as "TT133" | "TT200")} aria-label="Chế độ kế toán"><option value="TT133">TT133</option><option value="TT200">TT200</option></select>
+            <button className="btn bs sm" disabled={!journal.some((j) => j.status === "approved")} onClick={async () => { const r = await fetch(`/v1/journal-entries/export.csv?regime=${regime}`, { headers: { authorization: `Bearer ${sessionStorage.getItem("fcc-token")}` } }); const t = await r.text(); download("but-toan.csv", t); }}><Download size={14} aria-hidden="true" /> Xuất bút toán đã duyệt</button>
+          </span></div>
+        {journal.length === 0 && <div className="empty">Chưa có bút toán đề xuất (cần giải ngân, thanh toán hoặc phí phát sinh).</div>}
+        {journal.map((j) => (
+          <div key={j.ref} className="stack-sm" style={{ padding: "12px 16px", borderTop: "1px solid var(--line-2)" }}>
+            <div className="between"><span><strong>{j.title}</strong> · <span className="num">{date(j.date)}</span> <span className="muted">· tin cậy {Math.round(j.confidence * 100)}%</span></span>
+              <span className="row" style={{ gap: 6 }}>
+                {j.status === "suggested" ? <><button className="btn bp sm" disabled={busy} onClick={() => run(async () => { await api("POST", "/v1/journal-entries/decision", { ref: j.ref, status: "approved", regime }); loadAcc(); }, "Đã duyệt bút toán")}>Duyệt</button>
+                  <button className="btn bs sm" disabled={busy} onClick={() => run(async () => { await api("POST", "/v1/journal-entries/decision", { ref: j.ref, status: "rejected", regime }); loadAcc(); }, "Đã từ chối")}>Từ chối</button></> : <span className={`chip ${j.status === "approved" ? "c-ok" : "c-neu"}`}>{j.status === "approved" ? "Đã duyệt" : "Đã từ chối"}</span>}
+              </span></div>
+            <table style={{ fontSize: 12.5 }}><tbody>{j.lines.map((l, i) => <tr key={i}><td className="num" style={{ width: 60 }}>{l.account}</td><td>{l.accountName}</td><td className="r num">{l.debit ? vnd(l.debit) : ""}</td><td className="r num">{l.credit ? vnd(l.credit) : ""}</td></tr>)}</tbody></table>
+            {j.note && <div className="muted" style={{ fontSize: 12.5 }}>{j.note}</div>}
+          </div>
+        ))}
+      </section>
 
       <section className="row top">
         {[["Phải thu", ar], ["Phải trả", ap]].map(([label, xs]) => {

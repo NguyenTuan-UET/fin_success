@@ -763,6 +763,15 @@ export const actions: Record<string, Action> = {
     c.s.connections = [conn, ...c.s.connections.filter((x) => x.orgId !== orgId)]
     log(c, 'Cập nhật thiết lập dòng tiền', orgId, `Số dư ${vnd(conn.openingCash)} ₫, ${out.length} khoản chi định kỳ`)
   },
+  /** Liên kết tài khoản với ngân hàng giả lập (phase này chưa kết nối ngân hàng thật): sao kê dựng từ sự kiện tiền trên FCC. */
+  linkBank(c, orgId: string) {
+    requireSelf(c, orgId)
+    if (c.actor.type === 'fcc') throw forbidden('Tổ chức FCC không liên kết ngân hàng')
+    const conn = c.s.connections.find((x) => x.orgId === orgId)
+    if (!conn) throw conflict('Khai số dư tiền mặt ở thiết lập dòng tiền trước khi liên kết ngân hàng')
+    c.s.connections = c.s.connections.map((x) => (x.orgId === orgId ? { ...x, bankLinkedAt: iso(c.now), bankProvider: 'sim-bank' as const } : x))
+    log(c, 'Liên kết tài khoản ngân hàng (giả lập)', orgId, 'Sao kê dựng từ sự kiện tiền trên FCC')
+  },
   importLedger(c, orgId: string, items: LedgerItem[]) {
     requireSelf(c, orgId)
     if (!Array.isArray(items) || items.length === 0 || items.length > 5000) throw bad('Dữ liệu công nợ không hợp lệ')

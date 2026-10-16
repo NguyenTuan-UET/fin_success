@@ -357,6 +357,9 @@ export interface AccountingConnection {
   method: 'file'
   status: 'connected' | 'disconnected'
   lastSyncedAt: string
+  /** Liên kết tài khoản với ngân hàng giả lập: số dư đầu kỳ khai báo là số dư tại thời điểm liên kết; sao kê dựng từ sự kiện tiền trên FCC */
+  bankLinkedAt?: string
+  bankProvider?: 'sim-bank'
   openingCash: number
   recurringMonthlyOut: { name: string; amount: number; day: number }[]
   /** Thu từ đơn hàng mới ngoài AR hiện có (bình quân lịch sử) — chỉ tính từ ngày `fromDay` */
