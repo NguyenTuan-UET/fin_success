@@ -24,9 +24,9 @@ export function PublicData({ orgId, canDispute = false, empty }: { orgId: string
         <tbody>
           {rows.map((r) => (
             <tr key={r.id}>
-              <td>{r.field}<div><span className="chip c-neu">{r.label}</span></div></td>
-              <td>{r.value}{r.status && <div><span className="chip c-warn">{r.status}</span></div>}</td>
-              <td>{r.source}{r.manual ? " (FCC tra cứu thủ công)" : ""}{r.url && <div><a href={r.url} target="_blank" rel="noreferrer noopener">Xem nguồn gốc</a></div>}</td>
+              <td className="wrap">{r.field}<div><span className="chip c-neu">{r.label}</span></div></td>
+              <td className="wrap">{r.value}{r.status && <div><span className="chip c-warn">{r.status}</span></div>}</td>
+              <td className="wrap">{r.source}{r.manual ? " (FCC tra cứu thủ công)" : ""}{r.url && <div><a href={r.url} target="_blank" rel="noreferrer noopener">Xem nguồn gốc</a></div>}</td>
               <td>{dateTime(r.fetchedAt)}</td>
               <td>{canDispute && !r.disputed && <button className="btn bs sm" onClick={() => setReason({ id: r.id, text: "" })}>Khiếu nại</button>}</td>
             </tr>

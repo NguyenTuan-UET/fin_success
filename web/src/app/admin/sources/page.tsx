@@ -53,11 +53,11 @@ export default function SourcesPage() {
           <tbody>
             {sources.map((s) => (
               <tr key={s.id}>
-                <td>{s.name}<div className="muted">{s.owner}</div></td>
+                <td className="wrap">{s.name}<div className="muted">{s.owner}</div></td>
                 <td>{s.sourceClass ? CLASS_LABEL[s.sourceClass] : "—"}{s.adapter && <div className="muted">adapter {s.adapter}</div>}</td>
                 <td><span className={`chip ${STATUS_LABEL[s.status][1]}`}>{STATUS_LABEL[s.status][0]}</span>{s.approvedBy && <div className="muted">{s.approvedBy} · {s.approvedAt?.slice(0, 10)}</div>}</td>
-                <td className="muted">{s.survey ?? s.note}</td>
-                <td>{s.kind !== "vnstock" && s.sourceClass !== "C" && (
+                <td className="wrap muted" style={{ fontSize: 12.5 }}>{s.survey ?? s.note}</td>
+                <td className="wrap">{s.kind !== "vnstock" && s.sourceClass !== "C" && (
                   <div className="stack-sm">
                     <input className="input" placeholder="Căn cứ (điều khoản, ý kiến pháp chế…)" value={note[s.id] ?? ""} onChange={(e) => setNote({ ...note, [s.id]: e.target.value })} />
                     <div className="row" style={{ gap: 6 }}>
@@ -79,7 +79,7 @@ export default function SourcesPage() {
             <tbody>{jobs.map((j) => (
               <tr key={j.id}><td>{dateTime(j.createdAt)}</td><td>{orgName(data.orgs, j.orgId)}</td><td>{sources.find((s) => s.id === j.sourceId)?.name ?? j.sourceId}</td>
                 <td><span className={`chip ${j.status === "done" ? "c-ok" : j.status === "queued" ? "c-neu" : "c-warn"}`}>{{ done: "Xong", queued: "Chờ", running: "Đang chạy", failed: "Lỗi", manual_needed: "Cần tra cứu thủ công" }[j.status] ?? j.status}</span></td>
-                <td className="muted">{j.reason ?? j.error}</td></tr>
+                <td className="wrap muted">{j.reason ?? j.error}</td></tr>
             ))}</tbody></table></div>)}
         {manualJobs.length > 0 && <div className="muted">{manualJobs.length} việc cần FCC xử lý: tra cứu thủ công ở biểu mẫu dưới.</div>}
       </section>
