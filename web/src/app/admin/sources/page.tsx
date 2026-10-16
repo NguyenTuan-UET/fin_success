@@ -49,7 +49,7 @@ export default function SourcesPage() {
         <h2 className="ct">Danh mục nguồn</h2>
         <div className="muted">Nguồn chưa phê duyệt thì không chạy. Loại B chỉ tra cứu thủ công kèm đường dẫn; loại C không dùng (kết quả khảo sát bên dưới). Phê duyệt cần MFA và ghi căn cứ pháp lý/điều khoản.</div>
         <div className="tw"><table>
-          <thead><tr><th>Nguồn</th><th>Loại</th><th>Trạng thái</th><th>Khảo sát / căn cứ</th><th>Thao tác</th></tr></thead>
+          <thead><tr><th>Nguồn</th><th>Loại</th><th>Trạng thái</th><th>Khảo sát / căn cứ</th><th style={{ minWidth: 340 }}>Thao tác</th></tr></thead>
           <tbody>
             {sources.map((s) => (
               <tr key={s.id}>
@@ -57,12 +57,12 @@ export default function SourcesPage() {
                 <td>{s.sourceClass ? CLASS_LABEL[s.sourceClass] : "—"}{s.adapter && <div className="muted">adapter {s.adapter}</div>}</td>
                 <td><span className={`chip ${STATUS_LABEL[s.status][1]}`}>{STATUS_LABEL[s.status][0]}</span>{s.approvedBy && <div className="muted">{s.approvedBy} · {s.approvedAt?.slice(0, 10)}</div>}</td>
                 <td className="wrap muted" style={{ fontSize: 12.5 }}>{s.survey ?? s.note}</td>
-                <td className="wrap">{s.kind !== "vnstock" && s.sourceClass !== "C" && (
+                <td className="wrap" style={{ minWidth: 340 }}>{s.kind !== "vnstock" && s.sourceClass !== "C" && (
                   <div className="stack-sm">
                     <input className="input" placeholder="Căn cứ (điều khoản, ý kiến pháp chế…)" value={note[s.id] ?? ""} onChange={(e) => setNote({ ...note, [s.id]: e.target.value })} />
-                    <div className="row" style={{ gap: 6 }}>
-                      <button className="btn bp sm" disabled={s.status === "approved"} onClick={() => run(() => api("POST", `/v1/operations/data-sources/${s.id}/review`, { status: "approved", note: note[s.id] ?? "" }), "Đã phê duyệt nguồn")}>Phê duyệt</button>
-                      <button className="btn bs sm" disabled={s.status === "blocked"} onClick={() => run(() => api("POST", `/v1/operations/data-sources/${s.id}/review`, { status: "blocked", note: note[s.id] ?? "" }), "Đã chặn nguồn")}>Chặn</button>
+                    <div className="row" style={{ justifyContent: "space-between", gap: 12 }}>
+                      <button className="btn bp sm" disabled={s.status === "approved" || !note[s.id]?.trim()} onClick={() => run(() => api("POST", `/v1/operations/data-sources/${s.id}/review`, { status: "approved", note: note[s.id] ?? "" }), "Đã phê duyệt nguồn")}>Phê duyệt</button>
+                      <button className="btn bs sm" disabled={s.status === "blocked" || !note[s.id]?.trim()} onClick={() => run(() => api("POST", `/v1/operations/data-sources/${s.id}/review`, { status: "blocked", note: note[s.id] ?? "" }), "Đã chặn nguồn")}>Chặn</button>
                     </div>
                   </div>)}</td>
               </tr>

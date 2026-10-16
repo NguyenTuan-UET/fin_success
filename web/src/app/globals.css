@@ -924,7 +924,9 @@ input[type="range"] {
   display: flex;
   flex-direction: column;
   gap: 20px;
-  max-width: 1440px;
+  width: 100%;
+  max-width: 1760px;
+  margin-inline: auto;
 }
 
 /* Vai trò (topbar) */
@@ -1616,4 +1618,11 @@ input[type="range"] {
 .tabs {
   display: flex;
   gap: 8px;
+}
+
+@media (max-width: 640px) {
+  td.wrap,
+  th.wrap {
+    min-width: 170px;
+  }
 }

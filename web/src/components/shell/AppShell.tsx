@@ -11,6 +11,19 @@ import { Logo, NavIcon } from "@/components/ui/basic";
 import { useAssistant } from "@/components/assistant/Assistant";
 
 const subscribeNever = () => () => {};
+const subscribeHash = (callback: () => void) => {
+  window.addEventListener("hashchange", callback);
+  window.addEventListener("popstate", callback);
+  return () => {
+    window.removeEventListener("hashchange", callback);
+    window.removeEventListener("popstate", callback);
+  };
+};
+const currentHash = () => window.location.hash;
+const isNavActive = (href: string, pathname: string, hash: string) => {
+  const [path, anchor = ""] = href.split("#");
+  return pathname === path && hash === (anchor ? `#${anchor}` : "");
+};
 const dateFmt = new Intl.DateTimeFormat("vi-VN", { weekday: "long", day: "2-digit", month: "2-digit", year: "numeric", timeZone: "Asia/Ho_Chi_Minh" });
 /** Ngày hôm nay theo giờ Việt Nam, lấy từ đồng hồ trình duyệt (server render để trống rồi điền khi hydrate). */
 function todayVi() {
@@ -54,6 +67,7 @@ function Shell({ role, children }: { role: Role; children: ReactNode }) {
   };
   const today = useSyncExternalStore(subscribeNever, todayVi, () => "");
   const pathname = usePathname();
+  const hash = useSyncExternalStore(subscribeHash, currentHash, () => "");
   const router = useRouter();
   const { open: openAssistant } = useAssistant();
   const [navOpen, setNavOpen] = useState(false);
@@ -224,7 +238,7 @@ function Shell({ role, children }: { role: Role; children: ReactNode }) {
                 <Link
                   href={item.href}
                   className="nl"
-                  aria-current={pathname === item.href ? "page" : undefined}
+                  aria-current={isNavActive(item.href, pathname, hash) ? "page" : undefined}
                   onNavigate={closeAll}
                 >
                   <NavIcon name={item.icon} />
