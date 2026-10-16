@@ -158,6 +158,8 @@ export interface Receivable {
   fingerprint: string
   docs: { xml: boolean; contract: boolean; delivery: boolean }
   source: 'xml' | 'ocr' | 'manual' | 'accounting'
+  /** Chứng từ gốc đã tải lên kho tệp (bất biến, định danh theo SHA-256) */
+  files?: { key: string; name: string; kind: 'invoice' | 'contract' | 'delivery' | 'other' }[]
   disputeReason?: string
   confirmedAt?: string
   paidAt?: string
@@ -288,6 +290,8 @@ export interface EsgDocument {
   name: string
   mime: string
   dataUrl?: string // ảnh xem trước (chỉ lưu khi nhỏ)
+  /** Tệp gốc trong kho tệp (bất biến, SHA-256) */
+  fileKey?: string
   docType: string
   period?: string
   indicatorCodes: string[]

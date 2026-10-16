@@ -122,6 +122,7 @@ export const ROLES: Record<Role, RoleMeta> = {
     nav: [
       { href: "/admin", label: "Bảng điều khiển", icon: "overview" },
       { href: "/admin#users", label: "Người dùng & quyền", icon: "users" },
+      { href: "/admin/esg", label: "Thẩm định ESG", icon: "esg" },
       { href: "/admin#security", label: "Bảo mật & gian lận", icon: "shield" },
       { href: "/admin/settings", label: "Cài đặt hệ thống", icon: "settings" },
     ],
@@ -129,3 +130,9 @@ export const ROLES: Record<Role, RoleMeta> = {
 };
 
 export const ROLE_ORDER: Role[] = ["supplier", "buyer", "lender", "admin"];
+
+/** Vai trò giao diện theo loại tổ chức đang hoạt động. */
+export function roleOfOrgType(t: "supplier" | "buyer" | "lender" | "fcc"): Role {
+  return t === "fcc" ? "admin" : t;
+}
+export const DEV_ROLE: Record<Role, "supplier" | "buyer" | "lender" | "fcc"> = { supplier: "supplier", buyer: "buyer", lender: "lender", admin: "fcc" };

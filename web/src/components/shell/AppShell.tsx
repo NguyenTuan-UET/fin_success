@@ -4,32 +4,11 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { Bell, CalendarDays, Menu, ShieldCheck, Sparkles, X } from "lucide-react";
-import { ROLE_ORDER, ROLES, type Role } from "@/lib/roles";
+import { ROLES, roleOfOrgType, type Role } from "@/lib/roles";
+import { useFcc } from "@/lib/session";
+import { AuthGate } from "@/components/auth/AuthGate";
 import { Logo, NavIcon } from "@/components/ui/basic";
 import { useAssistant } from "@/components/assistant/Assistant";
-
-const NOTIFS: Record<Role, { title: string; note: string; href: string; tone: string }[]> = {
-  supplier: [
-    { title: "Cảnh báo thanh khoản 28/10", note: "Số dư dự báo 380 tr, dưới mức an toàn 800 tr", href: "/supplier", tone: "var(--warn-strong)" },
-    { title: "TT-0418 đã được phê duyệt", note: "Quỹ Đầu tư Xanh · chờ giải ngân T+1", href: "/supplier/disbursement", tone: "var(--brand-fill)" },
-    { title: "HD-0398 quá hạn 7 ngày", note: "Đã gửi nhắc nợ cho Nội thất Phố Hội", href: "/supplier/invoices", tone: "var(--bad-strong)" },
-  ],
-  buyer: [
-    { title: "3 hóa đơn chờ xác nhận", note: "Tổng 2,13 tỷ · 1 hóa đơn lệch số chuyến", href: "/buyer/invoices", tone: "var(--warn-strong)" },
-    { title: "2 đề nghị trả sớm có lợi", note: "Lợi suất 8,3–11%/năm > chi phí vốn 4,5%", href: "/buyer/invoices", tone: "var(--brand-fill)" },
-    { title: "Gỗ ván Tân Lập ESG 48", note: "Nhà cung cấp cần rà soát", href: "/buyer/esg", tone: "var(--bad-strong)" },
-  ],
-  lender: [
-    { title: "4 hồ sơ mới cần thẩm định", note: "2 hồ sơ AI khuyến nghị phê duyệt", href: "/lender/appraisal", tone: "var(--info-strong)" },
-    { title: "TT-0362 quá hạn 12 ngày", note: "Thủy sản Cửu Long · 620 tr", href: "/lender/monitoring", tone: "var(--bad-strong)" },
-    { title: "Nghi trùng lặp hóa đơn", note: "TT-0470 · Thương mại Bảo Long", href: "/lender/monitoring", tone: "var(--violet)" },
-  ],
-  admin: [
-    { title: "14 hóa đơn trùng lặp bị chặn", note: "Tháng 10/2026", href: "/admin#security", tone: "var(--bad-strong)" },
-    { title: "1 tài khoản tạm khóa", note: "Thương mại Bảo Long · chờ tuân thủ xử lý", href: "/admin#users", tone: "var(--warn-strong)" },
-    { title: "ISO/IEC 27001", note: "Đang chuẩn bị hồ sơ đánh giá", href: "/admin#security", tone: "var(--info-strong)" },
-  ],
-};
 
 const subscribeNever = () => () => {};
 const dateFmt = new Intl.DateTimeFormat("vi-VN", { weekday: "long", day: "2-digit", month: "2-digit", year: "numeric", timeZone: "Asia/Ho_Chi_Minh" });
@@ -39,8 +18,40 @@ function todayVi() {
   return d.charAt(0).toUpperCase() + d.slice(1);
 }
 
+/** Vỏ ứng dụng: chặn khi chưa đăng nhập, đưa về đúng vai trò theo loại tổ chức đang hoạt động. */
 export function AppShell({ role, children }: { role: Role; children: ReactNode }) {
+  const { status, error, org } = useFcc();
+  const router = useRouter();
+  const actual = org ? roleOfOrgType(org.type) : null;
+  useEffect(() => {
+    if (status === "ready" && actual && actual !== role) router.replace(ROLES[actual].home);
+  }, [status, actual, role, router]);
+  if (status === "loading") return <div className="auth-wrap muted">Đang tải…</div>;
+  if (status === "error") return <div className="auth-wrap"><div className="card auth-card err">{error}</div></div>;
+  if (status === "anon") return <AuthGate role={role} />;
+  if (!actual || actual !== role) return <div className="auth-wrap muted">Đang chuyển tới đúng vai trò…</div>;
+  return <Shell role={role}>{children}</Shell>;
+}
+
+function Shell({ role, children }: { role: Role; children: ReactNode }) {
   const meta = ROLES[role];
+  const { me, org, data, memberships, logout, switchOrg, act } = useFcc();
+  const initials = (me?.name ?? "").split(" ").slice(-2).map((w) => w[0]).join("").toUpperCase();
+  const notifs = (data?.notifications ?? []).filter((n) => n.orgId === org?.id);
+  const unread = notifs.filter((n) => !n.read);
+  const badge = (href: string): string | undefined => {
+    const rs = data?.receivables ?? [];
+    const as = data?.applications ?? [];
+    const n =
+      role === "supplier" && href === "/supplier/invoices"
+        ? rs.filter((r) => r.sellerId === org?.id && ["DRAFT", "BUYER_DISPUTED"].includes(r.state)).length
+        : role === "buyer" && href === "/buyer/invoices"
+          ? rs.filter((r) => r.buyerId === org?.id && r.state === "BUYER_PENDING").length
+          : role === "lender" && href === "/lender/appraisal"
+            ? as.filter((a) => a.lenderId === org?.id && ["SUBMITTED", "UNDER_REVIEW"].includes(a.state)).length
+            : 0;
+    return n ? String(n) : undefined;
+  };
   const today = useSyncExternalStore(subscribeNever, todayVi, () => "");
   const pathname = usePathname();
   const router = useRouter();
@@ -107,28 +118,26 @@ export function AppShell({ role, children }: { role: Role; children: ReactNode }
           </span>
         </Link>
 
-        <nav className="roles-tb" aria-label="Chuyển vai trò">
-          {ROLE_ORDER.map((r) => (
-            <Link key={r} href={ROLES[r].home} className="role-link" aria-current={r === role} onNavigate={closeAll}>
-              {ROLES[r].label}
-            </Link>
-          ))}
-        </nav>
-        <label className="sr-only" htmlFor="role-select">
-          Chuyển vai trò
-        </label>
-        <select
-          id="role-select"
-          className="select role-select"
-          value={role}
-          onChange={(e) => router.push(ROLES[e.target.value as Role].home)}
-        >
-          {ROLE_ORDER.map((r) => (
-            <option key={r} value={r}>
-              {ROLES[r].label}
-            </option>
-          ))}
-        </select>
+        {memberships.length > 1 && (
+          <>
+            <label className="sr-only" htmlFor="org-select">
+              Tổ chức đang hoạt động
+            </label>
+            <select
+              id="org-select"
+              className="select role-select"
+              style={{ display: "block" }}
+              value={org?.id}
+              onChange={(e) => void switchOrg(e.target.value)}
+            >
+              {memberships.map((m) => (
+                <option key={m.orgId} value={m.orgId}>
+                  {m.orgName} · {m.roleLabel}
+                </option>
+              ))}
+            </select>
+          </>
+        )}
 
         <span className="spacer" />
         <span className="muted tb-date">
@@ -139,27 +148,34 @@ export function AppShell({ role, children }: { role: Role; children: ReactNode }
         <div ref={bellRef} style={{ position: "relative" }}>
           <button
             className="ibtn"
-            aria-label={`Thông báo (${NOTIFS[role].length} mới)`}
+            aria-label={`Thông báo (${unread.length} mới)`}
             aria-expanded={bellOpen}
             onClick={() => setBellOpen((o) => !o)}
           >
             <Bell size={18} aria-hidden="true" />
-            <span className="dot-badge" />
+            {unread.length > 0 && <span className="dot-badge" />}
           </button>
           {bellOpen && (
             <div className="pop" role="menu" aria-label="Thông báo">
               <div className="between" style={{ padding: "6px 10px 8px" }}>
                 <strong>Thông báo</strong>
-                <span className="muted">{NOTIFS[role].length} mới</span>
+                {unread.length > 0 ? (
+                  <button className="btn bs sm" onClick={() => void act("POST", "/v1/notifications/read")}>
+                    Đánh dấu đã đọc ({unread.length})
+                  </button>
+                ) : (
+                  <span className="muted">Không có thông báo mới</span>
+                )}
               </div>
-              {NOTIFS[role].map((n) => (
-                <Link key={n.title} href={n.href} className="pop-item" role="menuitem" onNavigate={closeAll}>
+              {notifs.length === 0 && <div className="empty">Chưa có thông báo.</div>}
+              {notifs.slice(0, 12).map((n) => (
+                <Link key={n.id} href={linkOf(role, n.link)} className="pop-item" role="menuitem" onNavigate={closeAll}>
                   <span
-                    style={{ width: 8, height: 8, borderRadius: "50%", background: n.tone, marginTop: 6, flex: "0 0 auto" }}
+                    style={{ width: 8, height: 8, borderRadius: "50%", background: n.read ? "var(--line)" : "var(--brand-fill)", marginTop: 6, flex: "0 0 auto" }}
                   />
                   <span style={{ display: "flex", flexDirection: "column" }}>
                     <strong style={{ fontSize: 13 }}>{n.title}</strong>
-                    <span className="muted">{n.note}</span>
+                    <span className="muted">{n.body}</span>
                   </span>
                 </Link>
               ))}
@@ -169,15 +185,21 @@ export function AppShell({ role, children }: { role: Role; children: ReactNode }
 
         <div className="tb-user">
           <span className="avatar" aria-hidden="true">
-            {meta.user.initials}
+            {initials}
           </span>
           <span className="tb-user-text">
-            <strong>{meta.user.name}</strong>
+            <strong>{me?.name}</strong>
             <span className="muted">
-              {meta.user.title} · {meta.user.org}
+              {me?.title} · {org?.shortName}
             </span>
           </span>
         </div>
+        <Link href="/security" className="btn bs sm" onNavigate={closeAll}>
+          Bảo mật
+        </Link>
+        <button className="btn bs sm" onClick={() => void logout().then(() => router.push("/"))}>
+          Đăng xuất
+        </button>
       </header>
 
       <div className="body">
@@ -207,7 +229,7 @@ export function AppShell({ role, children }: { role: Role; children: ReactNode }
                 >
                   <NavIcon name={item.icon} />
                   {item.label}
-                  {item.badge && <span className="chip c-lime nl-badge">{item.badge}</span>}
+                  {badge(item.href) && <span className="chip c-lime nl-badge">{badge(item.href)}</span>}
                 </Link>
                 {item.children?.map((c) => (
                   <Link
@@ -243,7 +265,7 @@ export function AppShell({ role, children }: { role: Role; children: ReactNode }
           </div>
           <span className="side-sec">
             <ShieldCheck size={16} aria-hidden="true" />
-            AES-256 · MFA đang bật
+            {me?.mfaEnabled ? "AES-256 · MFA đang bật" : "AES-256 · MFA chưa bật"}
           </span>
         </aside>
 
@@ -253,4 +275,15 @@ export function AppShell({ role, children }: { role: Role; children: ReactNode }
       </div>
     </div>
   );
+}
+
+/** Liên kết trong thông báo của máy chủ (dùng đường dẫn của bản cũ) → đường dẫn theo vai trò. */
+function linkOf(role: Role, link?: string) {
+  const base = ROLES[role].home;
+  if (!link) return base;
+  if (link.startsWith("/admin")) return link;
+  if (link.startsWith("/invoices")) return role === "lender" ? `${base}/appraisal` : `${base}/invoices`;
+  if (link.startsWith("/marketplace")) return `${base}/marketplace`;
+  if (link.startsWith("/settings")) return `${base}/settings`;
+  return base;
 }

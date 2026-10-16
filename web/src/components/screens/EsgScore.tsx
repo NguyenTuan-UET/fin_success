@@ -1,432 +1,242 @@
 "use client";
 
-import Link from "next/link";
-import { useMemo, useState } from "react";
-import { FlaskConical, RotateCcw, Sparkles } from "lucide-react";
-import { ESG_INDUSTRIES, ESG_ISSUES, ESG_ITEMS, ESG_WEIGHTS, esgBand } from "@/lib/data";
-import { dec } from "@/lib/format";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Sparkles, Upload } from "lucide-react";
+import { computeEsg, ESG_BADGE, ESG_LEVEL_ACTION, INDICATORS, ISSUES, esgOfficialScore, type EsgIndicatorDef } from "@fcc/domain/esg";
+import type { EsgAssessment, EsgIndicatorResult, IndicatorLevel } from "@fcc/domain/types";
+import { api, fileToBase64 } from "@/lib/api";
+import { classifyEvidence, fileToImage, proposeLevel } from "@/lib/ai";
+import { date, dec } from "@/lib/format";
+import { orgName } from "@/lib/model";
+import { useData } from "@/lib/session";
+import { Bar, Disclaimer, Kpi } from "@/components/ui/basic";
 import { Term } from "@/components/ui/Term";
-import { PageHeader } from "@/components/ui/basic";
-import type { Role } from "@/lib/roles";
+import { useToast } from "@/components/providers/Toast";
 
-const LV = ["không có", "sơ khai", "tối thiểu", "có hệ thống", "chủ động & đo lường"];
-const f2 = (v: number) => v.toLocaleString("vi-VN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const LEVEL_CHIP = (s: number | null) => (s === null ? "c-neu" : s >= 80 ? "c-ok" : s >= 65 ? "c-info" : s >= 50 ? "c-warn" : "c-bad");
+const YEAR_MS = 365 * 86_400_000;
 
-export function EsgScore({
-  role,
-  header,
-}: {
-  role: Role;
-  header: { eyebrow: string; title: string; sub: string; as?: "h1" | "h2" };
-}) {
-  const [ind, setInd] = useState(0);
-  const [sim, setSim] = useState<Record<string, number>>({});
-  const canSimulate = role === "supplier";
+function Summary({ a }: { a: EsgAssessment }) {
+  const r = computeEsg(a.indicators, a.industryGroup);
+  const official = esgOfficialScore(a);
+  return (
+    <section className="grid-kpi">
+      <Kpi label={<Term k="esg">Điểm ESG</Term>} value={`${dec(r.score, 1)}/100`} note={official ? `Chính thức · ${ESG_BADGE[official.level]}` : `Tạm tính · khoảng ${dec(r.min, 0)}–${dec(r.max, 0)}`} />
+      <Kpi label={<Term k="coverage">Độ bao phủ</Term>} value={`${Math.round(r.coverage * 100)}%`} note={`${r.verifiedCount}/${r.applicableCount} chỉ tiêu đã xác minh · cần ≥ 80% để chính thức`} tone={r.coverage >= 0.8 ? "ok" : undefined} />
+      <Kpi label="Mức" value={r.level} note={ESG_LEVEL_ACTION[r.level]} />
+      <Kpi label="Cờ trọng yếu" value={String(r.flags.length)} note={r.flags.length ? r.flags.map((f) => f.code).join(", ") : "Không có"} tone={r.flags.length ? "bad" : "ok"} />
+    </section>
+  );
+}
 
-  const items = useMemo(() => ESG_ITEMS.map((x) => ({ ...x, score: sim[x.code] ?? x.score, base: x.score })), [sim]);
-  const w = ESG_WEIGHTS[ind];
-  const K = [0, 1, 2, 3, 4, 5].map((k) => (25 * (items[k * 3].score + items[k * 3 + 1].score + items[k * 3 + 2].score)) / 3);
-  const total = K.reduce((a, v, i) => a + (v * w[i]) / 100, 0);
-  const baseTotal = [0, 1, 2, 3, 4, 5]
-    .map((k) => (25 * (ESG_ITEMS[k * 3].score + ESG_ITEMS[k * 3 + 1].score + ESG_ITEMS[k * 3 + 2].score)) / 3)
-    .reduce((a, v, i) => a + (v * w[i]) / 100, 0);
-  const b = esgBand(total);
-  const simulating = Object.keys(sim).length > 0;
-  const delta = total - baseTotal;
+function IssueBars({ a }: { a: EsgAssessment }) {
+  const r = computeEsg(a.indicators, a.industryGroup);
+  return (
+    <section className="card stack-sm">
+      <h2 className="ct">Theo vấn đề trọng yếu</h2>
+      {r.issues.map((i) => (
+        <div key={i.issue}>
+          <div className="between"><span>{ISSUES[i.issue].label} ({Math.round(i.weight * 100)}%)</span><strong>{i.score === null ? "Chưa xác minh" : dec(i.score, 0)}</strong></div>
+          <Bar value={i.score ?? 0} />
+        </div>
+      ))}
+    </section>
+  );
+}
 
-  const pill = (a: number, c: number) => Math.round((K[a] * w[a] + K[c] * w[c]) / (w[a] + w[c]));
-  const pillars = [
-    ["E", "Môi trường", pill(0, 1), w[0] + w[1]],
-    ["S", "Xã hội", pill(2, 3), w[2] + w[3]],
-    ["G", "Quản trị", pill(4, 5), w[4] + w[5]],
-  ] as const;
+/** Doanh nghiệp: khai báo, tải bằng chứng, nhờ AI đề xuất mức (cần trích dẫn); mức chính thức do nhân sự FCC xác nhận. */
+export function EsgEditor() {
+  const { data, org, act } = useData();
+  const toast = useToast();
+  const fileRef = useRef<HTMLInputElement>(null);
+  const a = data.esg.find((e) => e.orgId === org.id && e.source === "assessed");
+  const [busy, setBusy] = useState("");
+  const [open, setOpen] = useState<string | null>(null);
 
-  const plan = items
-    .map((x, i) => ({ x, gain: x.score < 4 ? (w[Math.floor(i / 3)] * 25) / 3 / 100 : 0 }))
-    .filter((p) => p.gain > 0)
-    .sort((a, c) => c.gain - a.gain || a.x.score - c.x.score)
-    .slice(0, 3);
+  useEffect(() => {
+    if (!a) void act("POST", "/v1/esg-assessments", { orgId: org.id }).catch(() => undefined);
+  }, [a, act, org.id]);
 
-  const setLevel = (code: string, level: number, base: number) =>
-    setSim((s) => {
-      const n = { ...s };
-      if (level === base) delete n[code];
-      else n[code] = level;
-      return n;
-    });
+  if (!a) return <section className="card empty">Đang khởi tạo hồ sơ ESG…</section>;
+  // tài liệu cũ hơn 12 tháng không được dùng làm bằng chứng
+  const cutoff = new Date(a.period.split(" → ")[1] ?? a.issuedAt ?? 0).getTime() - YEAR_MS;
+  const recent = a.documents.filter((d) => !d.uploadedAt || new Date(d.uploadedAt).getTime() >= cutoff);
+  const ind = (code: string): EsgIndicatorResult => a.indicators.find((i) => i.code === code) ?? { code };
+  const run = async (key: string, f: () => Promise<unknown>, ok: string) => {
+    setBusy(key);
+    try { await f(); toast(ok); } catch (e) { toast((e as Error).message); }
+    setBusy("");
+  };
+
+  const upload = async (list: FileList | null) => {
+    const f = list?.[0];
+    if (!f) return;
+    await run("upload", async () => {
+      const stored = await api<{ key: string }>("POST", "/api/files", { name: f.name, mime: f.type || "application/octet-stream", dataBase64: await fileToBase64(f), kind: "esg" });
+      let base64: string | null = null;
+      if (/^image\/|pdf$/.test(f.type)) base64 = (await fileToImage(f)).base64;
+      // AI phân loại; lỗi thì để chưa phân loại — không tự điền
+      let cls: { docType: string; period?: string; indicatorCodes: string[]; extracted: Record<string, string | number>; summary: string } = { docType: "Chưa phân loại", indicatorCodes: [], extracted: {}, summary: "" };
+      try { cls = (await classifyEvidence(base64, f.name, INDICATORS, () => cls)).data; } catch { /* nhập tay */ }
+      await act("POST", `/v1/esg-assessments/${a.id}/evidence`, { id: `doc-${Date.now().toString(36)}`, name: f.name, mime: f.type || "application/octet-stream", docType: cls.docType, period: cls.period, indicatorCodes: cls.indicatorCodes, extracted: cls.extracted, extractionSummary: cls.summary, fileKey: stored.key });
+    }, "Đã tải bằng chứng (lưu bất biến, SHA-256)");
+  };
+
+  const suggest = (def: EsgIndicatorDef) =>
+    run(def.code, async () => {
+      const ev = recent.filter((d) => d.indicatorCodes.includes(def.code)).map((d) => ({ id: d.id, name: d.name, docType: d.docType, summary: d.extractionSummary, extracted: d.extracted }));
+      const p = (await proposeLevel(def, ev, ind(def.code).selfDeclared)).data;
+      await act("PUT", `/v1/esg-assessments/${a.id}/indicators/${def.code}`, { aiLevel: p.level ?? undefined, aiRationale: p.rationale, aiCitations: p.citations, aiMissing: p.missing });
+    }, "AI đã đề xuất (người thẩm định FCC sẽ xác nhận)");
 
   return (
     <>
-      <PageHeader
-        as={header.as}
-        eyebrow={header.eyebrow}
-        title={header.title}
-        sub={header.sub}
-        actions={
-          <div className="stack-sm" style={{ gap: 6 }}>
-            <span style={{ fontSize: 12.5, fontWeight: 600, color: "var(--ink-2)" }}>Nhóm ngành áp trọng số</span>
-            <div className="seg" role="group" aria-label="Nhóm ngành">
-              {ESG_INDUSTRIES.map((l, i) => (
-                <button key={l} className="seg-btn" aria-pressed={ind === i} onClick={() => setInd(i)}>
-                  {l}
-                </button>
-              ))}
-            </div>
+      <Summary a={a} />
+      <section className="card stack">
+        <div className="between">
+          <div><h2 className="ct">Bằng chứng</h2><p className="muted">Tài liệu trong 12 tháng gần nhất. AI phân loại và trích số liệu; không có trích dẫn thì AI không đề xuất mức ≥ 2.</p></div>
+          <div>
+            <input ref={fileRef} type="file" hidden accept="application/pdf,image/*,.xml,.csv,.xlsx" onChange={(e) => void upload(e.target.files)} />
+            <button className="btn bp" disabled={busy === "upload"} onClick={() => fileRef.current?.click()}><Upload size={16} aria-hidden="true" /> {busy === "upload" ? "Đang xử lý…" : "Tải bằng chứng"}</button>
           </div>
-        }
-      />
+        </div>
+        {recent.length === 0 && <div className="muted">Chưa có bằng chứng. Tải hóa đơn điện, chứng nhận ISO, hợp đồng BHXH, biên bản xử lý chất thải…</div>}
+        {recent.map((d) => (
+          <div key={d.id} className="soft"><strong>{d.name}</strong> · {d.docType}{d.period ? ` · ${d.period}` : ""}<div className="muted">{d.extractionSummary || "Chưa phân loại — chọn chỉ tiêu liên quan bên dưới"} · chỉ tiêu: {d.indicatorCodes.join(", ") || "—"}</div></div>
+        ))}
+      </section>
 
-      {simulating && (
-        <div
-          role="status"
-          style={{
-            display: "flex",
-            flexWrap: "wrap",
-            gap: 12,
-            alignItems: "center",
-            padding: "12px 16px",
-            borderRadius: 14,
-            background: "var(--violet-bg)",
-            color: "var(--violet)",
-          }}
-        >
-          <FlaskConical size={18} aria-hidden="true" />
-          <span style={{ flex: "1 1 300px" }}>
-            <strong>Đang mô phỏng:</strong> nếu cải thiện {Object.keys(sim).length} chỉ tiêu, điểm ESG{" "}
-            {delta >= 0 ? "tăng" : "giảm"} <strong className="num">{f2(Math.abs(delta))}</strong> → <strong className="num">{f2(total)}</strong> (
-            {b.band}). Đây chỉ là mô phỏng, không thay đổi điểm chính thức.
-          </span>
-          <button className="btn bs sm" onClick={() => setSim({})}>
-            <RotateCcw size={15} aria-hidden="true" />
-            Về điểm thật
+      <section className="card flush">
+        <div className="ch"><h2 className="ct">18 chỉ tiêu</h2><span className="muted">Mức 0–4 · “Chưa xác minh” không phải điểm 0</span></div>
+        {INDICATORS.map((def) => {
+          const i = ind(def.code);
+          const n = recent.filter((d) => d.indicatorCodes.includes(def.code)).length;
+          return (
+            <div key={def.code} style={{ borderTop: "1px solid var(--line-2)", padding: "12px 16px" }} className="stack-sm">
+              <div className="between" style={{ cursor: "pointer" }} onClick={() => setOpen(open === def.code ? null : def.code)}>
+                <span><strong className="num">{def.code}</strong> {def.name}{def.criticalFlag && <span className="chip c-warn" style={{ marginLeft: 6 }}>trọng yếu</span>}</span>
+                <span className="row" style={{ gap: 8 }}>
+                  <span className="muted">{n} bằng chứng</span>
+                  {i.aiLevel !== undefined && <span className="chip c-ai">AI đề xuất {i.aiLevel}</span>}
+                  <span className={`chip ${i.finalLevel === undefined ? "c-neu" : "c-ok"}`}>{i.na ? "Không áp dụng" : i.finalLevel === undefined ? "Chưa xác minh" : `Mức ${i.finalLevel}`}</span>
+                </span>
+              </div>
+              {open === def.code && (
+                <div className="stack-sm">
+                  <div className="muted">Bằng chứng cần: {def.evidence}</div>
+                  <ol className="muted" style={{ margin: 0, paddingLeft: 18 }}>{def.rubric.map((r, k) => <li key={k} value={k}>Mức {k}: {r}</li>)}</ol>
+                  <label className="field"><span>Doanh nghiệp tự khai</span><textarea className="input" rows={2} defaultValue={i.selfDeclared ?? ""} onBlur={(e) => e.target.value !== (i.selfDeclared ?? "") && void run(def.code, () => act("PUT", `/v1/esg-assessments/${a.id}/indicators/${def.code}`, { selfDeclared: e.target.value }), "Đã lưu")} /></label>
+                  <div className="row" style={{ gap: 8, alignItems: "center" }}>
+                    <button className="btn bs sm" disabled={busy === def.code} onClick={() => void suggest(def)}><Sparkles size={14} aria-hidden="true" /> AI đề xuất mức</button>
+                    <span className="muted">Đề xuất chỉ để tham khảo; mức chính thức do người thẩm định FCC xác nhận.</span>
+                  </div>
+                  {i.aiRationale && <div className="soft"><strong>AI:</strong> {i.aiLevel === undefined ? "Chưa đủ bằng chứng (Chưa xác minh)" : `đề xuất mức ${i.aiLevel}`} — {i.aiRationale}{i.aiCitations?.map((c) => <div key={c.documentId} className="muted">Trích dẫn [{recent.find((d) => d.id === c.documentId)?.name ?? c.documentId}]: {c.note}</div>)}{i.aiMissing?.length ? <div className="muted">Còn thiếu: {i.aiMissing.join("; ")}</div> : null}</div>}
+                  {i.reviewerNote && <div className="okmsg">Người thẩm định: {i.reviewerNote}</div>}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </section>
+
+      <IssueBars a={a} />
+      <Disclaimer>Điểm ESG của FCC là đánh giá theo khung nội bộ, không phải chứng nhận hay công nhận “xanh”. Ưu đãi xanh chỉ áp dụng khi tổ chức tài chính cấu hình và hồ sơ đủ điều kiện.</Disclaimer>
+    </>
+  );
+}
+
+/** Nhân sự FCC: rà soát đề xuất AI, xác nhận mức từng chỉ tiêu (ghi lý do khi khác AI), phát hành điểm chính thức. */
+export function EsgReview() {
+  const { data, act } = useData();
+  const toast = useToast();
+  const list = data.esg.filter((e) => e.source === "assessed");
+  const [sel, setSel] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const a = list.find((x) => x.id === sel) ?? list[0];
+  const r = a ? computeEsg(a.indicators, a.industryGroup) : null;
+  const run = async (f: () => Promise<unknown>, ok: string) => {
+    setBusy(true);
+    try { await f(); toast(ok); } catch (e) { toast((e as Error).message); }
+    setBusy(false);
+  };
+  const [notes, setNotes] = useState<Record<string, string>>({});
+  if (!list.length) return <section className="card empty">Chưa có doanh nghiệp nào khởi tạo hồ sơ ESG.</section>;
+  return (
+    <section className="row top">
+      <div className="card flush grow-1" style={{ flexBasis: 280 }}>
+        <div className="ch"><h2 className="ct">Hồ sơ ESG</h2></div>
+        {list.map((e) => { const x = computeEsg(e.indicators, e.industryGroup); return (
+          <button key={e.id} onClick={() => setSel(e.id)} className="soft" style={{ display: "block", width: "100%", textAlign: "left", border: "none", borderTop: "1px solid var(--line-2)", cursor: "pointer", background: a?.id === e.id ? "var(--surface-3)" : undefined }}>
+            <strong>{orgName(data.orgs, e.orgId)}</strong>
+            <div className="muted">{dec(x.score, 0)}/100 · bao phủ {Math.round(x.coverage * 100)}% · {{ draft: "Nháp", in_review: "Đang rà soát", official: "Chính thức", provisional: "Tạm tính" }[e.status]}</div>
           </button>
+        ); })}
+      </div>
+      {a && r && (
+        <div className="stack grow-3" style={{ flexBasis: 520 }}>
+          <Summary a={a} />
+          <section className="card flush">
+            <div className="ch"><h2 className="ct">Xác nhận chỉ tiêu · {orgName(data.orgs, a.orgId)}</h2>
+              <button className="btn bp" disabled={busy || r.coverage < 0.8} title={r.coverage < 0.8 ? "Độ bao phủ dưới 80% — chưa phát hành chính thức" : undefined} onClick={() => run(() => act("POST", `/v1/esg-assessments/${a.id}/issue`, { official: true }), "Đã phát hành điểm ESG chính thức")}>Phát hành chính thức (cần MFA)</button></div>
+            {a.status === "official" && <div className="okmsg" style={{ margin: "0 16px 8px" }}>Đã phát hành ngày {date(a.issuedAt)}, hiệu lực đến {date(a.validUntil)}.</div>}
+            {INDICATORS.map((def) => {
+              const i = a.indicators.find((x) => x.code === def.code) ?? { code: def.code };
+              const docs = a.documents.filter((d) => d.indicatorCodes.includes(def.code));
+              const note = notes[def.code] ?? i.reviewerNote ?? "";
+              const setLevel = (lvl: IndicatorLevel) => {
+                if (i.aiLevel !== undefined && lvl !== i.aiLevel && !note.trim()) return toast("Khác đề xuất AI: cần ghi lý do");
+                void run(() => act("PUT", `/v1/esg-assessments/${a.id}/indicators/${def.code}`, { finalLevel: lvl, reviewerNote: note || undefined }), `${def.code}: mức ${lvl}`);
+              };
+              return (
+                <div key={def.code} style={{ borderTop: "1px solid var(--line-2)", padding: "12px 16px" }} className="stack-sm">
+                  <div className="between"><span><strong className="num">{def.code}</strong> {def.name}</span><span className={`chip ${i.finalLevel === undefined ? "c-neu" : "c-ok"}`}>{i.finalLevel === undefined ? "Chưa xác minh" : `Mức ${i.finalLevel}`}</span></div>
+                  {i.selfDeclared && <div className="muted">Tự khai: {i.selfDeclared}</div>}
+                  {i.aiRationale && <div className="soft">AI {i.aiLevel !== undefined ? `đề xuất ${i.aiLevel}` : "chưa đủ bằng chứng"}: {i.aiRationale}{i.aiCitations?.map((c) => <div key={c.documentId} className="muted">[{docs.find((d) => d.id === c.documentId)?.name ?? c.documentId}] {c.note}</div>)}</div>}
+                  <div className="muted">{docs.length} bằng chứng liên quan{docs.map((d) => d.fileKey ? <button key={d.id} className="link-btn" style={{ marginLeft: 8 }} onClick={async () => { const u = await api<{ url: string }>("GET", `/api/files/${d.fileKey}/url`); window.open(u.url, "_blank"); }}>{d.name}</button> : null)}</div>
+                  <div className="row" style={{ gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                    {[0, 1, 2, 3, 4].map((l) => <button key={l} className={`btn sm ${i.finalLevel === l ? "bp" : "bs"}`} disabled={busy} onClick={() => setLevel(l as IndicatorLevel)}>{l}</button>)}
+                    <input className="input" style={{ flex: "1 1 220px" }} placeholder="Ghi chú thẩm định (bắt buộc khi khác AI)" value={note} onChange={(e) => setNotes({ ...notes, [def.code]: e.target.value })} />
+                  </div>
+                </div>
+              );
+            })}
+          </section>
+          <IssueBars a={a} />
         </div>
       )}
+    </section>
+  );
+}
 
-      <section className="row">
-        <div className="card grow-1 stack-sm" style={{ gap: 14 }}>
-          <div className="between">
-            <span className="ct">Điểm ESG tổng hợp</span>
-            <span className={`chip ${b.chip}`}>{b.medal}</span>
-          </div>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
-            <span className="num" style={{ fontSize: 64, fontWeight: 600, lineHeight: 1 }}>
-              {Math.round(total)}
-            </span>
-            <span className="muted" style={{ fontSize: 14 }}>
-              /100 · mức {b.band}
-            </span>
-          </div>
-          <div style={{ position: "relative", paddingTop: 18 }}>
-            <span
-              className="num"
-              style={{ position: "absolute", top: 0, left: `${total}%`, transform: "translateX(-50%)", fontSize: 11, fontWeight: 700 }}
-            >
-              {f2(total)}
-            </span>
-            <div style={{ display: "flex", gap: 2, height: 10 }} aria-hidden="true">
-              <span style={{ width: "50%", background: "#F2D3CF", borderRadius: "4px 0 0 4px" }} />
-              <span style={{ width: "15%", background: "#F5E2C2" }} />
-              <span style={{ width: "15%", background: "#CFE6DB" }} />
-              <span style={{ flex: "1 1 auto", background: "#9CCBB9", borderRadius: "0 4px 4px 0" }} />
-            </div>
-            <span
-              style={{
-                position: "absolute",
-                top: 14,
-                left: `${total}%`,
-                width: 3,
-                height: 18,
-                marginLeft: -1,
-                background: "var(--ink)",
-                borderRadius: 2,
-                transition: "left .3s var(--ease)",
-              }}
-            />
-            <div style={{ display: "flex", marginTop: 4, fontSize: 11, color: "var(--ink-3)" }}>
-              <span style={{ width: "50%" }}>Yếu &lt;50</span>
-              <span style={{ width: "15%" }}>TB</span>
-              <span style={{ width: "15%" }}>Khá</span>
-              <span>Tốt ≥80</span>
-            </div>
-          </div>
-          <div className="line-item divider">
-            <span>
-              <Term k="coverage">Độ bao phủ chứng cứ</Term>
-            </span>
-            <strong className="num">18/18 · 100%</strong>
-          </div>
-          <div className="line-item">
-            <span>Cờ rủi ro nghiêm trọng</span>
-            <strong>Không có</strong>
-          </div>
-          <div className="line-item">
-            <span>Hiệu lực điểm</span>
-            <strong>đến 10/2027</strong>
-          </div>
-        </div>
-
-        <div className="card grow-1 stack-sm" style={{ gap: 14 }}>
-          <span className="ct">Ba trụ cột</span>
-          {pillars.map(([code, name, score, wt]) => (
-            <div key={code} className="stack-sm" style={{ gap: 6 }}>
-              <div className="between" style={{ fontSize: 13.5 }}>
-                <span>
-                  <strong>{code}</strong> · {name}
-                </span>
-                <span className="num strong">{score}</span>
-              </div>
-              <div className="bar lg">
-                <span className="fill" style={{ width: `${score}%` }} />
-              </div>
-              <span className="muted">Trọng số {wt}%</span>
-            </div>
-          ))}
-        </div>
-
-        <div className="dark grow-1 stack-sm" style={{ gap: 12 }}>
-          <span className="d-title">
-            <Sparkles size={18} color="#DDF1C4" aria-hidden="true" />
-            {role === "lender" ? "Chính sách ưu đãi xanh của bạn" : "Ưu đãi tài chính xanh"}
-          </span>
-          <div className="d-line">
-            <span>Giảm lãi suất</span>
-            <span className="num strong">{total >= 80 ? "−1,0%/năm" : total >= 65 ? "−0,7%/năm" : "Chưa đủ điều kiện"}</span>
-          </div>
-          <div className="d-line">
-            <span>Thời gian phê duyệt</span>
-            <span className="num strong">{total >= 65 ? "24 giờ" : "Thẩm định tăng cường"}</span>
-          </div>
-          <div className="d-line">
-            <span>Gói xanh khả dụng</span>
-            <span className="strong">{total >= 80 ? "4 / 7 tổ chức" : total >= 65 ? "3 / 6 tổ chức" : "0 / 6 tổ chức"}</span>
-          </div>
-          <p style={{ fontSize: 12.5 }}>
-            Ưu đãi do từng tổ chức tài chính công bố. Điểm ESG là đầu vào bổ trợ, không thay thế phân tích dòng tiền, lịch sử trả nợ hay tài
-            sản bảo đảm.
-          </p>
-          <span className="spacer" />
-          {role === "supplier" && (
-            <Link className="btn bl" href="/supplier/marketplace">
-              Xem gói tài trợ xanh
-            </Link>
-          )}
-        </div>
+/** Bên mua / tổ chức tài chính: ESG của các doanh nghiệp đã đồng ý chia sẻ. */
+export function EsgPortfolio({ kind }: { kind: "buyer" | "lender" }) {
+  const { data, org } = useData();
+  const rows = useMemo(() => {
+    const related = new Set<string>();
+    for (const r of data.receivables) {
+      if (kind === "buyer" && r.buyerId === org.id) related.add(r.sellerId);
+      if (kind === "lender" && data.applications.some((a) => a.lenderId === org.id && a.receivableId === r.id)) related.add(r.sellerId);
+    }
+    return data.esg.filter((e) => e.source === "assessed" && related.has(e.orgId)).map((e) => ({ e, r: computeEsg(e.indicators, e.industryGroup), official: esgOfficialScore(e) }));
+  }, [data, org.id, kind]);
+  const green = rows.filter((x) => x.official && x.official.score >= 65 && x.official.flags === 0);
+  return (
+    <>
+      <section className="grid-kpi">
+        <Kpi label="Doanh nghiệp chia sẻ ESG" value={String(rows.length)} note={kind === "buyer" ? "nhà cung cấp của bạn" : "doanh nghiệp trong hồ sơ của bạn"} />
+        <Kpi label="Đạt ngưỡng xanh" value={`${green.length}/${rows.length}`} note="ESG chính thức ≥ 65, còn hiệu lực, không cờ trọng yếu" />
+        <Kpi label="Có cờ trọng yếu" value={String(rows.filter((x) => x.r.flags.length).length)} tone={rows.some((x) => x.r.flags.length) ? "bad" : "ok"} />
       </section>
-
-      <section className="row top">
-        <div className="card flush grow-3">
-          <div className="ch">
-            <div>
-              <h2 className="ct">6 vấn đề trọng yếu</h2>
-              <p className="muted">K = 25 × điểm bình quân · ESG = Σ trọng số ngành × K</p>
-            </div>
-            <span className="chip c-info">Trọng số: {ESG_INDUSTRIES[ind]}</span>
-          </div>
-          <div className="tw">
-            <table>
-              <thead>
-                <tr>
-                  <th>Vấn đề</th>
-                  <th>Điểm 3 chỉ tiêu</th>
-                  <th className="r">Điểm nhóm /100</th>
-                  <th className="r">Trọng số</th>
-                  <th className="r">Đóng góp</th>
-                </tr>
-              </thead>
-              <tbody>
-                {ESG_ISSUES.map((n, k) => (
-                  <tr key={n}>
-                    <td className="strong">{n}</td>
-                    <td className="num">
-                      {[0, 1, 2].map((j) => `${items[k * 3 + j].code}=${items[k * 3 + j].score}`).join(", ")}
-                    </td>
-                    <td className="r num">{f2(K[k])}</td>
-                    <td className="r num">{w[k]}%</td>
-                    <td className="r num">{f2((K[k] * w[k]) / 100)}</td>
-                  </tr>
-                ))}
-                <tr>
-                  <td style={{ fontWeight: 700 }}>Tổng</td>
-                  <td />
-                  <td />
-                  <td className="r num" style={{ fontWeight: 700 }}>
-                    100%
-                  </td>
-                  <td className="r num" style={{ fontWeight: 700 }}>
-                    {f2(total)}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <aside className="card grow-1 stack-sm" style={{ gap: 12 }}>
-          <h2 className="ct">{role === "supplier" ? "Kế hoạch cải thiện" : "Gợi ý cải thiện cho doanh nghiệp"}</h2>
-          <p className="muted">
-            Nâng 1 bậc ở các chỉ tiêu có tác động lớn nhất.{" "}
-            {total < 80 ? (
-              <>
-                Cần thêm{" "}
-                <strong className="num" style={{ color: "var(--ink)" }}>
-                  {f2(80 - total)}
-                </strong>{" "}
-                điểm để đạt mức Tốt.
-              </>
-            ) : (
-              "Đã đạt mức Tốt."
-            )}
-          </p>
-          {plan.map((p) => (
-            <div key={p.x.code} className="soft" style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
-              <span className="num" style={{ flex: "0 0 auto", fontWeight: 700, color: "var(--ok)", minWidth: 44 }}>
-                +{f2(p.gain)}
-              </span>
-              <div>
-                <strong style={{ fontSize: 13 }}>
-                  {p.x.code} · {p.x.name}
-                </strong>
-                <div className="muted wrap">
-                  Từ mức {LV[p.x.score]} lên {LV[p.x.score + 1]}: {p.x.next || "duy trì kết quả hiện tại"}
-                </div>
-                {canSimulate && (
-                  <button className="link-btn" style={{ fontSize: 12.5, minHeight: 28, padding: 0 }} onClick={() => setLevel(p.x.code, p.x.score + 1, p.x.base)}>
-                    Thử mô phỏng →
-                  </button>
-                )}
-              </div>
-            </div>
-          ))}
-          <p className="muted">Kế hoạch có thể gắn với điều kiện giám sát sau giải ngân; không tự động suy ra giảm lãi suất.</p>
-        </aside>
+      <section className="card flush">
+        <div className="ch"><h2 className="ct">ESG theo doanh nghiệp</h2></div>
+        <div className="tw"><table>
+          <thead><tr><th>Doanh nghiệp</th><th className="r">Điểm</th><th>Mức</th><th className="r">Bao phủ</th><th>Cờ</th><th>Trạng thái</th></tr></thead>
+          <tbody>
+            {rows.map(({ e, r, official }) => <tr key={e.id}><td>{orgName(data.orgs, e.orgId)}</td><td className="r num strong">{dec(r.score, 1)}</td><td><span className={`chip ${LEVEL_CHIP(r.score)}`}>{r.level}</span></td><td className="r num">{Math.round(r.coverage * 100)}%</td><td>{r.flags.map((f) => f.code).join(", ") || "—"}</td><td>{official ? <span className="chip c-ok">Chính thức</span> : <span className="chip c-neu">Tạm tính</span>}</td></tr>)}
+            {rows.length === 0 && <tr><td colSpan={6} className="empty">Chưa có doanh nghiệp nào chia sẻ ESG. Doanh nghiệp chia sẻ khi gửi yêu cầu báo giá hoặc hồ sơ tài trợ.</td></tr>}
+          </tbody></table></div>
       </section>
-
-      <section className="card">
-        <div className="ch">
-          <div>
-            <h2 className="ct">18 chỉ tiêu & minh chứng</h2>
-            <p className="muted">
-              0 không có/vi phạm · 1 sơ khai · 2 đáp ứng tối thiểu · 3 quản lý có hệ thống · 4 chủ động, có kết quả đo lường
-              {canSimulate && " · Bấm vào ô mức để mô phỏng"}
-            </p>
-          </div>
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(320px, 100%), 1fr))", gap: 20 }}>
-          {(
-            [
-              ["E · Môi trường", 0],
-              ["S · Xã hội", 6],
-              ["G · Quản trị", 12],
-            ] as const
-          ).map(([title, start]) => (
-            <div key={title} className="stack-sm" style={{ gap: 8 }}>
-              <span style={{ fontWeight: 700, fontSize: 13.5 }}>{title}</span>
-              {items.slice(start, start + 6).map((it) => (
-                <div
-                  key={it.code}
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "34px minmax(0, 1fr) auto",
-                    gap: 10,
-                    alignItems: "center",
-                    padding: "10px 0",
-                    borderTop: "1px solid var(--line-2)",
-                  }}
-                >
-                  <span className="num strong" style={{ fontSize: 12.5 }}>
-                    {it.code}
-                  </span>
-                  <div style={{ minWidth: 0 }}>
-                    <div className="strong" style={{ fontSize: 13 }}>
-                      {it.name}
-                    </div>
-                    <div className="muted wrap">{it.evidence}</div>
-                  </div>
-                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
-                    <div style={{ display: "flex", gap: 3 }} role={canSimulate ? "group" : "img"} aria-label={`${it.code} mức ${it.score} trên 4`}>
-                      {[1, 2, 3, 4].map((n) => {
-                        const filled = it.score >= n;
-                        const changed = it.score !== it.base && n > Math.min(it.score, it.base) && n <= Math.max(it.score, it.base);
-                        const style = {
-                          width: 14,
-                          height: 14,
-                          borderRadius: 3,
-                          border: 0,
-                          padding: 0,
-                          background: filled ? (changed ? "var(--violet)" : "var(--brand-fill)") : changed ? "#E5D6F5" : "#E6ECE8",
-                          cursor: canSimulate ? "pointer" : undefined,
-                        } as const;
-                        return canSimulate ? (
-                          <button
-                            key={n}
-                            style={style}
-                            aria-label={`Đặt ${it.code} ở mức ${n}`}
-                            onClick={() => setLevel(it.code, it.score === n ? n - 1 : n, it.base)}
-                          />
-                        ) : (
-                          <span key={n} style={style} />
-                        );
-                      })}
-                    </div>
-                    <span className="num muted" style={{ fontSize: 11.5 }}>
-                      {it.score}/4{it.score !== it.base && ` (thật: ${it.base})`}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section className="card">
-        <div className="ch">
-          <h2 className="ct">Quy trình chấm điểm 9 bước</h2>
-          <span className="muted">Tái chấm định kỳ: 10/2027 hoặc khi có sự cố</span>
-        </div>
-        <ol
-          style={{
-            listStyle: "none",
-            margin: 0,
-            padding: 0,
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(min(140px, 100%), 1fr))",
-            gap: 8,
-          }}
-        >
-          {[
-            "Tiếp nhận hồ sơ",
-            "Gắn nhóm ngành",
-            "Sàng lọc rủi ro nghiêm trọng",
-            "Thu thập minh chứng",
-            "AI đề xuất · người thẩm định xác nhận",
-            "Tính 6 vấn đề",
-            "Áp trọng số ngành",
-            "Chất lượng dữ liệu & cờ",
-            "Báo cáo & giám sát",
-          ].map((t, i) => (
-            <li
-              key={t}
-              style={{
-                padding: "10px 12px",
-                borderRadius: 10,
-                background: i === 8 ? "var(--forest)" : "var(--surface-3)",
-                color: i === 8 ? "#fff" : undefined,
-              }}
-            >
-              <span className="num" style={{ fontSize: 12.5, color: i === 8 ? "var(--on-forest-2)" : "var(--ink-3)" }}>
-                B{i + 1}
-              </span>
-              <div style={{ fontSize: 12.5, fontWeight: 600 }}>{t}</div>
-            </li>
-          ))}
-        </ol>
-        <p className="muted" style={{ marginTop: 12 }}>
-          Áp dụng “Khung chấm điểm ESG cho SMEs vay vốn FCC” · Coverage ≥ 80% mới phát hành điểm chính thức · chỉ dùng minh chứng trong 12 tháng
-          gần nhất · tổng hiện tại {dec(total, 2)}.
-        </p>
-      </section>
+      <Disclaimer>Chỉ hiển thị doanh nghiệp đã đồng ý chia sẻ. ESG là đầu vào bổ trợ, không thay thế phân tích dòng tiền và tín dụng.</Disclaimer>
     </>
   );
 }

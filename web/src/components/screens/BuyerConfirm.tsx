@@ -1,84 +1,51 @@
 "use client";
 
-import { useState } from "react";
-import { AlertTriangle, CircleCheck, Undo2 } from "lucide-react";
-import { cx, vnd } from "@/lib/format";
+import { useMemo, useState } from "react";
+import { AlertTriangle, CircleCheck } from "lucide-react";
+import type { Receivable } from "@fcc/domain/types";
+import { cx, date, daysFromNow, today, vnd } from "@/lib/format";
+import { orgName, RECEIVABLE_STAGE } from "@/lib/model";
+import { useData } from "@/lib/session";
+import { useScores } from "@/lib/scores";
 import { Term } from "@/components/ui/Term";
 import { useToast } from "@/components/providers/Toast";
 
-type Check = ["ok" | "warn", string, string];
-const PENDING: { id: string; sup: string; amt: number; due: string; ok3: boolean; checks: Check[] }[] = [
-  {
-    id: "HD-0421",
-    sup: "Vật liệu Sao Mai",
-    amt: 1_120_000_000,
-    due: "25/01/2027",
-    ok3: true,
-    checks: [
-      ["ok", "Khớp đơn mua hàng PO-2026-311", "Đơn giá và số lượng trùng khớp"],
-      ["ok", "Biên bản giao hàng BBGH-0421", "Ký số bởi kho công trình khu B"],
-      ["ok", "Hóa đơn điện tử hợp lệ", "Không trùng lặp, chưa hủy"],
-    ],
-  },
-  {
-    id: "HD-2209",
-    sup: "Điện cơ Nam Việt",
-    amt: 860_000_000,
-    due: "10/12/2026",
-    ok3: true,
-    checks: [
-      ["ok", "Khớp đơn mua hàng PO-2026-298", "Đơn giá và số lượng trùng khớp"],
-      ["ok", "Biên bản nghiệm thu", "Nghiệm thu lắp đặt 08/10"],
-      ["ok", "Hóa đơn điện tử hợp lệ", "Không trùng lặp, chưa hủy"],
-    ],
-  },
-  {
-    id: "HD-0631",
-    sup: "Vận tải Hưng Phát",
-    amt: 145_000_000,
-    due: "14/11/2026",
-    ok3: false,
-    checks: [
-      ["ok", "Khớp hợp đồng vận chuyển", "Đơn giá theo phụ lục 03"],
-      ["warn", "Chênh lệch số chuyến", "Hóa đơn 24 chuyến, nhật ký công trình ghi 22 chuyến"],
-      ["ok", "Hóa đơn điện tử hợp lệ", "Không trùng lặp, chưa hủy"],
-    ],
-  },
-];
-
-const EARLY = [
-  { id: "HD-0406", sup: "Vật liệu Sao Mai", amt: 455_000_000, due: "24/11/2026", days: 40, d: 0.012 },
-  { id: "HD-1187", sup: "Bê tông Thành Công", amt: 620_000_000, due: "19/11/2026", days: 35, d: 0.008 },
-  { id: "HD-2174", sup: "Điện cơ Nam Việt", amt: 380_000_000, due: "02/11/2026", days: 18, d: 0.002 },
-  { id: "HD-0617", sup: "Vận tải Hưng Phát", amt: 210_000_000, due: "30/11/2026", days: 46, d: 0.01 },
-];
-const HURDLE = 0.045;
+const HURDLE = 0.045; // chi phí cơ hội tiền mặt, %/năm (cấu hình mặc định)
 
 export function BuyerConfirm() {
+  const { data, org, act } = useData();
   const toast = useToast();
-  const [dec, setDec] = useState<Record<string, "ok" | "no">>({});
-  const [sel, setSel] = useState("HD-0421");
-  const [early, setEarly] = useState<Record<string, boolean>>({ "HD-0406": true, "HD-1187": true });
-  const [approved, setApproved] = useState(false);
+  const scores = useScores(data);
+  const [sel, setSel] = useState<string | null>(null);
+  const [dispute, setDispute] = useState<{ id: string; reason: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [offerFor, setOfferFor] = useState<Receivable | null>(null);
+  const [disc, setDisc] = useState("1");
+  const [payBy, setPayBy] = useState("");
 
-  const s = PENDING.find((p) => p.id === sel) ?? PENDING[0];
-  const left = PENDING.filter((p) => !dec[p.id]);
+  const mine = useMemo(() => data.receivables.filter((r) => r.buyerId === org.id), [data.receivables, org.id]);
+  const pending = mine.filter((r) => r.state === "BUYER_PENDING");
+  const confirmed = mine.filter((r) => ["BUYER_CONFIRMED", "SUBMITTED", "UNDER_REVIEW", "OFFERED", "ACCEPTED", "FUNDED", "OVERDUE"].includes(r.state));
+  const s = mine.find((r) => r.id === sel) ?? pending[0] ?? null;
+  const offers = data.earlyOffers.filter((o) => o.buyerId === org.id);
+  const activeApp = (rid: string) => data.applications.some((a) => a.receivableId === rid && !["REJECTED", "WITHDRAWN"].includes(a.state));
 
-  const rows = EARLY.map((e) => {
-    const on = !!early[e.id];
-    const sv = e.amt * e.d;
-    const y = (e.d / e.days) * 365;
-    return { ...e, on, sv, y };
-  });
-  const pay = rows.reduce((a, r) => (r.on ? a + r.amt - r.sv : a), 0);
-  const save = rows.reduce((a, r) => (r.on ? a + r.sv : a), 0);
-
-  const decide = (id: string, v: "ok" | "no") => {
-    setDec((d) => ({ ...d, [id]: v }));
-    setSel(id);
-    const p = PENDING.find((x) => x.id === id)!;
-    toast(v === "ok" ? `Đã xác nhận ${id}. ${p.sup} có thể dùng hóa đơn này để nhận tiền sớm.` : `Đã gửi yêu cầu giải trình ${id} tới ${p.sup}.`);
+  const run = async (f: () => Promise<unknown>, ok: string) => {
+    setBusy(true);
+    try {
+      await f();
+      toast(ok);
+    } catch (e) {
+      toast((e as Error).message);
+    }
+    setBusy(false);
   };
+
+  const checks = (r: Receivable): ["ok" | "warn", string, string][] => [
+    r.files?.some((f) => f.kind === "invoice") || r.docs.xml ? ["ok", "Chứng từ hóa đơn gốc đã được lưu", "Bất biến, định danh theo SHA-256"] : ["warn", "Chưa có tệp hóa đơn gốc", "Nhà cung cấp nhập tay — nên đối chiếu kỹ"],
+    r.docs.contract ? ["ok", "Có hợp đồng mua bán đính kèm", "Đối chiếu đơn giá, điều khoản thanh toán"] : ["warn", "Chưa đính kèm hợp đồng mua bán", "Có thể hỏi lại nhà cung cấp"],
+    r.docs.delivery ? ["ok", "Có chứng từ giao nhận", "Đối chiếu số lượng thực nhận"] : ["warn", "Chưa có biên bản giao nhận", "Nên xác nhận hàng đã nhận đủ"],
+  ];
 
   return (
     <>
@@ -86,207 +53,149 @@ export function BuyerConfirm() {
         <div className="card flush grow-3">
           <div className="ch">
             <h2 className="ct">Chờ xác nhận</h2>
-            <span className="muted">{left.length ? `${left.length} hóa đơn · ${vnd(left.reduce((a, p) => a + p.amt, 0))} đ` : "Đã xử lý hết"}</span>
+            <span className="muted">{pending.length ? `${pending.length} hóa đơn · ${vnd(pending.reduce((a, p) => a + p.amount, 0))} đ` : "Không có hóa đơn nào chờ xác nhận"}</span>
           </div>
           <div className="tw">
             <table>
               <thead>
-                <tr>
-                  <th>Hóa đơn</th>
-                  <th>Nhà cung cấp</th>
-                  <th className="r">Số tiền (đ)</th>
-                  <th>Hạn thanh toán</th>
-                  <th>
-                    <Term k="threeWay">Đối chiếu 3 chiều</Term>
-                  </th>
-                  <th>Quyết định</th>
-                </tr>
+                <tr><th>Hóa đơn</th><th>Nhà cung cấp</th><th className="r">Số tiền (đ)</th><th>Hạn thanh toán</th><th><Term k="threeWay">Đối chiếu chứng từ</Term></th><th>Quyết định</th></tr>
               </thead>
               <tbody>
-                {PENDING.map((p) => {
-                  const d = dec[p.id];
+                {pending.map((p) => {
+                  const warn = checks(p).filter((c) => c[0] === "warn").length;
                   return (
-                    <tr key={p.id} className={cx("clickable", p.id === sel && "sel")} onClick={() => setSel(p.id)}>
-                      <td>
-                        <button className="link-btn num" onClick={() => setSel(p.id)} aria-label={`Xem đối chiếu ${p.id}`}>
-                          {p.id}
-                        </button>
-                      </td>
-                      <td className="wrap" style={{ minWidth: 110 }}>
-                        {p.sup}
-                      </td>
-                      <td className="r num">{vnd(p.amt)}</td>
-                      <td className="num">{p.due}</td>
-                      <td>
-                        <span className={`chip ${p.ok3 ? "c-ok" : "c-warn"}`}>{p.ok3 ? "Khớp 3/3" : "Lệch 1/3"}</span>
-                      </td>
+                    <tr key={p.id} className={cx("clickable", s?.id === p.id && "sel")} onClick={() => setSel(p.id)}>
+                      <td><button className="link-btn num" onClick={() => setSel(p.id)}>{p.code}</button><div className="muted num">{p.invoiceSeries}-{p.invoiceNumber}</div></td>
+                      <td className="wrap" style={{ minWidth: 110 }}>{orgName(data.orgs, p.sellerId)}</td>
+                      <td className="r num">{vnd(p.amount)}</td>
+                      <td className="num">{date(p.dueDate)}</td>
+                      <td><span className={`chip ${warn ? "c-warn" : "c-ok"}`}>{warn ? `Thiếu ${warn}/3` : "Đủ 3/3"}</span></td>
                       <td onClick={(e) => e.stopPropagation()}>
-                        {d ? (
-                          <span style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
-                            <span className={`chip ${d === "ok" ? "c-ok" : "c-warn"}`}>{d === "ok" ? "Đã xác nhận" : "Đã yêu cầu giải trình"}</span>
-                            <button
-                              className="ibtn"
-                              style={{ width: 32, height: 32 }}
-                              aria-label={`Hoàn tác quyết định ${p.id}`}
-                              onClick={() =>
-                                setDec((x) => {
-                                  const n = { ...x };
-                                  delete n[p.id];
-                                  return n;
-                                })
-                              }
-                            >
-                              <Undo2 size={15} aria-hidden="true" />
-                            </button>
-                          </span>
-                        ) : (
-                          <div style={{ display: "flex", gap: 6 }}>
-                            <button className="btn bp sm" onClick={() => decide(p.id, "ok")} title={p.ok3 ? undefined : "Chứng từ đang lệch — nên kiểm tra trước"}>
-                              Xác nhận
-                            </button>
-                            <button
-                              className="btn bs sm"
-                              onClick={() => decide(p.id, "no")}
-                              title="Yêu cầu nhà cung cấp giải trình hoặc điều chỉnh"
-                              aria-label={`Yêu cầu giải trình ${p.id}`}
-                            >
-                              Hỏi lại
-                            </button>
-                          </div>
-                        )}
+                        <div style={{ display: "flex", gap: 6 }}>
+                          <button className="btn bp sm" disabled={busy} onClick={() => run(() => act("POST", `/v1/receivables/${p.id}/buyer-decision`, { confirm: true }), `Đã xác nhận ${p.code}. ${orgName(data.orgs, p.sellerId)} có thể dùng hóa đơn này để nhận tiền sớm.`)}>Xác nhận</button>
+                          <button className="btn bs sm" disabled={busy} onClick={() => setDispute({ id: p.id, reason: "" })}>Hỏi lại</button>
+                        </div>
                       </td>
                     </tr>
                   );
                 })}
+                {pending.length === 0 && <tr><td colSpan={6} className="empty">Đã xử lý hết.</td></tr>}
               </tbody>
             </table>
           </div>
         </div>
 
         <aside className="card grow-1 stack-sm" style={{ gap: 12 }} aria-label="Đối chiếu chi tiết">
-          <span className="muted">Đối chiếu chi tiết</span>
-          <h2 className="num" style={{ fontSize: 20, fontWeight: 600 }}>
-            {s.id}
-          </h2>
-          <span style={{ fontSize: 13 }}>
-            {s.sup} · <span className="num">{vnd(s.amt)} đ</span>
-          </span>
-          {s.checks.map(([lv, t, n]) => (
-            <div key={t} className="soft" style={{ display: "flex", gap: 10, alignItems: "flex-start", background: lv === "warn" ? "#FFFBF3" : undefined }}>
-              {lv === "ok" ? (
-                <CircleCheck size={17} color="var(--brand-fill)" style={{ flex: "0 0 auto", marginTop: 1 }} aria-hidden="true" />
-              ) : (
-                <AlertTriangle size={17} color="var(--warn-strong)" style={{ flex: "0 0 auto", marginTop: 1 }} aria-hidden="true" />
-              )}
-              <div>
-                <strong style={{ fontSize: 13 }}>{t}</strong>
-                <div className="muted wrap">{n}</div>
+          {s ? (
+            <>
+              <span className="muted">Đối chiếu chi tiết</span>
+              <h2 className="num" style={{ fontSize: 20, fontWeight: 600 }}>{s.code}</h2>
+              <span style={{ fontSize: 13 }}>{orgName(data.orgs, s.sellerId)} · <span className="num">{vnd(s.amount)} đ</span> · hạn {date(s.dueDate)}</span>
+              <span className="muted">Xếp hạng nhà cung cấp (tham khảo): {scores.supplier(s.sellerId).rating}{scores.supplier(s.sellerId).official ? "" : " · tạm tính"}</span>
+              {checks(s).map(([lv, t, n]) => (
+                <div key={t} className="soft" style={{ display: "flex", gap: 10, alignItems: "flex-start", background: lv === "warn" ? "#FFFBF3" : undefined }}>
+                  {lv === "ok" ? <CircleCheck size={17} color="var(--brand-fill)" aria-hidden="true" /> : <AlertTriangle size={17} color="var(--warn-strong)" aria-hidden="true" />}
+                  <div><strong style={{ fontSize: 13 }}>{t}</strong><div className="muted wrap">{n}</div></div>
+                </div>
+              ))}
+              <div style={{ fontSize: 12.5, color: "var(--ink-2)", background: "var(--info-bg)", padding: "10px 12px", borderRadius: 10 }}>
+                Xác nhận là khẳng định khoản phải trả là thật và đúng hạn (cần xác thực MFA). Nếu nhà cung cấp tài trợ hóa đơn này, bạn thanh toán đúng hạn — không phát sinh nghĩa vụ mới.
               </div>
-            </div>
-          ))}
-          {!s.ok3 && (
-            <p className="t-warn" style={{ fontSize: 13 }}>
-              Gợi ý: chọn <strong>Hỏi lại</strong> để nhà cung cấp điều chỉnh hóa đơn hoặc bổ sung nhật ký chuyến.
-            </p>
-          )}
-          <div style={{ fontSize: 12.5, color: "var(--ink-2)", background: "var(--info-bg)", padding: "10px 12px", borderRadius: 10 }}>
-            Xác nhận chỉ là khẳng định khoản phải trả là thật và đúng hạn. Nếu nhà cung cấp tài trợ hóa đơn này, bạn thanh toán đúng hạn vào tài
-            khoản chuyên thu — không phát sinh nghĩa vụ mới.
-          </div>
+            </>
+          ) : <div className="empty">Chọn một hóa đơn để xem đối chiếu.</div>}
         </aside>
       </section>
 
       <section className="card flush">
-        <div className="ch">
-          <div>
-            <h2 className="ct">
-              <Term k="earlyPay">Chiết khấu thanh toán sớm</Term>
-            </h2>
-            <p className="muted">Hóa đơn đã xác nhận · nhà cung cấp đồng ý chiết khấu nếu được thanh toán trước hạn</p>
-          </div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 16, alignItems: "center" }}>
-            <span className="muted">
-              Chi:{" "}
-              <strong className="num" style={{ color: "var(--ink)" }}>
-                {vnd(pay)} đ
-              </strong>
-            </span>
-            <span className="muted">
-              Tiết kiệm:{" "}
-              <strong className="num" style={{ color: "var(--ok)" }}>
-                {vnd(save)} đ
-              </strong>
-            </span>
-            <button
-              className="btn bp"
-              disabled={approved || pay === 0}
-              onClick={() => {
-                setApproved(true);
-                toast(`Đã duyệt thanh toán sớm ${rows.filter((r) => r.on).length} hóa đơn, tiết kiệm ${vnd(save)} đ.`);
-              }}
-            >
-              {approved ? "Đã duyệt" : "Duyệt thanh toán sớm"}
-            </button>
-          </div>
-        </div>
+        <div className="ch"><h2 className="ct">Hóa đơn đã xác nhận</h2><span className="muted">Ghi nhận thanh toán khi bạn đã chuyển tiền</span></div>
         <div className="tw">
           <table>
-            <thead>
-              <tr>
-                <th>Chọn</th>
-                <th>Hóa đơn</th>
-                <th>Nhà cung cấp</th>
-                <th className="r">Số tiền (đ)</th>
-                <th>Hạn gốc</th>
-                <th className="r">Trả sớm</th>
-                <th className="r">Chiết khấu</th>
-                <th className="r">Tiết kiệm (đ)</th>
-                <th className="r">
-                  <Term k="annualYield">Lợi suất quy năm</Term>
-                </th>
-                <th>Đánh giá</th>
-              </tr>
-            </thead>
+            <thead><tr><th>Hóa đơn</th><th>Nhà cung cấp</th><th className="r">Số tiền (đ)</th><th>Hạn</th><th>Trạng thái</th><th></th></tr></thead>
             <tbody>
-              {rows.map((e) => {
-                const good = e.y > HURDLE;
+              {confirmed.map((r) => {
+                const d = daysFromNow(r.dueDate);
+                const canEarly = r.state === "BUYER_CONFIRMED" && !activeApp(r.id) && !offers.some((o) => o.receivableId === r.id && ["OPEN", "ACCEPTED"].includes(o.state));
                 return (
-                  <tr key={e.id}>
-                    <td>
-                      <label className="check" style={{ alignItems: "center", minHeight: 32 }}>
-                        <input
-                          type="checkbox"
-                          checked={e.on}
-                          disabled={approved}
-                          onChange={() => setEarly((x) => ({ ...x, [e.id]: !e.on }))}
-                        />
-                        <span className="sr-only">Chọn {e.id}</span>
-                      </label>
-                    </td>
-                    <td className="num strong">{e.id}</td>
-                    <td>{e.sup}</td>
-                    <td className="r num">{vnd(e.amt)}</td>
-                    <td className="num">{e.due}</td>
-                    <td className="r num">{e.days} ngày</td>
-                    <td className="r num">{(e.d * 100).toLocaleString("vi-VN")}%</td>
-                    <td className="r num">{vnd(e.sv)}</td>
-                    <td className={cx("r num", good ? "t-ok strong" : "t-bad")}>
-                      {(e.y * 100).toLocaleString("vi-VN", { maximumFractionDigits: 1 })}%
-                    </td>
-                    <td>
-                      <span className={`chip ${good ? "c-ok" : "c-neu"}`}>{good ? "Nên trả sớm" : "Chưa đáng"}</span>
+                  <tr key={r.id}>
+                    <td className="num strong">{r.code}</td>
+                    <td>{orgName(data.orgs, r.sellerId)}</td>
+                    <td className="r num">{vnd(r.amount)}</td>
+                    <td><div className="num">{date(r.dueDate)}</div><div className={cx("muted", d < 0 && "t-bad")}>{d < 0 ? `quá hạn ${-d} ngày` : `còn ${d} ngày`}</div></td>
+                    <td><span className={`chip ${RECEIVABLE_STAGE[r.state].chip}`}>{RECEIVABLE_STAGE[r.state].short}</span></td>
+                    <td style={{ display: "flex", gap: 6 }}>
+                      {canEarly && <button className="btn bs sm" onClick={() => { setOfferFor(r); setPayBy(addDays(today(), 7)); }}>Đề nghị trả sớm</button>}
+                      {["BUYER_CONFIRMED", "FUNDED", "OVERDUE"].includes(r.state) && (
+                        <button className="btn bp sm" disabled={busy} onClick={() => run(() => act("POST", `/v1/receivables/${r.id}/buyer-payment`), `Đã ghi nhận thanh toán ${r.code}`)}>Ghi nhận đã thanh toán</button>
+                      )}
                     </td>
                   </tr>
                 );
               })}
+              {confirmed.length === 0 && <tr><td colSpan={6} className="empty">Chưa có hóa đơn đã xác nhận.</td></tr>}
             </tbody>
           </table>
         </div>
-        <p className="muted" style={{ padding: "12px 16px", borderTop: "1px solid var(--line-2)" }}>
-          Lợi suất quy năm = chiết khấu ÷ số ngày trả sớm × 365. Đề xuất chọn khi lợi suất vượt chi phí cơ hội tiền mặt 4,5%/năm. Bạn tự chuyển
-          tiền cho nhà cung cấp; FCC chỉ ghi nhận thỏa thuận và đối soát.
-        </p>
       </section>
+
+      <section className="card flush">
+        <div className="ch"><div><h2 className="ct"><Term k="earlyPay">Chiết khấu thanh toán sớm</Term></h2><p className="muted">Bạn đề nghị trả trước hạn để được chiết khấu; nhà cung cấp đồng ý rồi bạn tự chuyển tiền, FCC chỉ ghi nhận.</p></div></div>
+        <div className="tw">
+          <table>
+            <thead><tr><th>Hóa đơn</th><th>Nhà cung cấp</th><th className="r">Số tiền (đ)</th><th className="r">Chiết khấu</th><th>Trả trước</th><th className="r"><Term k="annualYield">Lợi suất quy năm</Term></th><th>Trạng thái</th><th></th></tr></thead>
+            <tbody>
+              {offers.map((o) => {
+                const r = data.receivables.find((x) => x.id === o.receivableId);
+                if (!r) return null;
+                const days = Math.max(1, Math.round((new Date(r.dueDate).getTime() - new Date(o.payBy).getTime()) / 86_400_000));
+                const y = (o.discountPct / 100 / days) * 365;
+                const pay = r.amount * (1 - o.discountPct / 100);
+                return (
+                  <tr key={o.id}>
+                    <td className="num strong">{r.code}</td>
+                    <td>{orgName(data.orgs, r.sellerId)}</td>
+                    <td className="r num">{vnd(r.amount)}</td>
+                    <td className="r num">{o.discountPct}% → trả {vnd(pay)} đ</td>
+                    <td className="num">{date(o.payBy)}</td>
+                    <td className={cx("r num", y > HURDLE ? "t-ok strong" : "t-bad")}>{(y * 100).toLocaleString("vi-VN", { maximumFractionDigits: 1 })}%</td>
+                    <td><span className={`chip ${o.state === "PAID" ? "c-ok" : o.state === "ACCEPTED" ? "c-info" : "c-neu"}`}>{{ OPEN: "Chờ nhà cung cấp", ACCEPTED: "Nhà cung cấp đồng ý", PAID: "Đã trả", EXPIRED: "Hết hạn", CANCELLED: "Đã hủy" }[o.state]}</span></td>
+                    <td>{o.state === "ACCEPTED" && <button className="btn bp sm" disabled={busy} onClick={() => run(() => act("POST", `/v1/early-payment-offers/${o.id}/paid`), `Đã ghi nhận trả sớm ${r.code}`)}>Ghi nhận đã trả</button>}</td>
+                  </tr>
+                );
+              })}
+              {offers.length === 0 && <tr><td colSpan={8} className="empty">Chưa có đề nghị trả sớm. Chọn “Đề nghị trả sớm” ở hóa đơn đã xác nhận.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+        <p className="muted" style={{ padding: "12px 16px", borderTop: "1px solid var(--line-2)" }}>Lợi suất quy năm = chiết khấu ÷ số ngày trả sớm × 365. Nên trả sớm khi lợi suất vượt chi phí cơ hội tiền mặt {HURDLE * 100}%/năm.</p>
+      </section>
+
+      {dispute && (
+        <div className="modal-scrim" role="dialog" aria-modal="true">
+          <div className="card modal">
+            <h2 className="ct">Yêu cầu nhà cung cấp giải trình</h2>
+            <label className="field"><span>Lý do (bắt buộc)</span><textarea className="input" rows={3} value={dispute.reason} onChange={(e) => setDispute({ ...dispute, reason: e.target.value })} placeholder="VD: giao thiếu số lượng, sai đơn giá…" /></label>
+            <div className="row" style={{ justifyContent: "flex-end", gap: 8 }}>
+              <button className="btn bs" onClick={() => setDispute(null)}>Hủy</button>
+              <button className="btn bp" disabled={!dispute.reason.trim() || busy} onClick={() => run(async () => { await act("POST", `/v1/receivables/${dispute.id}/buyer-decision`, { confirm: false, reason: dispute.reason }); setDispute(null); }, "Đã gửi yêu cầu giải trình")}>Gửi</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {offerFor && (
+        <div className="modal-scrim" role="dialog" aria-modal="true">
+          <div className="card modal">
+            <h2 className="ct">Đề nghị thanh toán sớm {offerFor.code}</h2>
+            <label className="field"><span>Chiết khấu (% giá trị hóa đơn)</span><input className="input num" inputMode="decimal" value={disc} onChange={(e) => setDisc(e.target.value.replace(",", "."))} /></label>
+            <label className="field"><span>Ngày trả</span><input className="input num" type="date" min={today()} max={offerFor.dueDate} value={payBy} onChange={(e) => setPayBy(e.target.value)} /></label>
+            <div className="row" style={{ justifyContent: "flex-end", gap: 8 }}>
+              <button className="btn bs" onClick={() => setOfferFor(null)}>Hủy</button>
+              <button className="btn bp" disabled={busy || !(Number(disc) > 0) || !payBy} onClick={() => run(async () => { await act("POST", "/v1/early-payment-offers", { receivableId: offerFor.id, discountPct: Number(disc), payBy }); setOfferFor(null); }, "Đã gửi đề nghị tới nhà cung cấp")}>Gửi đề nghị</button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
+
+const addDays = (d: string, n: number) => new Date(new Date(d).getTime() + n * 86_400_000).toISOString().slice(0, 10);

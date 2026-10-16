@@ -1,339 +1,187 @@
 "use client";
 
-import { useState } from "react";
-import { KeyRound, Plus } from "lucide-react";
+import Link from "next/link";
+import { useCallback, useEffect, useState } from "react";
+import type { Consent, Org } from "@fcc/domain/types";
+import { api, fileToBase64 } from "@/lib/api";
+import { date, dateTime } from "@/lib/format";
+import { orgName } from "@/lib/model";
+import { useData } from "@/lib/session";
 import { PageHeader } from "@/components/ui/basic";
 import { useToast } from "@/components/providers/Toast";
-import { ROLES, type Role } from "@/lib/roles";
+import type { Role } from "@/lib/roles";
 
-const NOTIFS: [string, string][] = [
-  ["due", "Hóa đơn sắp đến hạn / quá hạn"],
-  ["liq", "Cảnh báo thiếu hụt thanh khoản"],
-  ["offer", "Đề xuất tài trợ từ AI"],
-  ["week", "Báo cáo dòng tiền hằng tuần"],
-];
-
-const SHARES_OUT: [string, string, string][] = [
-  ["xanh", "Quỹ Đầu tư Xanh", "Hồ sơ TT-0418 · hóa đơn, BCTC, ESG · đến 13/01/2027"],
-  ["ta", "Ngân hàng TMCP Thịnh An", "Khoản TT-0401 · dòng tiền, hóa đơn · đến 14/12/2026"],
-  ["hd", "Ngân hàng Hải Đăng", "Khoản TT-0405 · dòng tiền, hóa đơn · đến 20/11/2026"],
-  ["vl", "Công ty Tài chính Vạn Lộc", "Chào giá 09/2026 · không chọn"],
-];
-
-const SHARES_IN: [string, string][] = [
-  ["Vật liệu Sao Mai", "TT-0418 · hóa đơn, BCTC, ESG, kế toán (chỉ đọc) · đến 13/01/2027"],
-  ["Điện cơ Nam Việt", "TT-0533 · hóa đơn, BCTC, ESG · đến 05/12/2026"],
-  ["Bao bì Hòa Khánh", "TT-0529 · gói tóm tắt RFQ · đến 22/10/2026"],
-];
-
-const POLICIES: [string, string][] = [
-  ["mfa", "Bắt buộc MFA khi phê duyệt tài trợ"],
-  ["dup", "Tự động khóa hóa đơn nghi trùng lặp"],
-  ["geo", "Cảnh báo đăng nhập từ vị trí lạ"],
-  ["two", "Phê duyệt hai người khi đổi phiên bản bộ chấm điểm"],
-];
-
-const AUDIT = [
-  ["16/10 09:02", "Phạm Minh · Quỹ Đầu tư Xanh", "Xem hồ sơ tín dụng", "TT-0418", "203.0.113.24"],
-  ["15/10 23:55", "Nguyễn Lan", "Gửi hồ sơ & cấp quyền chia sẻ", "Quỹ Đầu tư Xanh", "198.51.100.7"],
-  ["15/10 23:41", "Nguyễn Lan", "Đăng nhập (MFA)", "—", "198.51.100.7"],
-  ["15/10 18:20", "Hệ thống", "Tái chấm ESG", "74 · Khá", "—"],
-];
-
-function Switch({ on, label, onClick }: { on: boolean; label: string; onClick: () => void }) {
-  return (
-    <div className="between">
-      <span style={{ fontSize: 13.5 }}>{label}</span>
-      <button className="switch" role="switch" aria-checked={on} aria-label={label} onClick={onClick} />
-    </div>
-  );
-}
+type Member = { userId: string; email: string; name: string; title: string; role: string; roleLabel: string; status: string; mfaEnabled: boolean };
+type Members = { members: Member[]; invitations: { email: string; role: string; expiresAt: string }[]; roles: { role: string; label: string }[] };
+type Keys = { keys: { id: string; name: string; scopes: string[]; createdAt: string; lastUsedAt?: string; revokedAt?: string }[]; scopes: Record<string, { label: string }>; endpoint: string | null };
+const SCOPE_LABEL: Record<string, string> = { products: "sản phẩm", rfqs: "báo giá", applications: "hồ sơ", packages: "gói hồ sơ", events: "sự kiện tiền" };
+const KYC_LABEL = { pending: ["Chờ FCC xác minh", "c-warn"], verified: ["Đã xác minh", "c-ok"], rejected: ["Chưa đạt", "c-bad"] } as const;
 
 export function SettingsPanel({ role }: { role: Role }) {
+  const { data, org, me, act } = useData();
   const toast = useToast();
-  const meta = ROLES[role];
-  const [n, setN] = useState<Record<string, boolean>>({ due: true, liq: true, offer: true, week: false });
-  const [s, setS] = useState<Record<string, boolean>>({ xanh: true, ta: true, hd: true, vl: false });
-  const [p, setP] = useState<Record<string, boolean>>({ mfa: true, dup: true, geo: true, two: true });
-  const isBusiness = role === "supplier" || role === "buyer";
-  const orgFull =
-    role === "supplier" ? "Công ty TNHH Vật liệu Sao Mai" : role === "buyer" ? "CTCP Xây dựng Đông Á" : role === "lender" ? "Quỹ Đầu tư Xanh" : "FCC Operations";
+  const isOwner = ["owner", "fcc_admin"].includes(me.role);
+  const [members, setMembers] = useState<Members | null>(null);
+  const [invite, setInvite] = useState({ email: "", role: "" });
+  const [inviteUrl, setInviteUrl] = useState("");
+  const [profile, setProfile] = useState<Partial<Org>>({});
+  const [kycName, setKycName] = useState("");
+  const [kycKeys, setKycKeys] = useState<string[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [keys, setKeys] = useState<Keys | null>(null);
+  const [newKey, setNewKey] = useState<{ token: string; secret?: string } | null>(null);
+  const [hookEdit, setHookEdit] = useState<string | null>(null);
+  const [deliveries, setDeliveries] = useState<{ eventId: string; type: string; attempts: number; lastStatus?: number; deliveredAt?: string; deadAt?: string; lastError?: string }[]>([]);
+
+  const loadMembers = useCallback(() => api<Members>("GET", "/api/org/members").then(setMembers, () => undefined), []);
+  const loadKeys = useCallback(async () => {
+    if (org.type !== "lender") return;
+    setKeys(await api<Keys>("GET", "/v1/integration-keys").catch(() => null));
+    setDeliveries(await api<typeof deliveries>("GET", "/v1/partner-endpoint/deliveries").catch(() => []));
+  }, [org.type]);
+  // tải danh sách khi mở màn hình (dữ liệu từ máy chủ, không nằm trong trạng thái chung)
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => { void loadMembers(); void loadKeys(); }, [loadMembers, loadKeys]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+  const hookUrl = hookEdit ?? keys?.endpoint ?? "";
+  const setHookUrl = setHookEdit;
+
+  const run = async (f: () => Promise<unknown>, ok: string) => {
+    setBusy(true);
+    try { await f(); toast(ok); } catch (e) { toast((e as Error).message); }
+    setBusy(false);
+  };
+  const upd = <K extends keyof Org>(k: K, v: Org[K]) => setProfile((p) => ({ ...p, [k]: v }));
+  const val = <K extends keyof Org>(k: K) => (profile[k] ?? org[k] ?? "") as string | number;
+
+  const consentsOut = data.consents.filter((c) => c.ownerId === org.id);
+  const consentsIn = data.consents.filter((c) => c.recipientId === org.id);
+  const today = new Date().toISOString().slice(0, 10);
+  const live = (c: Consent) => !c.revokedAt && c.expiresAt >= today;
+  const myAudit = data.audit.slice(0, 40);
+
+  const uploadKyc = async (list: FileList | null) => {
+    const f = list?.[0];
+    if (!f) return;
+    await run(async () => {
+      const stored = await api<{ key: string }>("POST", "/api/files", { name: f.name, mime: f.type || "application/octet-stream", dataBase64: await fileToBase64(f), kind: "kyc" });
+      setKycKeys((k) => [...k, stored.key]);
+    }, "Đã tải giấy tờ lên (lưu mã hóa, SHA-256)");
+  };
 
   return (
     <>
-      <PageHeader
-        eyebrow={role === "admin" ? "Cài đặt hệ thống" : "Cài đặt"}
-        title={role === "admin" ? "Chính sách nền tảng & bảo mật" : "Tài khoản, tích hợp & bảo mật"}
-        sub={
-          isBusiness
-            ? `${orgFull} · Bạn chủ động cấp và thu hồi quyền chia sẻ dữ liệu với từng tổ chức tài chính.`
-            : `${orgFull} · Quản lý người dùng, bảo mật và quyền truy cập dữ liệu.`
-        }
-      />
-      <section className="row top">
-        <div className="stack grow-1" style={{ flexBasis: 420 }}>
-          <div className="card stack-sm" style={{ gap: 14 }}>
-            <h2 className="ct">Chung</h2>
-            <div className="grid-fields" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(180px, 100%), 1fr))" }}>
-              <label className="field">
-                <span className="field-label">Ngôn ngữ</span>
-                <select className="select" defaultValue="vi">
-                  <option value="vi">Tiếng Việt</option>
-                  <option value="en">English</option>
-                </select>
-              </label>
-              <label className="field">
-                <span className="field-label">Đơn vị hiển thị</span>
-                <select className="select" defaultValue="short">
-                  <option value="short">Triệu / tỷ đồng</option>
-                  <option value="full">Đồng đầy đủ</option>
-                </select>
-              </label>
-            </div>
-            <span className="field-label">Thông báo email</span>
-            {NOTIFS.map(([k, label]) => (
-              <Switch key={k} on={!!n[k]} label={label} onClick={() => setN((x) => ({ ...x, [k]: !x[k] }))} />
-            ))}
-          </div>
+      <PageHeader eyebrow="Cài đặt" title="Tổ chức, thành viên & chia sẻ dữ liệu" sub="Quản lý hồ sơ tổ chức, thành viên và quyền, dữ liệu bạn chia sẻ cho tổ chức khác, và nhật ký truy cập." actions={<Link className="btn bs" href="/security">Bảo mật tài khoản (MFA)</Link>} />
 
-          {role !== "admin" && (
-            <div className="card stack-sm" style={{ gap: 12 }}>
-              <div className="between">
-                <h2 className="ct">Kết nối ngân hàng</h2>
-                <span className="chip c-ok">2 tài khoản</span>
-              </div>
-              {[
-                ["TA", "Ngân hàng TMCP Thịnh An", "•••• 4821 · tài khoản thanh toán"],
-                ["HĐ", "Ngân hàng Hải Đăng", "•••• 0937 · tài khoản chuyên thu"],
-              ].map(([ini, name, acc]) => (
-                <div key={name} style={{ display: "flex", gap: 12, alignItems: "center", padding: 12, border: "1px solid var(--line-2)", borderRadius: 12 }}>
-                  <span className="todo-ic" style={{ background: "var(--info-bg)", color: "var(--info)", fontWeight: 700, fontSize: 13 }}>
-                    {ini}
-                  </span>
-                  <div style={{ flex: "1 1 auto" }}>
-                    <strong style={{ fontSize: 13.5 }}>{name}</strong>
-                    <div className="muted num">{acc}</div>
-                  </div>
-                  <span className="chip c-ok">Đồng bộ</span>
-                </div>
-              ))}
-              <button className="btn bs" style={{ alignSelf: "flex-start" }} onClick={() => toast("Mở luồng liên kết tài khoản ngân hàng.")}>
-                <Plus size={16} aria-hidden="true" />
-                Thêm tài khoản
-              </button>
-              <p className="muted">FCC chỉ lưu thông tin tài khoản nhận tiền, không giữ tiền và không chuyển tiền thay doanh nghiệp.</p>
-            </div>
-          )}
-
-          {role !== "admin" && (
-            <div className="card stack-sm" style={{ gap: 4 }}>
-              <h2 className="ct" style={{ marginBottom: 6 }}>
-                Tích hợp phần mềm kế toán & hóa đơn điện tử
-              </h2>
-              {[
-                ["Nhà cung cấp hóa đơn điện tử", "API · đồng bộ mỗi 15 phút", true],
-                ["MISA AMIS Kế toán", "Công nợ 131/331, số dư 111/112, BCTC · chỉ đọc", false],
-                ["SAP Business One", "Hóa đơn, công nợ, tồn kho · chỉ đọc", false],
-                ["Odoo", "Kế toán & bán hàng · chỉ đọc", false],
-              ].map(([name, note, on]) => (
-                <div key={name as string} className="between" style={{ padding: "10px 0", borderBottom: "1px solid var(--line-2)" }}>
-                  <div>
-                    <strong style={{ fontSize: 13.5 }}>{name}</strong>
-                    <div className="muted">{note}</div>
-                  </div>
-                  {on ? (
-                    <span className="chip c-ok">Đã kết nối</span>
-                  ) : (
-                    <button className="btn bs sm" onClick={() => toast(`Đang chuyển tới trang ủy quyền ${name}.`)}>
-                      Kết nối
-                    </button>
-                  )}
-                </div>
-              ))}
-              <div className="between" style={{ padding: "10px 0" }}>
-                <div>
-                  <strong style={{ fontSize: 13.5 }}>Nhập file định kỳ</strong>
-                  <div className="muted">Excel/CSV/XML theo mẫu FCC · có kiểm tra lỗi theo dòng</div>
-                </div>
-                <button className="btn bs sm" onClick={() => toast("Đã tải mẫu file nhập liệu FCC.")}>
-                  Tải mẫu
-                </button>
-              </div>
-            </div>
-          )}
+      <section className="card stack">
+        <div className="between">
+          <h2 className="ct">Hồ sơ tổ chức</h2>
+          {org.type === "lender" && <span className={`chip ${org.verified ? "c-ok" : "c-warn"}`}>{org.verified ? "FCC đã xác minh" : "Chờ FCC xác minh"}</span>}
+          {org.simulated && <span className="chip c-neu">Giả lập</span>}
         </div>
-
-        <div className="stack grow-1" style={{ flexBasis: 420 }}>
-          <div className="card stack-sm" style={{ gap: 12 }}>
-            <h2 className="ct">Bảo mật</h2>
-            {[
-              ["Xác thực 2 lớp (MFA)", "Ứng dụng xác thực · bắt buộc khi phê duyệt tài trợ", "Đang bật"],
-              ["eKYC người đại diện", "Xác minh khuôn mặt & giấy tờ", "Đã xác minh"],
-              ["Chữ ký số", "Ký hợp đồng tài trợ & xác nhận hóa đơn", "Hiệu lực đến 08/2027"],
-            ].map(([t, d, c]) => (
-              <div key={t} className="between">
-                <div>
-                  <strong style={{ fontSize: 13.5 }}>{t}</strong>
-                  <div className="muted">{d}</div>
-                </div>
-                <span className="chip c-ok">{c}</span>
-              </div>
-            ))}
-            <div className="divider" style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-              {["AES-256", "TLS", "Tokenization", "RBAC", "Hướng tới ISO/IEC 27001 · PCI DSS"].map((x) => (
-                <span key={x} className="chip c-neu">
-                  {x}
-                </span>
-              ))}
-            </div>
-          </div>
-
-          {isBusiness && (
-            <div className="card stack-sm" style={{ gap: 4 }}>
-              <div className="between" style={{ marginBottom: 6 }}>
-                <h2 className="ct">Quyền chia sẻ dữ liệu</h2>
-                <span className="muted">{Object.values(s).filter(Boolean).length} tổ chức đang có quyền</span>
-              </div>
-              {SHARES_OUT.map(([k, name, scope]) => {
-                const on = !!s[k];
-                return (
-                  <div key={k} className="between" style={{ flexWrap: "wrap", padding: "10px 0", borderTop: "1px solid var(--line-2)" }}>
-                    <div style={{ minWidth: 0 }}>
-                      <strong style={{ fontSize: 13.5 }}>{name}</strong>
-                      <div className="muted">{scope}</div>
-                    </div>
-                    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                      <span className={`chip ${on ? "c-ok" : "c-neu"}`}>{on ? "Đang chia sẻ" : "Đã thu hồi"}</span>
-                      <button
-                        className={on ? "btn bd sm" : "btn bs sm"}
-                        onClick={() => {
-                          setS((x) => ({ ...x, [k]: !on }));
-                          toast(on ? `Đã thu hồi quyền xem dữ liệu của ${name}.` : `Đã cấp lại quyền cho ${name}.`);
-                        }}
-                      >
-                        {on ? "Thu hồi" : "Cấp lại"}
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {role === "lender" && (
-            <div className="card stack-sm" style={{ gap: 4 }}>
-              <div className="between" style={{ marginBottom: 6 }}>
-                <h2 className="ct">Dữ liệu doanh nghiệp chia sẻ với bạn</h2>
-                <span className="muted">{SHARES_IN.length} doanh nghiệp</span>
-              </div>
-              {SHARES_IN.map(([name, scope]) => (
-                <div key={name} className="between" style={{ flexWrap: "wrap", padding: "10px 0", borderTop: "1px solid var(--line-2)" }}>
-                  <div>
-                    <strong style={{ fontSize: 13.5 }}>{name}</strong>
-                    <div className="muted">{scope}</div>
-                  </div>
-                  <span className="chip c-ok">Đang hiệu lực</span>
-                </div>
-              ))}
-              <p className="muted" style={{ marginTop: 6 }}>
-                Doanh nghiệp có thể thu hồi quyền bất kỳ lúc nào; mọi lượt xem của bạn đều được ghi vào Audit Trail.
-              </p>
-            </div>
-          )}
-
-          {role === "admin" && (
-            <div className="card stack-sm" style={{ gap: 12 }}>
-              <h2 className="ct">Chính sách bảo mật hệ thống</h2>
-              {POLICIES.map(([k, label]) => (
-                <Switch
-                  key={k}
-                  on={!!p[k]}
-                  label={label}
-                  onClick={() => {
-                    setP((x) => ({ ...x, [k]: !x[k] }));
-                    toast("Thay đổi chính sách cần người thứ hai phê duyệt trước khi có hiệu lực.");
-                  }}
-                />
-              ))}
-              <button className="btn bs" style={{ alignSelf: "flex-start" }} onClick={() => toast("Đã tạo API key mới cho đối tác.")}>
-                <KeyRound size={16} aria-hidden="true" />
-                Quản lý API key đối tác
-              </button>
-            </div>
-          )}
-
-          <div className="card stack-sm" style={{ gap: 10 }}>
-            <h2 className="ct">Người dùng {role === "admin" ? "vận hành" : role === "lender" ? "tổ chức" : "doanh nghiệp"}</h2>
-            {(role === "supplier"
-              ? [
-                  ["Nguyễn Lan", "Kế toán trưởng", "Quản trị", "c-info"],
-                  ["Đỗ Quang", "Giám đốc", "Phê duyệt tài trợ", "c-info"],
-                  ["Lê Hòa", "Kế toán viên", "Tải & sửa hóa đơn", "c-neu"],
-                ]
-              : role === "buyer"
-                ? [
-                    ["Trần Hùng", "Giám đốc tài chính", "Xác nhận & phê duyệt", "c-info"],
-                    ["Mai Anh", "Kế toán công nợ", "Đối chiếu 3 chiều", "c-neu"],
-                  ]
-                : role === "lender"
-                  ? [
-                      ["Phạm Minh", "Chuyên viên thẩm định", "Thẩm định, đề xuất", "c-info"],
-                      ["Hồ Ngọc", "Quản lý sản phẩm", "Đăng & sửa gói tài trợ", "c-info"],
-                    ]
-                  : [
-                      ["Đặng Vy", "Vận hành", "Toàn quyền hệ thống", "c-info"],
-                      ["Kiểm toán viên", "Chỉ đọc", "Xem nhật ký có lý do", "c-neu"],
-                    ]
-            ).map(([name, title, perm, chip]) => (
-              <div key={name} className="between" style={{ fontSize: 13 }}>
-                <span>
-                  <strong>{name}</strong> · {title}
-                </span>
-                <span className={`chip ${chip}`}>{perm}</span>
-              </div>
-            ))}
-            <button className="btn bs" style={{ alignSelf: "flex-start" }} onClick={() => toast("Đã gửi lời mời qua email.")}>
-              Mời người dùng
-            </button>
-          </div>
+        <div className="muted">MST {org.taxCode} · tạo {date(org.createdAt)}. MST chưa được đối chiếu tự động với cơ quan thuế.</div>
+        <div className="grid-fields">
+          {([["name", "Tên đầy đủ"], ["shortName", "Tên viết tắt"], ["vsic", "Mã ngành VSIC"], ["industryLabel", "Ngành nghề"], ["province", "Tỉnh/thành"], ["foundedYear", "Năm thành lập"], ["employees", "Số lao động"]] as const).map(([k, label]) => (
+            <label key={k} className="field"><span>{label}</span><input className="input" disabled={!isOwner || org.type === "fcc"} value={val(k)} onChange={(e) => upd(k, (typeof org[k] === "number" ? Number(e.target.value.replace(/\D/g, "")) : e.target.value) as never)} /></label>
+          ))}
+          {org.type === "buyer" && <label className="field"><span>Mã chứng khoán (nếu niêm yết)</span><input className="input" disabled={!isOwner} value={val("listedSymbol")} onChange={(e) => upd("listedSymbol", e.target.value.toUpperCase())} /></label>}
         </div>
+        {isOwner && org.type !== "fcc" && <button className="btn bp" style={{ alignSelf: "flex-start" }} disabled={busy || !Object.keys(profile).length} onClick={() => run(async () => { await act("POST", "/v1/organizations/me", profile); setProfile({}); }, "Đã cập nhật hồ sơ")}>Lưu hồ sơ</button>}
       </section>
+
+      {org.type !== "fcc" && (
+        <section className="card stack">
+          <div className="between"><h2 className="ct">Xác minh người đại diện (KYC)</h2>{org.kyc && <span className={`chip ${KYC_LABEL[org.kyc.status][1]}`}>{KYC_LABEL[org.kyc.status][0]}</span>}</div>
+          {org.kyc ? <div className="muted">Người đại diện: {org.kyc.representativeName} · nộp {date(org.kyc.submittedAt)}{org.kyc.note ? ` · ${org.kyc.note}` : ""}. Hiện FCC đối chiếu giấy tờ tải lên; eKYC qua nhà cung cấp sẽ bật khi có hợp đồng.</div> : <div className="muted">Tải CCCD/hộ chiếu của người đại diện và giấy đăng ký kinh doanh để FCC đối chiếu.</div>}
+          {isOwner && org.kyc?.status !== "verified" && (
+            <div className="stack-sm">
+              <label className="field"><span>Họ tên người đại diện theo pháp luật</span><input className="input" value={kycName || org.kyc?.representativeName || ""} onChange={(e) => setKycName(e.target.value)} /></label>
+              <label className="field"><span>Giấy tờ (tải từng tệp){kycKeys.length ? ` — đã tải ${kycKeys.length}` : ""}</span><input type="file" accept="application/pdf,image/*" onChange={(e) => void uploadKyc(e.target.files)} /></label>
+              <button className="btn bs" style={{ alignSelf: "flex-start" }} disabled={busy || !kycKeys.length || !(kycName || org.kyc?.representativeName)} onClick={() => run(async () => {
+                await act("POST", "/v1/organizations/me/kyc", { representativeName: kycName || org.kyc?.representativeName, documentKeys: kycKeys });
+                setKycKeys([]);
+              }, "Đã nộp hồ sơ xác minh")}>Nộp hồ sơ xác minh</button>
+            </div>
+          )}
+        </section>
+      )}
+
+      <section className="card stack">
+        <h2 className="ct">Thành viên & vai trò</h2>
+        <div className="tw"><table>
+          <thead><tr><th>Họ tên</th><th>Email</th><th>Vai trò</th><th>MFA</th><th></th></tr></thead>
+          <tbody>
+            {members?.members.filter((m) => m.status === "active").map((m) => (
+              <tr key={m.userId}>
+                <td>{m.name}<div className="muted">{m.title}</div></td><td>{m.email}</td>
+                <td>{isOwner && m.userId !== me.id ? (
+                  <select className="select" value={m.role} onChange={(e) => void run(async () => { await api("POST", `/api/org/members/${m.userId}/role`, { role: e.target.value }); await loadMembers(); }, "Đã đổi vai trò")}>
+                    {members.roles.map((r) => <option key={r.role} value={r.role}>{r.label}</option>)}
+                  </select>) : m.roleLabel}</td>
+                <td><span className={`chip ${m.mfaEnabled ? "c-ok" : "c-warn"}`}>{m.mfaEnabled ? "Đã bật" : "Chưa bật"}</span></td>
+                <td>{isOwner && m.userId !== me.id && <button className="btn bs sm" onClick={() => run(async () => { await api("POST", `/api/org/members/${m.userId}/revoke`, {}); await loadMembers(); }, "Đã thu hồi quyền — hiệu lực ngay")}>Thu hồi</button>}</td>
+              </tr>
+            ))}
+          </tbody></table></div>
+        {members?.invitations.map((i) => <div key={i.email} className="muted">Đã mời {i.email} ({i.role}) — hết hạn {date(i.expiresAt)}</div>)}
+        {isOwner && members && (
+          <div className="row" style={{ gap: 8, alignItems: "flex-end", flexWrap: "wrap" }}>
+            <label className="field"><span>Email người được mời</span><input className="input" type="email" value={invite.email} onChange={(e) => setInvite({ ...invite, email: e.target.value })} /></label>
+            <label className="field"><span>Vai trò</span><select className="select" value={invite.role || members.roles[members.roles.length > 1 ? 1 : 0].role} onChange={(e) => setInvite({ ...invite, role: e.target.value })}>{members.roles.map((r) => <option key={r.role} value={r.role}>{r.label}</option>)}</select></label>
+            <button className="btn bp" disabled={busy || !invite.email} onClick={() => run(async () => { const r = await api<{ inviteUrl: string }>("POST", "/api/org/invitations", { email: invite.email, role: invite.role || members.roles[members.roles.length > 1 ? 1 : 0].role }); setInviteUrl(r.inviteUrl); setInvite({ email: "", role: "" }); await loadMembers(); }, "Đã gửi lời mời qua email")}>Mời thành viên</button>
+          </div>
+        )}
+        {inviteUrl && <div className="okmsg">Liên kết mời (cũng đã gửi email): <code style={{ wordBreak: "break-all" }}>{inviteUrl}</code></div>}
+      </section>
+
+      <section className="card stack">
+        <h2 className="ct">Chia sẻ dữ liệu</h2>
+        <div className="muted">Quyền xem dữ liệu của bạn được cấp theo từng bên nhận, mục đích và thời hạn; thu hồi có hiệu lực ngay với truy cập mới.</div>
+        {[["Bạn đã chia sẻ cho", consentsOut, (c: Consent) => orgName(data.orgs, c.recipientId)], ["Chia sẻ tới bạn", consentsIn, (c: Consent) => orgName(data.orgs, c.ownerId)]].map(([title, list, who]) => (
+          <div key={title as string} className="stack-sm">
+            <strong style={{ fontSize: 13 }}>{title as string}</strong>
+            {(list as Consent[]).length === 0 && <span className="muted">Không có.</span>}
+            {(list as Consent[]).map((c) => (
+              <div key={c.id} className="between soft">
+                <span><strong>{(who as (c: Consent) => string)(c)}</strong> · {c.purpose}<div className="muted">{c.scopes.join(", ")} · đến {date(c.expiresAt)}{c.signature ? ` · ký ${c.signature.method === "mfa_snapshot" ? "MFA" : c.signature.method}` : ""}</div></span>
+                {live(c) ? (c.ownerId === org.id && <button className="btn bs sm" onClick={() => run(() => act("POST", `/v1/consents/${c.id}/revoke`), "Đã thu hồi quyền chia sẻ")}>Thu hồi</button>) : <span className="chip c-neu">{c.revokedAt ? "Đã thu hồi" : "Hết hạn"}</span>}
+              </div>
+            ))}
+          </div>
+        ))}
+      </section>
+
+      {org.type === "lender" && isOwner && keys && (
+        <section className="card stack">
+          <h2 className="ct">Tích hợp hệ thống của tổ chức tài chính</h2>
+          <div className="muted">Dùng khóa tích hợp để đăng sản phẩm, trả báo giá, thẩm định và gửi sự kiện giải ngân từ hệ thống của bạn (tài liệu: <code>/v1/openapi.json</code>). Webhook gửi tới địa chỉ bạn đăng ký, ký <code>t=,v1=HMAC-SHA256</code>.</div>
+          <label className="field"><span>Địa chỉ nhận webhook (HTTPS)</span><input className="input" value={hookUrl} onChange={(e) => setHookUrl(e.target.value)} placeholder="https://…" /></label>
+          <div className="row" style={{ gap: 8 }}>
+            <button className="btn bs" disabled={busy} onClick={() => run(async () => { await api("POST", "/v1/partner-endpoint", { url: hookUrl || null }); await loadKeys(); }, "Đã lưu địa chỉ webhook")}>Lưu địa chỉ</button>
+            <button className="btn bs" disabled={busy || !org.verified} onClick={() => run(async () => { const r = await api<{ secret: string }>("POST", "/api/webhook-secret", {}); setNewKey({ token: "", secret: r.secret }); }, "Đã tạo khóa ký webhook")}>Tạo khóa ký webhook</button>
+            <button className="btn bp" disabled={busy} onClick={() => run(async () => { const r = await act<{ token: string }>("POST", "/v1/integration-keys", { name: "Hệ thống nội bộ", scopes: Object.keys(keys.scopes) }); setNewKey({ token: r.token }); await loadKeys(); }, "Đã tạo khóa tích hợp")}>Tạo khóa tích hợp (cần MFA)</button>
+          </div>
+          {newKey && <div className="okmsg">Lưu ngay — chỉ hiển thị một lần:{newKey.token && <div><code style={{ wordBreak: "break-all" }}>{newKey.token}</code></div>}{newKey.secret && <div>Khóa ký: <code style={{ wordBreak: "break-all" }}>{newKey.secret}</code></div>}</div>}
+          <div className="tw"><table>
+            <thead><tr><th>Khóa</th><th>Phạm vi</th><th>Tạo</th><th>Dùng lần cuối</th><th></th></tr></thead>
+            <tbody>
+              {keys.keys.map((k) => <tr key={k.id}><td className="num">{k.id}<div className="muted">{k.name}</div></td><td>{k.scopes.map((s) => SCOPE_LABEL[s.split(":")[0]] ?? s).join(", ")}</td><td>{date(k.createdAt)}</td><td>{k.lastUsedAt ? dateTime(k.lastUsedAt) : "—"}</td><td>{k.revokedAt ? <span className="chip c-neu">Đã thu hồi</span> : <button className="btn bs sm" onClick={() => run(async () => { await api("POST", `/v1/integration-keys/${k.id}/revoke`, {}); await loadKeys(); }, "Đã thu hồi khóa")}>Thu hồi</button>}</td></tr>)}
+              {keys.keys.length === 0 && <tr><td colSpan={5} className="empty">Chưa có khóa tích hợp.</td></tr>}
+            </tbody></table></div>
+          {deliveries.length > 0 && <div className="stack-sm"><strong style={{ fontSize: 13 }}>Lịch sử gửi webhook</strong>{deliveries.slice(0, 8).map((d) => <div key={d.eventId} className="between soft"><span className="num">{d.type}</span><span className={`chip ${d.deliveredAt ? "c-ok" : d.deadAt ? "c-bad" : "c-warn"}`}>{d.deliveredAt ? "Đã gửi" : d.deadAt ? "Ngừng thử" : `Thử lại (lần ${d.attempts})`}{d.lastStatus ? ` · HTTP ${d.lastStatus}` : ""}</span></div>)}</div>}
+        </section>
+      )}
 
       <section className="card flush">
-        <div className="ch">
-          <h2 className="ct">Nhật ký truy cập (Audit Trail)</h2>
-          <button className="btn bs sm" onClick={() => toast("Đã xuất nhật ký truy cập.")}>
-            Xuất nhật ký
-          </button>
-        </div>
-        <div className="tw">
-          <table>
-            <thead>
-              <tr>
-                <th>Thời gian</th>
-                <th>Chủ thể</th>
-                <th>Hành động</th>
-                <th>Đối tượng</th>
-                <th>Địa chỉ IP</th>
-              </tr>
-            </thead>
-            <tbody>
-              {AUDIT.map(([t, who, act, obj, ip]) => (
-                <tr key={t + act}>
-                  <td className="num">{t}</td>
-                  <td>{who}</td>
-                  <td>{act}</td>
-                  <td>{obj}</td>
-                  <td className="num">{ip}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <p className="muted" style={{ padding: "10px 16px 14px" }}>
-          Đang đăng nhập: {meta.user.name} · {meta.user.title}.
-        </p>
+        <div className="ch"><h2 className="ct">Nhật ký hoạt động</h2><span className="muted">Chỉ thêm, không sửa; nối chuỗi băm kiểm tra toàn vẹn</span></div>
+        <div className="tw"><table>
+          <thead><tr><th>Thời gian</th><th>Hành động</th><th>Đối tượng</th><th>Chi tiết</th></tr></thead>
+          <tbody>
+            {myAudit.map((e) => <tr key={e.id}><td className="num">{dateTime(e.at)}</td><td>{e.action}</td><td className="num">{e.entity}</td><td className="wrap">{e.detail}</td></tr>)}
+            {myAudit.length === 0 && <tr><td colSpan={4} className="empty">Chưa có hoạt động.</td></tr>}
+          </tbody></table></div>
       </section>
+      <span className="muted">Đang đăng nhập: {me.name} · {me.email} · vai trò {me.role} · {role}</span>
     </>
   );
 }

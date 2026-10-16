@@ -1,191 +1,74 @@
-import type { Metadata } from "next";
+"use client";
+
 import Link from "next/link";
-import { BadgePercent, ClipboardCheck, Leaf, Sparkles } from "lucide-react";
-import { Bar, Kpi, PageHeader } from "@/components/ui/basic";
-import { Term } from "@/components/ui/Term";
-import { AskButton } from "@/components/assistant/Assistant";
+import { AlertTriangle, Clock, Sparkles } from "lucide-react";
+import { Disclaimer, Kpi, PageHeader } from "@/components/ui/basic";
 import { TodoTiles, type Todo } from "@/components/ui/TodoTiles";
-
-export const metadata: Metadata = { title: "Tổng quan người mua" };
-
-const WEEKS: [string, number][] = [
-  ["19/10", 0.42],
-  ["26/10", 0.31],
-  ["02/11", 0.86],
-  ["09/11", 0.55],
-  ["16/11", 0.5],
-  ["23/11", 1.12],
-  ["30/11", 0.64],
-  ["07/12", 0.38],
-];
-
-const SUPPLIERS = [
-  ["Điện cơ Nam Việt", "Sản xuất", "1.240.000.000", 81, "c-ok", "Tốt", "c-info", "Đang sử dụng", "42 ngày"],
-  ["Công ty TNHH Vật liệu Sao Mai", "Sản xuất", "4.925.000.000", 74, "c-gold", "Khá · Hạng Vàng", "c-info", "Đang sử dụng", "88 ngày"],
-  ["Bê tông Thành Công", "Sản xuất", "1.860.000.000", 68, "c-ok", "Khá", "c-neu", "Chưa tham gia", "61 ngày"],
-  ["Vận tải Hưng Phát", "TM – dịch vụ", "540.000.000", 63, "c-warn", "Trung bình", "c-info", "Đang sử dụng", "37 ngày"],
-  ["Gỗ ván Tân Lập", "Nông nghiệp – TP", "380.000.000", 48, "c-bad", "Yếu · cần rà soát", "c-neu", "Chưa tham gia", "55 ngày"],
-] as const;
-
-const TODOS: Todo[] = [
-  { icon: ClipboardCheck, bg: "var(--warn-bg)", fg: "var(--warn)", title: "3 hóa đơn chờ bạn xác nhận", note: "Tổng 2,13 tỷ · 1 hóa đơn lệch số chuyến", href: "/buyer/invoices", cta: "Xác nhận" },
-  { icon: BadgePercent, bg: "var(--ok-bg)", fg: "var(--ok)", title: "Tiết kiệm 10,4 tr nhờ trả sớm", note: "2 hóa đơn có lợi suất > chi phí vốn 4,5%", href: "/buyer/invoices", cta: "Xem" },
-  { icon: Leaf, bg: "var(--bad-bg)", fg: "var(--bad)", title: "1 nhà cung cấp ESG yếu", note: "Gỗ ván Tân Lập · 48 điểm", href: "/buyer/esg", cta: "Rà soát" },
-];
+import { date, daysFromNow, money, vnd } from "@/lib/format";
+import { orgName, RECEIVABLE_STAGE, sumAmount } from "@/lib/model";
+import { useData } from "@/lib/session";
+import { useScores } from "@/lib/scores";
 
 export default function BuyerOverview() {
-  const max = 1.2;
+  const { data, org, me } = useData();
+  const scores = useScores(data);
+  const mine = data.receivables.filter((r) => r.buyerId === org.id && !["DRAFT", "CANCELLED"].includes(r.state));
+  const pending = mine.filter((r) => r.state === "BUYER_PENDING");
+  const payable = mine.filter((r) => ["BUYER_CONFIRMED", "SUBMITTED", "UNDER_REVIEW", "OFFERED", "ACCEPTED", "FUNDED", "OVERDUE"].includes(r.state)).sort((a, b) => (a.dueDate > b.dueDate ? 1 : -1));
+  const dueSoon = payable.filter((r) => daysFromNow(r.dueDate) <= 7);
+  const overdue = payable.filter((r) => r.state === "OVERDUE" || daysFromNow(r.dueDate) < 0);
+  const suppliers = [...new Set(mine.map((r) => r.sellerId))];
+  const earlyOpen = data.earlyOffers.filter((o) => o.buyerId === org.id && ["OPEN", "ACCEPTED"].includes(o.state));
+  const rating = scores.buyer(org.id);
+
+  // lịch thanh toán theo tuần, 8 tuần tới
+  const weeks = Array.from({ length: 8 }, (_, i) => {
+    const from = i * 7;
+    const items = payable.filter((r) => { const d = daysFromNow(r.dueDate); return d >= from && d < from + 7; });
+    return { i, from, items, total: sumAmount(items) };
+  });
+  const maxW = Math.max(1, ...weeks.map((w) => w.total));
+
+  const todos: Todo[] = [
+    ...(pending.length ? [{ icon: Clock, bg: "var(--warn-bg)", fg: "var(--warn)", title: `${pending.length} hóa đơn chờ bạn xác nhận`, note: `Tổng ${money(sumAmount(pending))} đ`, href: "/buyer/invoices", cta: "Xác nhận" }] : []),
+    ...(overdue.length ? [{ icon: AlertTriangle, bg: "var(--bad-bg)", fg: "var(--bad)", title: `${overdue.length} khoản quá hạn thanh toán`, note: `${money(sumAmount(overdue))} đ`, href: "/buyer/invoices", cta: "Xử lý" }] : []),
+    ...(dueSoon.length ? [{ icon: Clock, bg: "var(--info-bg)", fg: "var(--info)", title: `${dueSoon.length} khoản đến hạn trong 7 ngày`, note: `${money(sumAmount(dueSoon))} đ`, href: "/buyer/invoices", cta: "Xem" }] : []),
+    ...(earlyOpen.length ? [{ icon: Sparkles, bg: "var(--ok-bg)", fg: "var(--ok)", title: `${earlyOpen.length} đề nghị trả sớm đang mở`, note: "Theo dõi phản hồi nhà cung cấp", href: "/buyer/invoices", cta: "Xem" }] : []),
+  ];
+
   return (
     <>
-      <PageHeader
-        eyebrow="Tổng quan · Người mua"
-        title="Công nợ phải trả & nhà cung cấp"
-        sub="Xin chào Trần Hùng · CTCP Xây dựng Đông Á · 14 nhà cung cấp trên FCC · dữ liệu đồng bộ từ ERP lúc 23:30"
-        actions={
-          <Link className="btn bp" href="/buyer/invoices">
-            Xác nhận hóa đơn
-            <span className="chip c-lime" style={{ height: 20 }}>
-              3
-            </span>
-          </Link>
-        }
-      />
-
-      <section className="grid-kpi" aria-label="Chỉ tiêu">
-        <Kpi label="Phải trả nhà cung cấp" value="12,40 tỷ" note="24 hóa đơn" />
-        <Kpi label="Đến hạn trong 30 ngày" value="2,14 tỷ" note="7 hóa đơn" />
-        <Kpi label="Tiền mặt khả dụng" value="4,80 tỷ" note="Chi phí cơ hội 4,5%/năm" />
-        <Kpi label="Chương trình tài trợ NCC" value="11,6 / 20 tỷ" note="Hạn mức do ngân hàng cấp cho chuỗi của bạn">
-          <Bar value={58} />
-        </Kpi>
+      <PageHeader eyebrow="Tổng quan · Người mua" title={`Xin chào ${me.name.split(" ").slice(-1)[0]}`} sub="Xác nhận hóa đơn, lên lịch thanh toán và theo dõi nhà cung cấp của bạn." />
+      {todos.length > 0 ? <TodoTiles items={todos} /> : <section className="card empty">Chưa có việc cần làm. Hóa đơn nhà cung cấp gửi tới sẽ xuất hiện ở đây.</section>}
+      <section className="grid-kpi">
+        <Kpi label="Phải trả (đã xác nhận)" value={money(sumAmount(payable))} note={`${payable.length} hóa đơn`} />
+        <Kpi label="Chờ xác nhận" value={String(pending.length)} note={money(sumAmount(pending)) + " đ"} />
+        <Kpi label="Nhà cung cấp" value={String(suppliers.length)} note="đã gửi hóa đơn cho bạn" />
+        <Kpi label="Xếp hạng của bạn (tham khảo)" value={rating.rating} note={rating.official ? "Điểm chính thức" : `Tạm tính · bao phủ ${Math.round(rating.coverage * 100)}%`} />
       </section>
-
-      <section className="row">
-        <div className="card grow-2">
-          <div className="ch">
-            <div>
-              <h2 className="ct">Lịch thanh toán 8 tuần tới</h2>
-              <p className="muted">Tỷ đồng · theo tuần bắt đầu thứ Hai · cột cam là tuần vượt 1 tỷ</p>
+      <section className="row top">
+        <div className="card grow-2 stack-sm">
+          <h2 className="ct">Lịch thanh toán 8 tuần tới</h2>
+          {weeks.map((w) => (
+            <div key={w.i} style={{ display: "grid", gridTemplateColumns: "90px 1fr 110px", gap: 10, alignItems: "center", fontSize: 13 }}>
+              <span className="muted">Tuần {w.i + 1}</span>
+              <div className="bar"><span className="fill" style={{ width: `${(w.total / maxW) * 100}%` }} /></div>
+              <span className="num r">{w.total ? `${money(w.total)} đ` : "—"}</span>
             </div>
-          </div>
-          <div
-            style={{ display: "flex", gap: 10, alignItems: "flex-end", height: 220, paddingTop: 8, borderBottom: "1px solid var(--line-strong)" }}
-            role="img"
-            aria-label={`Phải trả theo tuần: ${WEEKS.map(([w, v]) => `tuần ${w} ${v.toLocaleString("vi-VN")} tỷ`).join("; ")}`}
-          >
-            {WEEKS.map(([w, v]) => (
-              <div
-                key={w}
-                title={`Tuần ${w}: ${v.toLocaleString("vi-VN")} tỷ`}
-                style={{ flex: "1 1 0", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", gap: 6, height: "100%", minWidth: 0 }}
-              >
-                <span className="num" style={{ fontSize: 11.5, color: "var(--ink-2)" }}>
-                  {v.toLocaleString("vi-VN")}
-                </span>
-                <span
-                  style={{
-                    width: "100%",
-                    maxWidth: 44,
-                    borderRadius: "4px 4px 0 0",
-                    height: Math.round((v / max) * 170),
-                    background: v > 1 ? "var(--warn-strong)" : "var(--info-strong)",
-                  }}
-                />
-              </div>
-            ))}
-          </div>
-          <div style={{ display: "flex", gap: 10, marginTop: 6 }}>
-            {WEEKS.map(([w]) => (
-              <span key={w} className="muted num" style={{ flex: "1 1 0", textAlign: "center", fontSize: 11, minWidth: 0 }}>
-                {w}
-              </span>
-            ))}
-          </div>
-          <p className="muted" style={{ marginTop: 10 }}>
-            Tuần 23/11 tập trung 1,12 tỷ, trong đó có HD-0406 (Vật liệu Sao Mai, 455 tr) — thanh toán sớm có chiết khấu giúp giãn áp lực tuần
-            này.
-          </p>
+          ))}
+          {overdue.length > 0 && <div className="err">Đã quá hạn: {money(sumAmount(overdue))} đ ({overdue.length} khoản)</div>}
         </div>
-        <div className="dark grow-1 stack-sm" style={{ gap: 12 }}>
-          <span className="d-title">
-            <Sparkles size={18} color="#DDF1C4" aria-hidden="true" />
-            AI đề xuất <Term k="earlyPay">chiết khấu thanh toán sớm</Term>
-          </span>
-          <p>Lợi suất chiết khấu quy năm cao hơn chi phí cơ hội tiền mặt 4,5%.</p>
-          <div className="d-box">
-            <div className="between">
-              <strong className="num" style={{ color: "#fff" }}>
-                HD-0406 · Sao Mai
-              </strong>
-              <span className="num" style={{ color: "var(--lime)" }}>
-                −1,2%
-              </span>
-            </div>
-            <span style={{ fontSize: 12.5, color: "var(--on-forest-2)" }}>455 tr · trả sớm 40 ngày · tiết kiệm 5,46 tr · ≈ 11,0%/năm</span>
-          </div>
-          <div className="d-box">
-            <div className="between">
-              <strong className="num" style={{ color: "#fff" }}>
-                HD-1187 · Bê tông Thành Công
-              </strong>
-              <span className="num" style={{ color: "var(--lime)" }}>
-                −0,8%
-              </span>
-            </div>
-            <span style={{ fontSize: 12.5, color: "var(--on-forest-2)" }}>620 tr · trả sớm 35 ngày · tiết kiệm 4,96 tr · ≈ 8,3%/năm</span>
-          </div>
-          <span className="spacer" />
-          <Link className="btn bl" href="/buyer/invoices">
-            Xem & duyệt thanh toán sớm
-          </Link>
-          <AskButton className="btn bg-dark" question="Có nên thanh toán sớm không?">
-            Hỏi trợ lý: có nên trả sớm?
-          </AskButton>
+        <div className="card flush grow-2">
+          <div className="ch"><h2 className="ct">Sắp đến hạn</h2><Link className="btn bs sm" href="/buyer/invoices">Tất cả</Link></div>
+          <div className="tw"><table>
+            <thead><tr><th>Mã</th><th>Nhà cung cấp</th><th className="r">Số tiền (đ)</th><th>Hạn</th><th>Trạng thái</th></tr></thead>
+            <tbody>
+              {payable.slice(0, 6).map((r) => <tr key={r.id}><td className="num strong">{r.code}</td><td>{orgName(data.orgs, r.sellerId)}</td><td className="r num">{vnd(r.amount)}</td><td className="num">{date(r.dueDate)}</td><td><span className={`chip ${RECEIVABLE_STAGE[r.state].chip}`}>{RECEIVABLE_STAGE[r.state].short}</span></td></tr>)}
+              {payable.length === 0 && <tr><td colSpan={5} className="empty">Không có khoản phải trả.</td></tr>}
+            </tbody></table></div>
         </div>
       </section>
-
-      <TodoTiles items={TODOS} />
-
-      <section className="card flush">
-          <div className="ch">
-            <h2 className="ct">Nhà cung cấp chiến lược</h2>
-            <Link href="/buyer/esg" className="strong" style={{ fontSize: 13 }}>
-              ESG chuỗi cung ứng
-            </Link>
-          </div>
-          <div className="tw">
-            <table>
-              <thead>
-                <tr>
-                  <th>Nhà cung cấp</th>
-                  <th>Ngành</th>
-                  <th className="r">Phải trả (đ)</th>
-                  <th className="r">ESG</th>
-                  <th>Mức ESG</th>
-                  <th>Tài trợ qua FCC</th>
-                  <th>Thời gian trả TB</th>
-                </tr>
-              </thead>
-              <tbody>
-                {SUPPLIERS.map(([n, ind, amt, esg, ec, el, fc, fl, days]) => (
-                  <tr key={n}>
-                    <td className="strong">{n}</td>
-                    <td>{ind}</td>
-                    <td className="r num">{amt}</td>
-                    <td className="r num">{esg}</td>
-                    <td>
-                      <span className={`chip ${ec}`}>{el}</span>
-                    </td>
-                    <td>
-                      <span className={`chip ${fc}`}>{fl}</span>
-                    </td>
-                    <td className="num">{days}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-      </section>
+      <Disclaimer>Xác nhận hóa đơn trên FCC là xác nhận nghĩa vụ thanh toán; FCC không giữ tiền — bạn thanh toán trực tiếp theo thỏa thuận.</Disclaimer>
     </>
   );
 }

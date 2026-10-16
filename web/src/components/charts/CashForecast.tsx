@@ -1,22 +1,29 @@
 "use client";
 
 import { useState } from "react";
-import { CASH_FORECAST, forecastDates, SAFE_BALANCE } from "@/lib/data";
+import type { Forecast } from "@fcc/domain/cashflow";
 import { vnd } from "@/lib/format";
 
 const W = 720;
 const TOP = 12;
 const PLOT_H = 188;
-const MAX = 2000;
 const x = (i: number, n: number) => (i / (n - 1)) * W;
-const y = (v: number) => TOP + (1 - v / MAX) * PLOT_H;
+const dm = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
 
-export function CashForecast() {
+/** Dự báo số dư tiền mặt từ dữ liệu thật (lịch phải thu/phải trả, chi định kỳ, độ trễ thanh toán). Đơn vị hiển thị: triệu đồng. */
+export function CashForecast({ forecast, openingCash, safeBalance }: { forecast: Forecast; openingCash: number; safeBalance: number }) {
   const [range, setRange] = useState<7 | 30>(30);
   const [hover, setHover] = useState<number | null>(null);
 
   const n = range;
-  const data = CASH_FORECAST.slice(0, n);
+  const SAFE_BALANCE = safeBalance / 1e6;
+  const base = forecast.points.slice(0, n).map((p) => p.base / 1e6);
+  const data = base;
+  const forecastDates = forecast.points.map((p) => dm(p.date));
+  const rawMax = Math.max(SAFE_BALANCE * 1.2, ...data, 100);
+  const MAX = Math.ceil(rawMax / 500) * 500;
+  const lo = Math.min(0, ...data);
+  const y = (v: number) => TOP + (1 - (v - lo) / (MAX - lo)) * PLOT_H;
   const pts = data.map((v, i) => `${x(i, n).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
   const area = `M0,200 L${pts.replaceAll(" ", " L")} L${W},200 Z`;
   let minI = 0;
@@ -28,10 +35,12 @@ export function CashForecast() {
   const pctX = (i: number) => (x(i, n) / W) * 100;
 
   // Số dư đầu + thu − chi = số dư cuối kỳ (khớp với chuỗi dự báo).
-  const flows =
-    n === 7
-      ? { inn: 1030, innNote: "4 hóa đơn đến hạn", out: 1050, outNote: "phải trả đến hạn 7 ngày" }
-      : { inn: 4820, innNote: "12 hóa đơn · theo độ trễ từng người mua", out: 4260, outNote: "phải trả, lương, thuế" };
+  const flows = {
+    inn: (n === 7 ? forecast.inflow.d7 : forecast.inflow.d30) / 1e6,
+    innNote: "phải thu theo độ trễ từng người mua",
+    out: (n === 7 ? forecast.outflow.d7 : forecast.outflow.d30) / 1e6,
+    outNote: "phải trả và chi định kỳ",
+  };
 
   const summary = hasDip
     ? `Thấp nhất ${vnd(data[minI])} tr ngày ${forecastDates[minI]}, dưới mức an toàn ${vnd(SAFE_BALANCE)} tr.`
@@ -62,7 +71,7 @@ export function CashForecast() {
       </div>
 
       <div style={{ position: "relative", paddingLeft: 48 }} onMouseLeave={() => setHover(null)}>
-        {[2000, 1500, 1000, 500, 0].map((v, i) => (
+        {[MAX, (MAX * 3) / 4, MAX / 2, MAX / 4, 0].map((v, i) => (
           <span key={v} className="muted num chart-y" style={{ top: 4 + i * 47 }}>
             {vnd(v)}
           </span>
@@ -201,7 +210,7 @@ export function CashForecast() {
       >
         {(
           [
-            ["Số dư hôm nay", 1260, "2 tài khoản"],
+            ["Số dư hôm nay", openingCash / 1e6, "do doanh nghiệp khai"],
             ["Thu dự kiến", flows.inn, flows.innNote],
             ["Chi dự kiến", -flows.out, flows.outNote],
             [`Cuối kỳ ${n} ngày`, data[n - 1], data[n - 1] >= SAFE_BALANCE ? "trên mức an toàn" : "dưới mức an toàn"],
@@ -218,7 +227,7 @@ export function CashForecast() {
         ))}
       </div>
       <p className="muted" style={{ marginTop: 10 }}>
-        Dự báo – không phải cam kết. Sai số trung bình 30 ngày gần nhất: ±6%.
+        Dự báo – không phải cam kết. Số dư đầu kỳ và chi định kỳ do doanh nghiệp tự khai; phải thu/phải trả lấy từ công nợ đã nhập và hóa đơn trên FCC.
       </p>
     </div>
   );

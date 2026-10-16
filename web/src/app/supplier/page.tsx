@@ -1,269 +1,120 @@
-import type { Metadata } from "next";
+"use client";
+
 import Link from "next/link";
-import { AlertTriangle, ArrowRight, BadgeCheck, CircleAlert, Clock, Sparkles, Upload } from "lucide-react";
-import { Bar, Kpi, PageHeader } from "@/components/ui/basic";
-import { Term } from "@/components/ui/Term";
+import { AlertTriangle, CircleAlert, Clock, FileSignature, Sparkles, Upload } from "lucide-react";
+import { Bar, Disclaimer, Kpi, PageHeader } from "@/components/ui/basic";
 import { CashForecast } from "@/components/charts/CashForecast";
 import { TodoTiles, type Todo } from "@/components/ui/TodoTiles";
 import { AskButton } from "@/components/assistant/Assistant";
-import { SUPPLIER_INVOICES, STAGES } from "@/lib/data";
-import { vnd } from "@/lib/format";
-
-export const metadata: Metadata = { title: "Tổng quan nhà cung cấp" };
-
-const RECENT = ["HD-0421", "HD-0418", "HD-0412", "HD-0405", "HD-0398"].map(
-  (id) => SUPPLIER_INVOICES.find((i) => i.id === id)!,
-);
-
-const TODOS: Todo[] = [
-  {
-    icon: AlertTriangle,
-    bg: "var(--warn-bg)",
-    fg: "var(--warn)",
-    title: "Bù thiếu hụt 420 tr trước 28/10",
-    note: "Tài trợ HD-0412 là cách rẻ nhất · chi phí ≈ 7,0 tr",
-    href: "/supplier/marketplace",
-    cta: "Xem phương án",
-  },
-  {
-    icon: Clock,
-    bg: "var(--info-bg)",
-    fg: "var(--info)",
-    title: "3 hóa đơn chờ người mua xác nhận",
-    note: "Đã gửi 3 ngày · FCC sẽ nhắc tự động",
-    href: "/supplier/invoices",
-    cta: "Theo dõi",
-  },
-  {
-    icon: CircleAlert,
-    bg: "var(--bad-bg)",
-    fg: "var(--bad)",
-    title: "HD-0398 quá hạn 7 ngày",
-    note: "Nội thất Phố Hội · 315 tr",
-    href: "/supplier/invoices",
-    cta: "Xử lý",
-  },
-  {
-    icon: Upload,
-    bg: "var(--ok-bg)",
-    fg: "var(--ok)",
-    title: "2 hóa đơn nháp chưa gửi",
-    note: "HD-0423, HD-0422 · 705 tr",
-    href: "/supplier/invoices/upload",
-    cta: "Hoàn tất",
-  },
-];
+import { daysFromNow, money, vnd, date } from "@/lib/format";
+import { orgName, RECEIVABLE_STAGE, sumAmount } from "@/lib/model";
+import { useData } from "@/lib/session";
+import { useScores } from "@/lib/scores";
+import { useCashForecast } from "@/lib/cash";
 
 export default function SupplierOverview() {
+  const { data, org, me } = useData();
+  const scores = useScores(data);
+  const { forecast, hasSetup, openingCash } = useCashForecast(data, org);
+
+  const mine = data.receivables.filter((r) => r.sellerId === org.id && r.state !== "CANCELLED");
+  const open = mine.filter((r) => !["SETTLED", "EARLY_PAID", "REJECTED"].includes(r.state));
+  const overdue = mine.filter((r) => r.state === "OVERDUE");
+  const pending = mine.filter((r) => r.state === "BUYER_PENDING");
+  const disputed = mine.filter((r) => r.state === "BUYER_DISPUTED");
+  const drafts = mine.filter((r) => r.state === "DRAFT");
+  const eligible = mine.filter((r) => r.state === "BUYER_CONFIRMED");
+  const funded = data.applications.filter((a) => ["ACCEPTED", "FUNDED"].includes(a.state) && mine.some((r) => r.id === a.receivableId));
+  const offers = data.applications.filter((a) => a.state === "OFFERED" && mine.some((r) => r.id === a.receivableId));
+  const quotes = data.rfqs.filter((q) => q.sellerId === org.id && q.state === "RESPONDED");
+  const ap = data.ledger.filter((l) => l.orgId === org.id && l.kind === "AP").reduce((a, l) => a + l.amount - l.paid, 0);
+  const score = scores.supplier(org.id);
+  const SAFE = 0; // ngưỡng an toàn: số dư thấp hơn 0 là thiếu hụt thật
+  const short = forecast?.shortfall;
+  const best = [...eligible].sort((a, b) => scores.buyer(a.buyerId).score - scores.buyer(b.buyerId).score).reverse()[0];
+
+  const todos: Todo[] = [
+    ...(short ? [{ icon: AlertTriangle, bg: "var(--warn-bg)", fg: "var(--warn)", title: `Dự báo thiếu hụt ${money(-short.value)} từ ${date(short.date)}`, note: "Xem gói tài trợ để bù thiếu hụt", href: "/supplier/marketplace", cta: "Xem phương án" }] : []),
+    ...(offers.length ? [{ icon: FileSignature, bg: "var(--ok-bg)", fg: "var(--ok)", title: `${offers.length} đề nghị tài trợ chờ bạn chấp thuận`, note: "Có hạn chấp thuận", href: "/supplier/disbursement", cta: "Xem đề nghị" }] : []),
+    ...(quotes.length ? [{ icon: Sparkles, bg: "var(--info-bg)", fg: "var(--info)", title: `${quotes.length} RFQ đã có báo giá`, note: "Chọn báo giá tốt nhất", href: "/supplier/marketplace", cta: "So sánh" }] : []),
+    ...(disputed.length ? [{ icon: CircleAlert, bg: "var(--bad-bg)", fg: "var(--bad)", title: `${disputed.length} hóa đơn bị người mua hỏi lại`, note: disputed[0].disputeReason ?? "Cần giải trình hoặc điều chỉnh", href: "/supplier/invoices", cta: "Xử lý" }] : []),
+    ...(pending.length ? [{ icon: Clock, bg: "var(--info-bg)", fg: "var(--info)", title: `${pending.length} hóa đơn chờ người mua xác nhận`, note: "Theo dõi ở Hóa đơn", href: "/supplier/invoices", cta: "Theo dõi" }] : []),
+    ...(drafts.length ? [{ icon: Upload, bg: "var(--warn-bg)", fg: "var(--warn)", title: `${drafts.length} hóa đơn nháp chưa gửi`, note: "Gửi người mua để xác nhận", href: "/supplier/invoices", cta: "Hoàn tất" }] : []),
+    ...(overdue.length ? [{ icon: AlertTriangle, bg: "var(--bad-bg)", fg: "var(--bad)", title: `${overdue.length} hóa đơn quá hạn`, note: `${money(sumAmount(overdue))} đ chưa thu`, href: "/supplier/invoices", cta: "Xem" }] : []),
+  ];
+
   return (
     <>
       <PageHeader
         eyebrow="Tổng quan · Nhà cung cấp"
-        title="Vốn lưu động hôm nay"
-        sub="Xin chào Nguyễn Lan · đồng bộ từ hóa đơn điện tử và 2 tài khoản ngân hàng lúc 23:40"
-        actions={
-          <>
-            <Link className="btn bs" href="/supplier/invoices/upload">
-              <Upload size={16} aria-hidden="true" />
-              Tải hóa đơn
-            </Link>
-            <Link className="btn bp" href="/supplier/funding">
-              Yêu cầu tài trợ
-              <ArrowRight size={16} aria-hidden="true" />
-            </Link>
-          </>
-        }
+        title={`Xin chào ${me.name.split(" ").slice(-1)[0]}`}
+        sub={short ? `Dự báo thiếu hụt ${money(-short.value)} ngày ${date(short.date)}. Xem các gói tài trợ để bù thiếu hụt.` : "Theo dõi vốn lưu động, hóa đơn và tài trợ của bạn."}
+        actions={<Link className="btn bp" href="/supplier/invoices/upload"><Upload size={16} aria-hidden="true" /> Tải hóa đơn</Link>}
       />
 
-      <div
-        role="alert"
-        style={{
-          display: "flex",
-          flexWrap: "wrap",
-          alignItems: "center",
-          gap: "12px 16px",
-          padding: "14px 18px",
-          borderRadius: 14,
-          background: "var(--warn-bg)",
-          color: "#4D2B00",
-        }}
-      >
-        <AlertTriangle size={20} color="#A35A00" aria-hidden="true" />
-        <p style={{ flex: "1 1 320px" }}>
-          <strong>Cảnh báo thanh khoản:</strong> số dư dự báo xuống <span className="num">380 tr</span> ngày 28/10, thấp hơn mức an toàn{" "}
-          <span className="num">800 tr</span>. Thiếu hụt <span className="num">420 tr</span> có thể bù bằng tài trợ 1 hóa đơn.
-        </p>
-        <AskButton className="btn bs sm" question="Khi nào tôi có thể thiếu tiền?">
-          <Sparkles size={15} aria-hidden="true" />
-          Giải thích
-        </AskButton>
-        <Link className="btn bp sm" href="/supplier/marketplace">
-          Xem phương án
-        </Link>
-      </div>
+      {todos.length > 0 ? <TodoTiles items={todos} /> : <section className="card empty">Không có việc cần làm. Tải hóa đơn đầu tiên để bắt đầu.</section>}
 
       <section className="grid-kpi" aria-label="Chỉ tiêu vốn lưu động">
-        <Kpi
-          label="Phải thu"
-          value="6,84 tỷ"
-          note={
-            <>
-              18 hóa đơn · <span className="t-bad strong">1 quá hạn</span>
-            </>
-          }
-        />
-        <Kpi label="Phải trả" value="3,12 tỷ" note="9 hóa đơn · đến hạn 7 ngày: 1,05 tỷ" />
-        <Kpi label="Hàng tồn kho" value="2,47 tỷ" note={<>Vòng quay 41 ngày (<Term k="dio" />)</>} />
-        <Kpi label="Tiền mặt" value="1,26 tỷ" note="2 tài khoản ngân hàng" />
+        <Kpi label="Phải thu đang mở" value={money(sumAmount(open))} note={<>{open.length} hóa đơn{overdue.length > 0 && <> · <span className="t-bad strong">{overdue.length} quá hạn</span></>}</>} />
+        <Kpi label="Phải trả (công nợ đã nhập)" value={money(ap)} note={ap ? "theo file công nợ" : "Chưa nhập công nợ phải trả"} />
+        <Kpi label="Đang được tài trợ" value={money(funded.reduce((a, x) => a + (x.fundedAmount ?? x.offer?.advanceVnd ?? 0), 0))} note={`${funded.length} hồ sơ`} />
+        <Kpi label="Tiền mặt (khai báo)" value={hasSetup ? money(openingCash) : "—"} note={hasSetup ? "số dư đầu kỳ do doanh nghiệp khai" : <Link href="/supplier/accounting">Khai số dư để có dự báo</Link>} />
       </section>
 
       <section className="row">
         <div className="card grow-2">
-          <CashForecast />
+          {forecast ? (
+            <CashForecast forecast={forecast} openingCash={openingCash} safeBalance={SAFE} />
+          ) : (
+            <div className="empty stack" style={{ alignItems: "center" }}>
+              <strong>Chưa có dự báo dòng tiền.</strong>
+              <span>Khai số dư tiền mặt, chi định kỳ và nhập công nợ để FCC dự báo 7/30/90 ngày.</span>
+              <Link className="btn bp" href="/supplier/accounting">Thiết lập dòng tiền</Link>
+            </div>
+          )}
         </div>
         <div className="dark grow-1" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          <span className="d-title">
-            <Sparkles size={18} color="#DDF1C4" aria-hidden="true" />
-            AI đề xuất tài trợ
-          </span>
-          <p>Ưu tiên hóa đơn bù đủ thiếu hụt 420 tr với chi phí vốn thấp nhất.</p>
-          <div className="d-box">
-            <div className="between">
-              <strong className="num" style={{ color: "#fff" }}>
-                HD-0412
-              </strong>
-              <span className="chip c-lime">Khuyến nghị</span>
-            </div>
-            <span className="d-text" style={{ fontSize: 12.5 }}>
-              Kết cấu Thép Miền Trung · còn 51 ngày
-            </span>
-            <div className="d-line">
-              <span>Nhận trước 80%</span>
-              <span className="num">688 tr</span>
-            </div>
-            <div className="d-line">
-              <span>Chi phí ước tính · 5,9%/năm</span>
-              <span className="num">≈ 7,0 tr</span>
-            </div>
-          </div>
-          <div className="d-box outline">
-            <div className="between">
-              <strong className="num" style={{ color: "#fff" }}>
-                HD-0418
-              </strong>
-              <span className="chip" style={{ background: "var(--forest-3)", color: "#E6F0EB" }}>
-                Phương án 2
-              </span>
-            </div>
-            <span className="d-text" style={{ fontSize: 12.5 }}>
-              Xây dựng Đông Á · còn 90 ngày
-            </span>
-            <div className="d-line">
-              <span>Nhận trước 80%</span>
-              <span className="num">1,60 tỷ</span>
-            </div>
-            <div className="d-line">
-              <span>Chi phí ước tính · 5,9%/năm</span>
-              <span className="num">≈ 26,5 tr</span>
-            </div>
-          </div>
-          <span className="spacer" />
-          <Link className="btn bl" href="/supplier/marketplace">
-            So sánh trên Marketplace
-          </Link>
-          <AskButton className="btn bg-dark" question="Nên tài trợ hóa đơn nào?">
-            Vì sao lại là HD-0412?
-          </AskButton>
+          <span className="d-title"><Sparkles size={18} color="#DDF1C4" aria-hidden="true" />Gợi ý tài trợ</span>
+          {best ? (
+            <>
+              <p>Hóa đơn có người mua xếp hạng cao nhất trong các khoản đã xác nhận:</p>
+              <div className="d-box">
+                <div className="between"><strong className="num" style={{ color: "#fff" }}>{best.code}</strong><span className="chip c-lime">Gợi ý</span></div>
+                <div>{orgName(data.orgs, best.buyerId)} · {money(best.amount)} đ · hạn {date(best.dueDate)} (còn {daysFromNow(best.dueDate)} ngày)</div>
+                <div className="muted" style={{ color: "var(--on-forest-2)" }}>Xếp hạng người mua {scores.buyer(best.buyerId).rating}</div>
+              </div>
+              <Link className="btn bl" href={`/supplier/marketplace?r=${best.id}`}>So sánh gói cho hóa đơn này</Link>
+            </>
+          ) : <p>Chưa có hóa đơn nào được người mua xác nhận. Sau khi được xác nhận, FCC gợi ý hóa đơn nên tài trợ.</p>}
+          <AskButton className="btn bl" question="Nên tài trợ hóa đơn nào?">Hỏi trợ lý</AskButton>
         </div>
       </section>
 
-      <TodoTiles items={TODOS} />
-
-      <section className="card flush">
-          <div className="ch">
-            <h2 className="ct">Hóa đơn gần đây</h2>
-            <Link href="/supplier/invoices" className="strong" style={{ fontSize: 13 }}>
-              Xem tất cả
-            </Link>
-          </div>
+      <section className="row top">
+        <div className="card flush grow-2">
+          <div className="ch"><h2 className="ct">Hóa đơn gần đây</h2><Link className="btn bs sm" href="/supplier/invoices">Xem tất cả</Link></div>
           <div className="tw">
             <table>
-              <thead>
-                <tr>
-                  <th>Mã</th>
-                  <th>Người mua</th>
-                  <th className="r">Số tiền (đ)</th>
-                  <th>Hạn thanh toán</th>
-                  <th className="r">ESG người mua</th>
-                  <th>Trạng thái</th>
-                </tr>
-              </thead>
+              <thead><tr><th>Mã</th><th>Người mua</th><th className="r">Số tiền (đ)</th><th>Hạn</th><th>Trạng thái</th></tr></thead>
               <tbody>
-                {RECENT.map((i) => (
-                  <tr key={i.id}>
-                    <td className="num strong">{i.id}</td>
-                    <td>{i.buyer}</td>
-                    <td className="r num">{vnd(i.amount)}</td>
-                    <td className="num">{i.due}</td>
-                    <td className="r num">{i.esg}</td>
-                    <td>
-                      <span className={`chip ${STAGES[i.stage].chip}`}>
-                        {i.stage === "over" ? "Quá hạn 7 ngày" : STAGES[i.stage].label}
-                      </span>
-                    </td>
-                  </tr>
+                {[...mine].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1)).slice(0, 6).map((r) => (
+                  <tr key={r.id}><td className="num strong">{r.code}</td><td>{orgName(data.orgs, r.buyerId)}</td><td className="r num">{vnd(r.amount)}</td><td className="num">{date(r.dueDate)}</td><td><span className={`chip ${RECEIVABLE_STAGE[r.state].chip}`}>{RECEIVABLE_STAGE[r.state].short}</span></td></tr>
                 ))}
+                {mine.length === 0 && <tr><td colSpan={5} className="empty">Chưa có hóa đơn.</td></tr>}
               </tbody>
             </table>
           </div>
+        </div>
+        <div className="card grow-1 stack-sm">
+          <h2 className="ct">Điểm tín dụng tham khảo</h2>
+          <div className="between"><strong style={{ fontSize: 28 }}>{score.rating}</strong><span className="num">{Math.round(score.score)}/100</span></div>
+          <Bar value={score.score} />
+          <span className="muted">{score.official ? "Điểm chính thức" : `Tạm tính · độ bao phủ dữ liệu ${Math.round(score.coverage * 100)}%`}. Bổ sung hồ sơ tài chính, ESG để tăng độ bao phủ.</span>
+          {score.missingMandatory.length > 0 && <span className="muted">Còn thiếu: {score.missingMandatory.join(", ")}</span>}
+          <Link className="btn bs sm" href="/supplier/funding">Xem hồ sơ & 5C</Link>
+        </div>
       </section>
-
-      <section className="grid-kpi" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(280px, 100%), 1fr))" }}>
-        <Link className="card stack-sm" href="/supplier/esg">
-          <div className="between">
-            <span className="ct">Điểm ESG doanh nghiệp</span>
-            <span className="chip c-gold">Hạng Vàng</span>
-          </div>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-            <span className="num" style={{ fontSize: 40, fontWeight: 600, lineHeight: 1 }}>
-              74
-            </span>
-            <span className="muted">/100 · mức Khá</span>
-          </div>
-          <Bar value={74} />
-          <span style={{ fontSize: 13, color: "var(--ink-2)" }}>
-            Đủ điều kiện ưu đãi <strong>−0,7%/năm</strong> từ 3 tổ chức có gói xanh.
-          </span>
-        </Link>
-        <Link className="card stack-sm" href="/supplier/funding">
-          <div className="between">
-            <span className="ct">Xếp hạng tín dụng FCC</span>
-            <span className="chip c-ok">
-              <BadgeCheck size={14} aria-hidden="true" />
-              +1 bậc
-            </span>
-          </div>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-            <span className="num" style={{ fontSize: 40, fontWeight: 600, lineHeight: 1 }}>
-              A
-            </span>
-            <span className="muted">76/100 · mô hình 5C · kỳ trước BBB</span>
-          </div>
-          <Bar value={76} />
-          <span className="muted">Xếp hạng tham khảo FCC — không phải quyết định tín dụng.</span>
-        </Link>
-        <Link className="card stack-sm" href="/supplier/marketplace">
-          <span className="muted">Ưu đãi tốt nhất trên Marketplace</span>
-          <span className="ct">Quỹ Đầu tư Xanh</span>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-            <span className="num" style={{ fontSize: 32, fontWeight: 600 }}>
-              5,9%
-            </span>
-            <span className="muted">/năm · tài trợ tới 80% · T+1</span>
-          </div>
-          <span className="muted">Giá do đối tác công bố, cập nhật 23:30.</span>
-        </Link>
-      </section>
+      <Disclaimer>Xếp hạng tham khảo FCC — không phải quyết định tín dụng. Dự báo – không phải cam kết.</Disclaimer>
     </>
   );
 }

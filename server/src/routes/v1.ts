@@ -3,6 +3,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { createHash, randomBytes } from 'node:crypto'
 import { matchProduct, rankMatches } from '@fcc/domain/marketplace'
+import { ewsAlerts } from '@fcc/domain/ews'
 import { applicationScoreOf, buyerScoreOf, esgOf, supplierScoreOf } from '@fcc/domain/engine'
 import type { Authed, Core } from '../core'
 import { actions, fundApplication, matchContextFor } from '../service'
@@ -38,6 +39,8 @@ interface Endpoint {
   run?: (s: Src, core: Core) => unknown | Promise<unknown>
   /** Mô tả thân yêu cầu cho tài liệu */
   body?: Record<string, string>
+  /** Kiểm tra bổ sung trước khi chạy hành động */
+  check?: 'receivableFiles'
 }
 
 const P = (s: Src, k: string) => {
@@ -74,7 +77,7 @@ export const ENDPOINTS: Endpoint[] = [
     run: (s, core) => page(view(core, s.a!.activeOrgId).receivables.filter((r) => !s.query.state || r.state === s.query.state), s.query) },
   { method: 'GET', path: '/v1/receivables/{id}', tag: 'Khoản phải thu', summary: 'Chi tiết', auth: 'user',
     run: (s, core) => view(core, s.a!.activeOrgId).receivables.find((r) => r.id === P(s, 'id')) ?? (() => { throw notFound('Không tìm thấy khoản phải thu') })() },
-  { method: 'POST', path: '/v1/receivables', tag: 'Khoản phải thu', summary: 'Tạo khoản phải thu từ hóa đơn', auth: 'user', action: 'createReceivable', args: (s) => [B(s)],
+  { method: 'POST', path: '/v1/receivables', tag: 'Khoản phải thu', summary: 'Tạo khoản phải thu từ hóa đơn (files: khóa tệp đã tải lên /api/files)', auth: 'user', action: 'createReceivable', args: (s) => [B(s)], check: 'receivableFiles',
     body: { buyerId: 'string', invoiceSeries: 'string', invoiceNumber: 'string', issueDate: 'YYYY-MM-DD', dueDate: 'YYYY-MM-DD', amount: 'integer VND', fingerprint: 'string', source: 'xml|ocr|manual|accounting' } },
   { method: 'POST', path: '/v1/receivables/{id}/buyer-invitation', tag: 'Khoản phải thu', summary: 'Gửi bên mua xác nhận', auth: 'user', action: 'sendToBuyer', args: (s) => [P(s, 'id')] },
   { method: 'POST', path: '/v1/receivables/{id}/buyer-decision', tag: 'Bên mua', summary: 'Bên mua xác nhận nghĩa vụ hoặc nêu tranh chấp (cần MFA)', auth: 'user', action: 'buyerDecision',
@@ -129,6 +132,15 @@ export const ENDPOINTS: Endpoint[] = [
       const byType = new Map<string, number[][]>()
       for (const p of ps) byType.set(p.type, [...(byType.get(p.type) ?? []), [p.pricing.rateMin, p.pricing.rateMax, p.pricing.advancePct]])
       return [...byType].map(([type, xs]) => ({ type, products: xs.length, rateMin: Math.min(...xs.map((x) => x[0])), rateMax: Math.max(...xs.map((x) => x[1])), advanceAvgPct: xs.reduce((a, x) => a + x[2], 0) / xs.length }))
+    } },
+
+  { method: 'GET', path: '/v1/ews-alerts', tag: 'Giám sát', summary: 'Cảnh báo sớm theo luật cho danh mục hồ sơ (tổ chức tài chính: hồ sơ của mình; nhà cung cấp: hồ sơ trên hóa đơn của mình)', auth: 'user',
+    run: (s, core) => {
+      const v = view(core, s.a!.activeOrgId)
+      const type = orgOf(core, s.a!.activeOrgId)?.type
+      if (type !== 'lender' && type !== 'supplier') throw forbidden('Chỉ tổ chức tài chính và nhà cung cấp')
+      const apps = v.applications.filter((a) => (type === 'lender' ? a.lenderId === s.a!.activeOrgId : v.receivables.find((r) => r.id === a.receivableId)?.sellerId === s.a!.activeOrgId))
+      return page(ewsAlerts(core.getState(), apps, core.clock()), s.query)
     } },
 
   // ---- tổ chức, KYC, chấm điểm ----
@@ -329,6 +341,10 @@ export function v1Routes(app: FastifyInstance, core: Core) {
           const args = ep.args ? ep.args(s) : []
           if (s.a) {
             core.authorize(s.a, ep.action)
+            if (ep.check === 'receivableFiles') {
+              const files = (B(s).files ?? []) as { key?: unknown }[]
+              for (const f of Array.isArray(files) ? files : []) if (typeof f?.key !== 'string' || !(await core.db.fileOf(f.key, s.a.activeOrgId))) throw bad('Chứng từ chưa được tải lên bởi tổ chức này')
+            }
             const result = await core.mutate({ kind: 'user', user: s.a, correlationId: req.id }, (c) => fn(c, ...args))
             out = { result: result ?? null, version: core.version() }
           } else {

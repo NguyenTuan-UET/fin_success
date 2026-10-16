@@ -171,6 +171,9 @@ export const actions: Record<string, Action> = {
       issueDate: input.issueDate, dueDate: input.dueDate, amount: input.amount, description: String(input.description ?? '').slice(0, 500),
       fingerprint: input.fingerprint, docs: { xml: !!input.docs?.xml, contract: !!input.docs?.contract, delivery: !!input.docs?.delivery },
       source: (['xml', 'ocr', 'manual', 'accounting'] as const).includes(input.source) ? input.source : 'manual',
+      files: Array.isArray(input.files)
+        ? input.files.slice(0, 10).filter((f) => /^[0-9a-f]{64}$/.test(f?.key)).map((f) => ({ key: f.key, name: String(f.name ?? '').slice(0, 200), kind: (['invoice', 'contract', 'delivery'] as const).find((k) => k === f.kind) ?? ('other' as const) }))
+        : undefined,
     }
     c.s.receivables = [r, ...c.s.receivables]
     log(c, 'Tạo khoản phải thu', r.code, `${orgName(c, r.buyerId)} · ${vnd(r.amount)} ₫ · nguồn ${r.source}`)
@@ -540,7 +543,7 @@ export const actions: Record<string, Action> = {
     const a = esgAccess(c, assessmentId, 'owner')
     if (!doc?.name || !doc.mime) throw bad('Thiếu thông tin tài liệu')
     if (doc.dataUrl && doc.dataUrl.length > 8_000_000) throw bad('Tệp quá lớn (tối đa ~6 MB)')
-    const clean: EsgDocument = { ...doc, id: doc.id || uid('doc'), uploadedAt: c.now.toISOString(), indicatorCodes: doc.indicatorCodes ?? [] }
+    const clean: EsgDocument = { ...doc, fileKey: /^[0-9a-f]{64}$/.test(String(doc.fileKey)) ? doc.fileKey : undefined, id: doc.id || uid('doc'), uploadedAt: c.now.toISOString(), indicatorCodes: doc.indicatorCodes ?? [] }
     c.s.esg = c.s.esg.map((x) => (x.id === a.id ? { ...x, documents: [clean, ...x.documents] } : x))
     log(c, 'Tải bằng chứng ESG', a.id, `${clean.name} → ${clean.indicatorCodes.join(', ') || 'chưa phân loại'}`)
   },

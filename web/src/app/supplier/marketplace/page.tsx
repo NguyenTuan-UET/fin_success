@@ -11,22 +11,14 @@ export default function SupplierMarketplace() {
       <PageHeader
         eyebrow="Marketplace tài chính"
         title="So sánh gói tài trợ"
-        sub="6 tổ chức tài chính đang chào gói phù hợp với hồ sơ của bạn. Chọn hóa đơn, FCC tính ngay số tiền thực nhận và tổng chi phí của từng gói."
+        sub="Các gói do tổ chức tài chính công bố. Chọn hóa đơn đã được người mua xác nhận, FCC tính ngay số tiền thực nhận và tổng chi phí ước tính của từng gói."
         actions={
           <Link className="btn bs" href="/supplier/funding">
             Xem lại hồ sơ tài trợ
           </Link>
         }
       />
-      <MarketplaceCompare
-        partyLabel="Người mua"
-        nextHref="/supplier/disbursement"
-        targets={[
-          { id: "HD-0418", party: "Xây dựng Đông Á", amount: 2_000_000_000, days: 90 },
-          { id: "HD-0412", party: "Kết cấu Thép Miền Trung", amount: 860_000_000, days: 51 },
-          { id: "HD-0410", party: "Hạ tầng Bình Minh", amount: 395_000_000, days: 77 },
-        ]}
-      />
+      <MarketplaceCompare />
     </>
   );
 }

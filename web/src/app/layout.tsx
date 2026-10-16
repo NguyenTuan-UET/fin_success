@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Be_Vietnam_Pro, IBM_Plex_Mono } from "next/font/google";
 import { ToastProvider } from "@/components/providers/Toast";
 import { AssistantProvider } from "@/components/assistant/Assistant";
+import { FccProvider } from "@/lib/session";
 import "./globals.css";
 
 const beVietnam = Be_Vietnam_Pro({
@@ -36,7 +37,9 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html lang="vi" className={`${beVietnam.variable} ${plexMono.variable}`}>
       <body>
         <ToastProvider>
-          <AssistantProvider>{children}</AssistantProvider>
+          <FccProvider>
+            <AssistantProvider>{children}</AssistantProvider>
+          </FccProvider>
         </ToastProvider>
       </body>
     </html>

@@ -1537,3 +1537,70 @@ input[type="range"] {
     font-size: 22px;
   }
 }
+
+/* Hộp thoại và thông báo lỗi dùng chung */
+.modal-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(14, 42, 35, 0.55);
+}
+.modal {
+  width: min(440px, 100%);
+  max-height: 90vh;
+  overflow: auto;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.modal.wide {
+  width: min(720px, 100%);
+}
+.err {
+  color: var(--bad);
+  background: var(--bad-bg);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 13px;
+}
+.okmsg {
+  color: var(--ok);
+  background: var(--ok-bg);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 13px;
+}
+.empty {
+  padding: 28px 16px;
+  text-align: center;
+  color: var(--ink-3);
+}
+.auth-wrap {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: var(--bg);
+}
+.auth-card {
+  width: min(720px, 100%);
+  padding: 24px;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+.field > span {
+  font-weight: 600;
+}
+.tabs {
+  display: flex;
+  gap: 8px;
+}

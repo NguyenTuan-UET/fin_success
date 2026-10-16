@@ -1,327 +1,144 @@
 "use client";
 
-import Link from "next/link";
 import { useState } from "react";
-import { Check, Info, Plus, Sparkles } from "lucide-react";
+import { Trash2 } from "lucide-react";
+import { classifyFunding, COLLATERAL_HAIRCUT, preliminaryValue, totalPreliminaryValue } from "@fcc/domain/collateral";
+import type { CollateralItem, CreditProfile, FinancialYear } from "@fcc/domain/types";
+import { dec, money, vnd } from "@/lib/format";
+import { orgName, ratingTone } from "@/lib/model";
+import { useData } from "@/lib/session";
+import { useScores } from "@/lib/scores";
 import { Bar, Disclaimer } from "@/components/ui/basic";
 import { Term } from "@/components/ui/Term";
 import { useToast } from "@/components/providers/Toast";
 
-const ASSETS = [
-  { name: "Nhà xưởng KCN Tân Phú", type: "Bất động sản", value: 3_200_000_000, ltv: 0.7, doc: "Đã xác thực", note: "Sổ đỏ", ok: true },
-  { name: "Máy cắt CNC 5 trục", type: "Máy móc thiết bị", value: 850_000_000, ltv: 0.5, doc: "Đã xác thực", note: "Hóa đơn mua", ok: true },
-  { name: "Thép cuộn tồn kho", type: "Hàng tồn kho", value: 1_200_000_000, ltv: 0.4, doc: "Chờ kiểm kê", note: "Thiếu biên bản kiểm kê", ok: false },
+const FY_FIELDS: [keyof FinancialYear, string][] = [
+  ["revenue", "Doanh thu"], ["netProfit", "Lợi nhuận sau thuế"], ["ebit", "EBIT"], ["interestExpense", "Chi phí lãi vay"], ["depreciation", "Khấu hao"],
+  ["totalAssets", "Tổng tài sản"], ["currentAssets", "Tài sản ngắn hạn"], ["currentLiabilities", "Nợ ngắn hạn"], ["totalLiabilities", "Tổng nợ"], ["equity", "Vốn chủ sở hữu"],
+  ["operatingCashFlow", "Dòng tiền kinh doanh"], ["debtService", "Nợ gốc + lãi phải trả trong năm"], ["cash", "Tiền"], ["inventory", "Hàng tồn kho"], ["receivables", "Phải thu"],
 ];
 
-const fmt = (v: number) => Math.round(v).toLocaleString("vi-VN");
-
 export function FundingRequest() {
+  const { data, org, act } = useData();
   const toast = useToast();
-  const [collat, setCollat] = useState(true);
+  const scores = useScores(data);
+  const profile = data.profiles.find((p) => p.orgId === org.id);
+  const score = scores.supplier(org.id);
+  const collateral = profile?.collateral ?? [];
+  const [col, setCol] = useState({ kind: "realestate" as CollateralItem["kind"], description: "", declaredValue: "" });
+  const [fy, setFy] = useState<Record<string, string>>({ year: String(new Date().getFullYear() - 1) });
+  const [misc, setMisc] = useState({ cicGroup: String(profile?.cic?.worstDebtGroup ?? ""), cicLate: String(profile?.cic?.maxLateDays ?? ""), taxStatus: profile?.taxStatus ?? "", legalEvents: profile?.legalEvents ?? "", capitalNeed: String(profile?.capitalNeed ?? "") });
+  const [busy, setBusy] = useState(false);
 
-  const fives = [
-    { name: "Nhân cách", en: "Character", score: 18, max: 20, note: "CIC nhóm 1, không nợ quá hạn 36 tháng, quan hệ với 2 ngân hàng" },
-    { name: "Năng lực trả nợ", en: "Capacity", score: 22, max: 30, note: "DSCR 1,55; nợ/VCSH 1,8; doanh thu tăng 14% so với năm trước" },
-    { name: "Vốn", en: "Capital", score: 12, max: 15, note: "Vốn tự có tham gia 30% tổng nhu cầu vốn" },
-    collat
-      ? { name: "Tài sản bảo đảm", en: "Collateral", score: 10, max: 15, note: "Giá trị công nhận 3,15 tỷ; nhà xưởng LTV 70%" }
-      : { name: "Tài sản bảo đảm", en: "Collateral", score: 4, max: 15, note: "Không có TSBĐ; thay bằng khoản phải thu từ người mua hạng A" },
-    { name: "Hoàn cảnh", en: "Conditions", score: 14, max: 20, note: "Ngành vật liệu xây dựng xếp hạng B+, chu kỳ thanh toán dài" },
-  ];
-  const total = fives.reduce((a, f) => a + f.score, 0);
-  const grade = total >= 90 ? "AAA" : total >= 80 ? "AA" : total >= 70 ? "A" : total >= 60 ? "BBB" : total >= 50 ? "BB" : total >= 40 ? "B" : "CCC";
-  const weakest = [...fives].sort((a, b) => a.score / a.max - b.score / b.max)[0];
+  const targets = data.receivables.filter((r) => r.sellerId === org.id && ["BUYER_CONFIRMED", "REJECTED"].includes(r.state));
+  const [tid, setTid] = useState("");
+  const t = targets.find((x) => x.id === tid) ?? targets[0];
+  const app = t ? scores.application(t.id) : null;
+  const cls = t && app ? classifyFunding({ applicationRating: app.rating, buyerRating: scores.buyer(t.buyerId).rating, collateralValue: totalPreliminaryValue(collateral), amount: t.amount }) : null;
 
-  const cases = [
-    { title: "(i) Có TSBĐ & khoản phải thu tốt", desc: "Ưu tiên, hạn mức đầy đủ", on: collat },
-    { title: "(ii) Không TSBĐ, khoản phải thu chất lượng cao", desc: "Tài trợ dựa trên khoản phải thu và uy tín người mua", on: !collat },
-    { title: "(iii) Không TSBĐ, phải thu yếu, điểm thấp", desc: "FCC không gợi ý sản phẩm", on: false },
-  ];
-
-  const offer = collat
-    ? { limit: "4,20 tỷ", ratio: "80%", base: "6,6%", rate: "5,9%", advance: "1.600.000.000 đ" }
-    : { limit: "2,50 tỷ", ratio: "75%", base: "7,1%", rate: "6,4%", advance: "1.500.000.000 đ" };
-
-  const totalValue = ASSETS.reduce((a, x) => a + x.value, 0);
-  const totalRecognized = ASSETS.reduce((a, x) => a + x.value * x.ltv, 0);
+  const run = async (f: () => Promise<unknown>, ok: string) => {
+    setBusy(true);
+    try { await f(); toast(ok); } catch (e) { toast((e as Error).message); }
+    setBusy(false);
+  };
+  const saveCollateral = (items: CollateralItem[]) => act("POST", `/v1/organizations/${org.id}/credit-profile`, { collateral: items });
 
   return (
-    <section className="row top">
-      <div className="stack grow-3">
-        <div className="card">
-          <div className="ch">
-            <h2 className="ct">Khoản phải thu đề nghị tài trợ</h2>
-            <Link href="/supplier/invoices" className="strong" style={{ fontSize: 13 }}>
-              Đổi hóa đơn
-            </Link>
+    <>
+      <section className="row top">
+        <div className="card grow-2 stack-sm">
+          <div className="between">
+            <h2 className="ct"><Term k="fiveC">Điểm nhà cung cấp (5C)</Term></h2>
+            <span className={`chip ${ratingTone(score.rating)}`}>{score.rating} · {dec(score.score, 0)}/100{score.official ? "" : " · tạm tính"}</span>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(150px, 100%), 1fr))", gap: 14 }}>
-            {[
-              ["Hóa đơn", <span key="a" className="num">HD-0418</span>],
-              ["Giá trị", <span key="b" className="num">2.000.000.000 đ</span>],
-              ["Kỳ hạn", <span key="c" className="num">90 ngày · 13/01/2027</span>],
-              ["Người mua", "Xây dựng Đông Á"],
-              [
-                <Term key="t" k="riskScore">Xếp hạng người mua</Term>,
-                <span key="d">
-                  <span className="num">A</span> · trả đúng hạn 96%
-                </span>,
-              ],
-            ].map(([k, v], i) => (
-              <div key={i}>
-                <div className="muted">{k}</div>
-                <div className="strong">{v}</div>
-              </div>
-            ))}
-          </div>
-          <div className="chip c-ok" style={{ marginTop: 14 }}>
-            <Check size={14} aria-hidden="true" />
-            Người mua đã xác nhận khoản phải thu ngày 15/10
-          </div>
-        </div>
-
-        <div className="card">
-          <div className="ch">
-            <div>
-              <h2 className="ct">
-                <Term k="tsbd">Tài sản bảo đảm</Term> <span className="muted">(không bắt buộc)</span>
-              </h2>
-              <p className="muted">Định giá sơ bộ từ dữ liệu thị trường; tổ chức tài chính quyết định giá trị công nhận.</p>
-            </div>
-            <div className="seg" role="group" aria-label="Tài sản bảo đảm">
-              <button className="seg-btn" aria-pressed={collat} onClick={() => setCollat(true)}>
-                Có TSBĐ
-              </button>
-              <button className="seg-btn" aria-pressed={!collat} onClick={() => setCollat(false)}>
-                Không có TSBĐ
-              </button>
-            </div>
-          </div>
-          {collat ? (
-            <>
-              <div className="tw">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Tài sản</th>
-                      <th className="r">Định giá sơ bộ (đ)</th>
-                      <th className="r">
-                        <Term k="ltv">LTV</Term> tối đa
-                      </th>
-                      <th className="r">Giá trị công nhận (đ)</th>
-                      <th>Hồ sơ</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {ASSETS.map((a) => (
-                      <tr key={a.name}>
-                        <td className="wrap" style={{ minWidth: 140 }}>
-                          {a.name}
-                          <div className="muted">{a.type}</div>
-                        </td>
-                        <td className="r num">{fmt(a.value)}</td>
-                        <td className="r num">{a.ltv * 100}%</td>
-                        <td className="r num">{fmt(a.value * a.ltv)}</td>
-                        <td>
-                          <span className={`chip ${a.ok ? "c-ok" : "c-warn"}`} title={a.note}>
-                            {a.doc}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                    <tr>
-                      <td className="strong">Tổng</td>
-                      <td className="r num strong">{fmt(totalValue)}</td>
-                      <td />
-                      <td className="r num strong">{fmt(totalRecognized)}</td>
-                      <td />
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-              <button className="btn bs" style={{ marginTop: 12 }} onClick={() => toast("Mở biểu mẫu thêm tài sản.")}>
-                <Plus size={16} aria-hidden="true" />
-                Thêm tài sản
-              </button>
-            </>
-          ) : (
-            <div style={{ display: "flex", gap: 12, alignItems: "flex-start", padding: 14, background: "var(--info-bg)", borderRadius: 12, color: "#183F75" }}>
-              <Info size={18} style={{ flex: "0 0 auto", marginTop: 2 }} aria-hidden="true" />
-              <p style={{ fontSize: 13 }}>
-                Không sao cả! Không có tài sản cố định vẫn có thể được tài trợ dựa trên khoản phải thu: hóa đơn hợp lệ, người mua xếp hạng A
-                và dòng tiền ổn định. Hạn mức và tỷ lệ tài trợ thấp hơn một chút, lãi suất cao hơn.
-              </p>
-            </div>
-          )}
-        </div>
-
-        <div className="card">
-          <div className="ch">
-            <div>
-              <h2 className="ct">
-                AI Credit Scoring · <Term k="fiveC">mô hình 5C</Term>
-              </h2>
-              <p className="muted">BCTC 2 năm (TT 200/2014), CIC 36 tháng, dữ liệu hóa đơn & dòng tiền trên FCC</p>
-            </div>
-            <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-              <span className="num" style={{ fontSize: 36, fontWeight: 600, lineHeight: 1 }}>
-                {total}
-              </span>
-              <span className="muted">/100</span>
-              <span className="chip c-ok lg">Hạng {grade}</span>
-            </div>
-          </div>
-          <div className="stack" style={{ gap: 14 }}>
-            {fives.map((c) => (
-              <div
-                key={c.en}
-                style={{ display: "grid", gridTemplateColumns: "minmax(140px, 1.1fr) minmax(120px, 2fr) 64px", gap: "8px 16px", alignItems: "center" }}
-              >
-                <div>
-                  <div className="strong" style={{ fontSize: 13.5 }}>
-                    {c.name}
-                  </div>
-                  <div className="muted">{c.en}</div>
-                </div>
-                <div className="stack-sm" style={{ gap: 6 }}>
-                  <Bar value={(c.score / c.max) * 100} color={c.score / c.max < 0.5 ? "var(--warn-strong)" : undefined} />
-                  <div className="muted wrap">{c.note}</div>
-                </div>
-                <div className="num strong" style={{ textAlign: "right" }}>
-                  {c.score}
-                  <span className="muted">/{c.max}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(min(130px, 100%), 1fr))",
-              gap: 10,
-              marginTop: 16,
-              paddingTop: 16,
-              borderTop: "1px solid var(--line-2)",
-            }}
-          >
-            <div>
-              <div className="muted">
-                <Term k="dscr" />
-              </div>
-              <div className="num strong">
-                1,55 <span className="chip c-ok" style={{ height: 20 }}>≥ 1,3</span>
-              </div>
-            </div>
-            <div>
-              <div className="muted">Nợ phải trả / VCSH</div>
-              <div className="num strong">
-                1,8 <span className="chip c-ok" style={{ height: 20 }}>≤ 3</span>
-              </div>
-            </div>
-            <div>
-              <div className="muted">ROE · ROA</div>
-              <div className="num strong">18% · 7,2%</div>
-            </div>
-            <div>
-              <div className="muted">Vốn tự có</div>
-              <div className="num strong">
-                30% <span className="chip c-ok" style={{ height: 20 }}>≥ 15%</span>
-              </div>
-            </div>
-            <div>
-              <div className="muted">
-                <Term k="cic" />
-              </div>
-              <div className="strong">Nhóm 1</div>
-            </div>
-            <div>
-              <div className="muted">Xếp hạng ngành</div>
-              <div className="num strong">VLXD · B+</div>
-            </div>
-          </div>
-          <div className="soft" style={{ marginTop: 14, display: "flex", gap: 10, alignItems: "flex-start", fontSize: 13 }}>
-            <Sparkles size={16} color="var(--brand)" style={{ flex: "0 0 auto", marginTop: 2 }} aria-hidden="true" />
-            <span>
-              <strong>Gợi ý cải thiện:</strong> thành phần yếu nhất là <strong>{weakest.name}</strong> ({weakest.score}/{weakest.max}).{" "}
-              {collat
-                ? "Bổ sung biên bản kiểm kê thép cuộn để được công nhận thêm 480 tr giá trị TSBĐ."
-                : "Bổ sung hợp đồng khung ≥ 12 tháng với Xây dựng Đông Á để tăng điểm hỗ trợ tín dụng."}
-            </span>
-          </div>
-          <div style={{ marginTop: 10 }}>
-            <Disclaimer>Xếp hạng tham khảo FCC — không phải quyết định tín dụng. Tổ chức tài chính tự thẩm định và quyết định.</Disclaimer>
-          </div>
-        </div>
-      </div>
-
-      <aside className="stack grow-1">
-        <div className="card stack-sm" style={{ gap: 12 }}>
-          <h2 className="ct">Phân loại hồ sơ</h2>
-          {cases.map((k) => (
-            <div
-              key={k.title}
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: 4,
-                padding: 12,
-                borderRadius: 10,
-                border: k.on ? "2px solid var(--brand-fill)" : "1px solid var(--line-2)",
-                background: k.on ? "var(--surface-3)" : "#fff",
-              }}
-            >
-              <div className="between">
-                <strong style={{ fontSize: 13 }}>{k.title}</strong>
-                {k.on && <span className="chip c-ok">Hồ sơ này</span>}
-              </div>
-              <span className="muted wrap">{k.desc}</span>
+          <div className="muted">Độ bao phủ dữ liệu {Math.round(score.coverage * 100)}% · khoảng điểm {dec(score.min, 0)}–{dec(score.max, 0)}. Cần bao phủ đủ ngưỡng mới là điểm chính thức.</div>
+          {score.components.map((c) => (
+            <div key={c.key}>
+              <div className="between"><span>{c.label} ({Math.round(c.weight * 100)}%)</span><strong>{c.score === null ? "Chưa xác minh" : dec(c.score, 0)}</strong></div>
+              <Bar value={c.score ?? 0} />
             </div>
           ))}
+          {score.flags.length > 0 && <div className="err">{score.flags.join("; ")}</div>}
+          {score.missingMandatory.length > 0 && <div className="muted">Còn thiếu để tính đủ: {score.missingMandatory.join(", ")}</div>}
+          <div className="stack-sm">
+            {score.positives.slice(0, 3).map((f) => <div key={f.code} className="t-ok">＋ {f.name}: {f.raw}</div>)}
+            {score.negatives.slice(0, 3).map((f) => <div key={f.code} className="t-bad">− {f.name}: {f.raw}</div>)}
+          </div>
         </div>
-        <div className="dark stack-sm" style={{ gap: 12 }}>
-          <span className="d-title">
-            <Sparkles size={18} color="#DDF1C4" aria-hidden="true" />
-            Ước tính hạn mức
-          </span>
-          <div className="d-line">
-            <span>Hạn mức tài trợ</span>
-            <span className="num strong">{offer.limit}</span>
-          </div>
-          <div className="d-line">
-            <span>
-              <Term k="advance">Tỷ lệ tài trợ</Term>
-            </span>
-            <span className="num strong">{offer.ratio}</span>
-          </div>
-          <div className="d-line">
-            <span>Lãi suất tham chiếu</span>
-            <span className="num">{offer.base}</span>
-          </div>
-          <div className="d-line">
-            <span>Ưu đãi ESG (74 · Hạng Vàng)</span>
-            <span className="num" style={{ color: "var(--lime)" }}>
-              −0,7%
-            </span>
-          </div>
-          <div className="d-line" style={{ paddingTop: 10, borderTop: "1px solid var(--forest-3)" }}>
-            <span style={{ color: "#fff" }}>Lãi suất dự kiến</span>
-            <span className="num strong">{offer.rate}/năm</span>
-          </div>
-          <div className="d-box">
-            <span style={{ color: "var(--on-forest-2)", fontSize: 12.5 }}>Số tiền dự kiến nhận</span>
-            <span className="num" style={{ color: "#fff", fontSize: 26, fontWeight: 600 }}>
-              {offer.advance}
-            </span>
-            <span style={{ color: "var(--on-forest-2)", fontSize: 12.5 }}>
-              Giải ngân mục tiêu <Term k="tPlus">T+1/T+2</Term> sau phê duyệt
-            </span>
-          </div>
-          <Link className="btn bl" href="/supplier/marketplace">
-            Chọn nguồn vốn trên Marketplace
-          </Link>
-          <span style={{ fontSize: 12, color: "var(--on-forest-2)" }}>Ước tính theo biểu giá công bố, không phải cam kết cho vay.</span>
+
+        <div className="card grow-2 stack-sm">
+          <h2 className="ct">Phân loại hồ sơ tài trợ</h2>
+          {!t ? <div className="empty">Chưa có hóa đơn đã xác nhận để phân loại.</div> : (
+            <>
+              <label className="field"><span>Hóa đơn</span><select className="select" value={t.id} onChange={(e) => setTid(e.target.value)}>{targets.map((x) => <option key={x.id} value={x.id}>{x.code} · {orgName(data.orgs, x.buyerId)} · {money(x.amount)} đ</option>)}</select></label>
+              {app && cls && (
+                <>
+                  <div className="between"><span>Điểm hồ sơ (tham khảo)</span><span className={`chip ${ratingTone(app.rating)}`}>{app.rating} · {dec(app.score, 0)}</span></div>
+                  <div className="between"><span>Bên mua</span><span className={`chip ${ratingTone(scores.buyer(t.buyerId).rating)}`}>{scores.buyer(t.buyerId).rating}</span></div>
+                  <div className={`soft ${cls.case === 3 ? "err" : "okmsg"}`}><strong>{cls.label}</strong>{cls.reasons.map((r) => <div key={r}>{r}</div>)}</div>
+                  {!cls.suggestProducts && <div className="muted">FCC không gợi ý sản phẩm cho nhóm này. Bạn vẫn có thể bổ sung dữ liệu để cải thiện điểm.</div>}
+                </>
+              )}
+            </>
+          )}
         </div>
-      </aside>
-    </section>
+      </section>
+
+      <section className="card stack">
+        <div className="between"><h2 className="ct"><Term k="tsbd">Tài sản bảo đảm</Term> (không bắt buộc)</h2><span className="muted">Cơ sở bảo đảm tham khảo: <strong className="num">{vnd(totalPreliminaryValue(collateral))} đ</strong></span></div>
+        <div className="tw"><table>
+          <thead><tr><th>Loại</th><th>Mô tả</th><th className="r">Giá trị khai báo (đ)</th><th className="r">Định giá sơ bộ (đ)</th><th></th></tr></thead>
+          <tbody>
+            {collateral.map((c) => <tr key={c.id}><td>{COLLATERAL_HAIRCUT[c.kind].label}<div className="muted">{COLLATERAL_HAIRCUT[c.kind].note}</div></td><td className="wrap">{c.description}</td><td className="r num">{vnd(c.declaredValue)}</td><td className="r num strong">{vnd(preliminaryValue(c))}</td>
+              <td><button className="ibtn" aria-label="Xóa tài sản" onClick={() => run(() => saveCollateral(collateral.filter((x) => x.id !== c.id)), "Đã xóa tài sản")}><Trash2 size={15} aria-hidden="true" /></button></td></tr>)}
+            {collateral.length === 0 && <tr><td colSpan={5} className="empty">Không có tài sản bảo đảm. Khoản phải thu chất lượng vẫn có thể được tài trợ (nhóm ii).</td></tr>}
+          </tbody></table></div>
+        <div className="grid-fields">
+          <label className="field"><span>Loại</span><select className="select" value={col.kind} onChange={(e) => setCol({ ...col, kind: e.target.value as CollateralItem["kind"] })}>{Object.entries(COLLATERAL_HAIRCUT).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}</select></label>
+          <label className="field"><span>Mô tả</span><input className="input" value={col.description} onChange={(e) => setCol({ ...col, description: e.target.value })} /></label>
+          <label className="field"><span>Giá trị khai báo (đ)</span><input className="input num" inputMode="numeric" value={col.declaredValue} onChange={(e) => setCol({ ...col, declaredValue: e.target.value.replace(/\D/g, "") })} /></label>
+        </div>
+        <button className="btn bp" style={{ alignSelf: "flex-start" }} disabled={busy || !col.description.trim() || !col.declaredValue} onClick={() => run(async () => { await saveCollateral([...collateral, { id: `col-${Date.now().toString(36)}`, kind: col.kind, description: col.description.trim(), declaredValue: Number(col.declaredValue) }]); setCol({ ...col, description: "", declaredValue: "" }); }, "Đã thêm tài sản")}>Thêm tài sản</button>
+        <Disclaimer>Định giá sơ bộ theo hệ số chiết khấu công khai, chỉ để tham khảo — không có giá trị pháp lý. Tổ chức tài chính quyết định giá trị được công nhận và tự xử lý tài sản theo hợp đồng.</Disclaimer>
+      </section>
+
+      <section className="card stack">
+        <h2 className="ct">Báo cáo tài chính (VND)</h2>
+        <div className="tw"><table>
+          <thead><tr><th>Năm</th><th className="r">Doanh thu</th><th className="r">Lợi nhuận</th><th className="r">Tổng tài sản</th><th className="r">Vốn chủ</th><th>Nguồn</th><th>Trạng thái</th></tr></thead>
+          <tbody>
+            {(profile?.financials ?? []).map((f) => <tr key={f.year}><td className="num strong">{f.year}</td><td className="r num">{vnd(f.revenue)}</td><td className="r num">{vnd(f.netProfit)}</td><td className="r num">{vnd(f.totalAssets)}</td><td className="r num">{vnd(f.equity)}</td><td>{f.source}</td><td><span className="chip c-neu">{{ self_declared: "Tự khai", extracted: "AI trích xuất", verified: "Đã xác minh", public_reference: "Công bố tham khảo" }[f.status] ?? f.status}</span></td></tr>)}
+            {!profile?.financials.length && <tr><td colSpan={7} className="empty">Chưa có BCTC. Khai ít nhất 2 năm để chấm 5C đầy đủ hơn.</td></tr>}
+          </tbody></table></div>
+        <div className="grid-fields">
+          <label className="field"><span>Năm</span><input className="input num" inputMode="numeric" value={fy.year ?? ""} onChange={(e) => setFy({ ...fy, year: e.target.value.replace(/\D/g, "") })} /></label>
+          {FY_FIELDS.map(([k, label]) => <label key={k} className="field"><span>{label}</span><input className="input num" inputMode="numeric" value={fy[k] ?? ""} onChange={(e) => setFy({ ...fy, [k]: e.target.value.replace(/[^\d-]/g, "") })} /></label>)}
+        </div>
+        <button className="btn bp" style={{ alignSelf: "flex-start" }} disabled={busy || !fy.year || !fy.revenue} onClick={() => run(async () => {
+          const o = Object.fromEntries(FY_FIELDS.map(([k]) => [k, Number(fy[k] ?? 0)]));
+          await act("POST", `/v1/organizations/${org.id}/financial-years`, { year: Number(fy.year), ...o, source: "Doanh nghiệp tự khai", status: "self_declared" });
+        }, "Đã lưu BCTC (tự khai, chưa xác minh)")}>Lưu BCTC</button>
+      </section>
+
+      <section className="card stack">
+        <h2 className="ct">Tín dụng, thuế, pháp lý & nhu cầu vốn</h2>
+        <div className="muted">Báo cáo CIC do doanh nghiệp tự tra cứu và khai; FCC không truy cập CIC thay doanh nghiệp.</div>
+        <div className="grid-fields">
+          <label className="field"><span>Nhóm nợ CIC xấu nhất (1–5)</span><input className="input num" inputMode="numeric" value={misc.cicGroup} onChange={(e) => setMisc({ ...misc, cicGroup: e.target.value.replace(/\D/g, "") })} /></label>
+          <label className="field"><span>Số ngày trễ tối đa (CIC)</span><input className="input num" inputMode="numeric" value={misc.cicLate} onChange={(e) => setMisc({ ...misc, cicLate: e.target.value.replace(/\D/g, "") })} /></label>
+          <label className="field"><span>Tình trạng thuế</span><select className="select" value={misc.taxStatus} onChange={(e) => setMisc({ ...misc, taxStatus: e.target.value as typeof misc.taxStatus })}><option value="">Chưa khai</option><option value="active">Đang hoạt động, nộp đủ</option><option value="deferred">Có khoản nộp chậm/gia hạn</option><option value="enforced">Bị cưỡng chế</option><option value="ceased">Ngừng hoạt động</option></select></label>
+          <label className="field"><span>Sự kiện pháp lý</span><select className="select" value={misc.legalEvents} onChange={(e) => setMisc({ ...misc, legalEvents: e.target.value as typeof misc.legalEvents })}><option value="">Chưa khai</option><option value="none">Không có</option><option value="minor_resolved">Nhỏ, đã giải quyết</option><option value="major">Nghiêm trọng</option></select></label>
+          <label className="field"><span>Nhu cầu vốn (đ)</span><input className="input num" inputMode="numeric" value={misc.capitalNeed} onChange={(e) => setMisc({ ...misc, capitalNeed: e.target.value.replace(/\D/g, "") })} /></label>
+        </div>
+        <button className="btn bp" style={{ alignSelf: "flex-start" }} disabled={busy} onClick={() => run(() => {
+          const patch: Partial<CreditProfile> = {};
+          if (misc.cicGroup) patch.cic = { worstDebtGroup: Number(misc.cicGroup) as 1 | 2 | 3 | 4 | 5, maxLateDays: Number(misc.cicLate || 0), months: 24, source: "Doanh nghiệp tự khai" };
+          if (misc.taxStatus) patch.taxStatus = misc.taxStatus as CreditProfile["taxStatus"];
+          if (misc.legalEvents) patch.legalEvents = misc.legalEvents as CreditProfile["legalEvents"];
+          if (misc.capitalNeed) patch.capitalNeed = Number(misc.capitalNeed);
+          return act("POST", `/v1/organizations/${org.id}/credit-profile`, patch);
+        }, "Đã lưu")}>Lưu</button>
+      </section>
+    </>
   );
 }
