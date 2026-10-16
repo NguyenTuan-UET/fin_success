@@ -5,4 +5,4 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 [ -f .env.production ] || { echo "Thiếu server/.env.production (mẫu: .env.production.example)"; exit 1; }
-exec npx tsx --env-file=.env.production src/index.ts
+exec npx tsx --env-file-if-exists=.env --env-file=.env.production src/index.ts # .env (khóa AI) nạp trước, .env.production ghi đè
