@@ -44,13 +44,46 @@ export interface ScoreResult {
 
 export const RATING_ORDER: Rating[] = ['CCC', 'B', 'BB', 'BBB', 'A', 'AA', 'AAA']
 
+/**
+ * Tham số của bộ chấm điểm (scorecard_versions). Mặc định là giá trị khởi tạo; phiên bản mới do model owner đề xuất
+ * và được hai người duyệt, rồi máy chủ chạy bộ chấm điểm trong `withScorecard` để áp dụng.
+ */
+export interface ScorecardParams {
+  /** Ngưỡng điểm tối thiểu của AAA, AA, A, BBB, BB, B (dưới B là CCC) */
+  ratingCutoffs: [number, number, number, number, number, number]
+  /** Trung vị biên lợi nhuận ròng theo nhóm ngành */
+  industryMargin: Record<IndustryGroup, number>
+  /** Ghi đè mức rủi ro ngành theo VSIC cấp 2 */
+  industryRisk: Record<string, 'low' | 'medium' | 'high'>
+}
+
+export const DEFAULT_SCORECARD: ScorecardParams = {
+  ratingCutoffs: [90, 80, 70, 60, 50, 40],
+  industryMargin: { manufacturing: 0.045, trade: 0.025, agri: 0.04, tech: 0.08 },
+  industryRisk: {},
+}
+
+let active: ScorecardParams = DEFAULT_SCORECARD
+
+/** Chạy một phép tính điểm với bộ tham số cho trước (đồng bộ; khôi phục tham số cũ khi xong). */
+export function withScorecard<T>(params: ScorecardParams, fn: () => T): T {
+  const prev = active
+  active = params
+  try {
+    return fn()
+  } finally {
+    active = prev
+  }
+}
+
 export function toRating(score: number): Rating {
-  if (score >= 90) return 'AAA'
-  if (score >= 80) return 'AA'
-  if (score >= 70) return 'A'
-  if (score >= 60) return 'BBB'
-  if (score >= 50) return 'BB'
-  if (score >= 40) return 'B'
+  const [aaa, aa, a, bbb, bb, b] = active.ratingCutoffs
+  if (score >= aaa) return 'AAA'
+  if (score >= aa) return 'AA'
+  if (score >= a) return 'A'
+  if (score >= bbb) return 'BBB'
+  if (score >= bb) return 'BB'
+  if (score >= b) return 'B'
   return 'CCC'
 }
 
@@ -85,8 +118,6 @@ export const INDUSTRY_RISK: Record<string, { label: string; risk: 'low' | 'mediu
   '23': { label: 'Sản xuất sản phẩm từ khoáng phi kim loại', risk: 'medium' },
 }
 
-/** Trung vị biên lợi nhuận ròng theo nhóm ngành (giá trị khởi tạo, cần hiệu chỉnh). */
-const INDUSTRY_MARGIN: Record<IndustryGroup, number> = { manufacturing: 0.045, trade: 0.025, agri: 0.04, tech: 0.08 }
 
 function lastTwo(f: FinancialYear[]) {
   const s = [...f].sort((a, b) => b.year - a.year)
@@ -219,7 +250,7 @@ export function scoreSupplier(ctx: SupplierContext, now = new Date()): ScoreResu
 
   if (cur) {
     const m = cur.netProfit / cur.revenue
-    const med = INDUSTRY_MARGIN[org.industryGroup]
+    const med = active.industryMargin[org.industryGroup]
     const pts = m < 0 ? 0 : m >= med * 1.15 ? 100 : m >= med * 0.85 ? 60 : 30
     add({ code: 'P4', name: 'Biên lợi nhuận ròng', component: 'capacity', raw: `${pct(m)} (trung vị ngành ${pct(med)})`, points: pts, source: cur.source, reason: pts >= 60 ? 'Biên lợi nhuận ngang/hơn ngành' : 'Biên lợi nhuận thấp hơn ngành' })
   } else add({ code: 'P4', name: 'Biên lợi nhuận ròng', component: 'capacity', raw: 'Thiếu BCTC', points: null, source: '—', reason: 'Thiếu KQKD' })
@@ -270,7 +301,9 @@ export function scoreSupplier(ctx: SupplierContext, now = new Date()): ScoreResu
   } else add({ code: 'B3', name: 'Hợp đồng khung', component: 'collateral', raw: 'Chưa tải hợp đồng', points: null, source: '—', reason: 'Thiếu hợp đồng khung' })
 
   // ---- Conditions 15% ----
-  const ir = INDUSTRY_RISK[org.vsic.slice(0, 2)]
+  const ir0 = INDUSTRY_RISK[org.vsic.slice(0, 2)]
+  const override = active.industryRisk[org.vsic.slice(0, 2)]
+  const ir = ir0 && override ? { ...ir0, risk: override } : ir0
   if (ir) add({ code: 'D1', name: 'Rủi ro ngành', component: 'conditions', raw: `${ir.label} — rủi ro ${{ low: 'thấp', medium: 'trung bình', high: 'cao' }[ir.risk]}`, points: { low: 100, medium: 60, high: 30 }[ir.risk], source: 'Bảng xếp hạng ngành nội bộ (VSIC)', reason: ir.risk === 'high' ? 'Ngành chu kỳ thanh toán dài, rủi ro cao' : 'Rủi ro ngành chấp nhận được' })
   else add({ code: 'D1', name: 'Rủi ro ngành', component: 'conditions', raw: `VSIC ${org.vsic} chưa có trong bảng`, points: null, source: '—', reason: 'Chưa xếp hạng ngành' })
 

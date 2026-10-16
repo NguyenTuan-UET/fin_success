@@ -10,6 +10,7 @@ import { authRoutes } from './routes/auth'
 import { orgRoutes } from './routes/org'
 import { businessRoutes } from './routes/business'
 import { v1Routes } from './routes/v1'
+import { ensureDefaultScorecard } from './assessments'
 import { deliverWebhooks } from './integrations/partner'
 
 export interface AppOptions {
@@ -76,6 +77,7 @@ export async function buildApp(opt: AppOptions): Promise<FccApp> {
     return reply.code(500).send({ error: 'Lỗi máy chủ', requestId: req.id })
   })
 
+  await ensureDefaultScorecard(db)
   const { openSession } = authRoutes(app, core)
   orgRoutes(app, core, openSession)
   businessRoutes(app, core, { ollamaKey: opt.ollamaKey, ollamaBase: opt.ollamaBase })

@@ -120,8 +120,17 @@ export function createCore(db: Database, files: ObjectStore, dataKey: Buffer, in
   })
   const snapshot = (a: Authed) => ({ version, me: me(a), state: viewFor(state, a.activeOrgId, clock()) })
 
+  /** Ghi một sự kiện nhật ký (cho các thao tác ngoài hành động nghiệp vụ, ví dụ chấm điểm, phiên bản bộ chấm điểm). */
+  function audit(orgId: string, userId: string | undefined, action: string, entity: string, detail: string, correlationId?: string) {
+    return serial(async () => {
+      const draft: State = { ...state }
+      draft.audit = [{ id: uid('EV'), at: clock().toISOString(), actorOrgId: orgId, actorUserId: userId, action, entity, detail, correlationId }, ...draft.audit]
+      await commit(draft)
+    })
+  }
+
   return {
-    db, files, dataKey, opt, clock, serial, commit, mutate, auth, authByHash, authorize, requireStepUp, snapshot, me,
+    audit, db, files, dataKey, opt, clock, serial, commit, mutate, auth, authByHash, authorize, requireStepUp, snapshot, me,
     getState: () => state,
     version: () => version,
     onChange: (l: (v: number) => void) => (listeners.add(l), () => listeners.delete(l)),

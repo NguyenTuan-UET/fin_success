@@ -13,6 +13,9 @@ import { enqueueEvents, newIntegrationKey, partnerAuth, SCOPES, verifySignature,
 import { isAdminRole } from '../auth/roles'
 import type { State } from '../state'
 import { provisionSimBanks } from '../sim/provision'
+import { assertCanAssess, assess, canSeeAssessment, OFFICIAL_VALID_DAYS, shape, type Kind } from '../assessments'
+import { DEFAULT_SCORECARD, type ScorecardParams } from '@fcc/domain/credit'
+import { uid } from '../core'
 
 type Json = Record<string, unknown>
 interface Src {
@@ -163,6 +166,121 @@ export const ENDPOINTS: Endpoint[] = [
       const e = esgOf(st, id)
       return { credit, esg: e ? { score: e.result.score, level: e.result.level, coverage: e.result.coverage, status: e.assessment.status } : null, note: 'Xếp hạng tham khảo FCC — không phải quyết định tín dụng' }
     } },
+  // ---- chấm điểm tín dụng tham khảo (chạy ở máy chủ, lưu bất biến) ----
+  { method: 'POST', path: '/v1/organizations/{id}/credit-assessments', tag: 'Chấm điểm', summary: 'Chấm điểm nhà cung cấp/bên mua (5C hoặc bên mua). Cùng đầu vào + phiên bản trả lại bản ghi cũ (cùng input_hash); khác thì tạo bản ghi mới', auth: 'user',
+    run: async (s, core) => {
+      const id = P(s, 'id')
+      const o = orgOf(core, id)
+      if (!o || !['supplier', 'buyer'].includes(o.type)) throw notFound('Chỉ chấm điểm nhà cung cấp hoặc bên mua')
+      assertCanAssess(core, s.a!.activeOrgId, o.type as Kind, id, s.a!.role)
+      const { row, reused } = await assess(core, o.type as Kind, id, s.a!.id)
+      if (!reused) await core.audit(s.a!.activeOrgId, s.a!.id, 'Chấm điểm tín dụng tham khảo', row.id, `${o.shortName}: ${row.rating} ${Math.round(Number(row.score))} (bao phủ ${Math.round(Number(row.coverage) * 100)}%)`, s.req.id)
+      return { ...shape(row), reused }
+    } },
+  { method: 'POST', path: '/v1/receivables/{id}/application-assessments', tag: 'Chấm điểm', summary: 'Chấm điểm hồ sơ tài trợ của khoản phải thu (chỉ khi bên mua đã xác nhận)', auth: 'user',
+    run: async (s, core) => {
+      const r = core.getState().receivables.find((x) => x.id === P(s, 'id'))
+      if (!r || r.sellerId !== s.a!.activeOrgId) throw notFound('Không tìm thấy khoản phải thu')
+      if (!['BUYER_CONFIRMED', 'SUBMITTED', 'UNDER_REVIEW', 'OFFERED', 'ACCEPTED', 'FUNDED', 'SETTLED'].includes(r.state)) throw new HttpError(409, 'Chỉ chấm điểm hồ sơ khi bên mua đã xác nhận')
+      const { row, reused } = await assess(core, 'application', r.id, s.a!.id)
+      if (!reused) await core.audit(s.a!.activeOrgId, s.a!.id, 'Chấm điểm hồ sơ tài trợ', row.id, `${r.code}: ${row.rating}`, s.req.id)
+      return { ...shape(row), reused }
+    } },
+  { method: 'GET', path: '/v1/organizations/{id}/credit-assessments', tag: 'Chấm điểm', summary: 'Các kết quả chấm điểm của tổ chức (theo quyền chia sẻ)', auth: 'user',
+    run: async (s, core) => {
+      const id = P(s, 'id')
+      const o = orgOf(core, id)
+      if (!o) throw notFound('Không tìm thấy tổ chức')
+      const rows = (await core.db.assessmentsOf(o.type === 'buyer' ? 'buyer' : 'supplier', id)).filter((r) => canSeeAssessment(core, s.a!.activeOrgId, r))
+      return rows.map((r) => ({ ...shape(r), result: undefined }))
+    } },
+  { method: 'GET', path: '/v1/credit-assessments/{id}', tag: 'Chấm điểm', summary: 'Chi tiết một kết quả chấm điểm: thành phần, yếu tố, lý do, phiên bản bộ chấm điểm', auth: 'user',
+    run: async (s, core) => {
+      const r = await core.db.assessment(P(s, 'id'))
+      if (!r || !canSeeAssessment(core, s.a!.activeOrgId, r)) throw notFound('Không tìm thấy kết quả chấm điểm')
+      return shape(r)
+    } },
+  { method: 'POST', path: '/v1/credit-assessments/{id}/issue', tag: 'Vận hành FCC', summary: 'Thẩm định viên FCC phát hành điểm chính thức (cần MFA; chỉ khi độ bao phủ đạt ngưỡng; không sửa sau phát hành)', auth: 'user',
+    run: async (s, core) => {
+      if (orgOf(core, s.a!.activeOrgId)?.type !== 'fcc' || !['fcc_admin', 'fcc_reviewer'].includes(s.a!.role)) throw forbidden('Chỉ thẩm định viên FCC')
+      core.requireStepUp(s.a!)
+      const r = await core.db.assessment(P(s, 'id'))
+      if (!r) throw notFound('Không tìm thấy kết quả chấm điểm')
+      if (r.status !== 'provisional') throw new HttpError(409, 'Chỉ phát hành bản tạm tính mới nhất')
+      if (!(r.result as { official?: boolean }).official) throw new HttpError(422, `Độ bao phủ ${Math.round(Number(r.coverage) * 100)}% hoặc thiếu dữ liệu bắt buộc — chưa phát hành điểm chính thức`)
+      if (!(await core.db.issueAssessment(r.id, s.a!.id, new Date(core.clock().getTime() + OFFICIAL_VALID_DAYS * 86_400_000)))) throw new HttpError(409, 'Kết quả đã được phát hành hoặc bị thay thế')
+      await core.audit(s.a!.activeOrgId, s.a!.id, 'Phát hành điểm tín dụng chính thức', r.id, `${r.rating} · hiệu lực ${OFFICIAL_VALID_DAYS} ngày`, s.req.id)
+      return shape(await core.db.assessment(r.id))
+    } },
+  { method: 'POST', path: '/v1/credit-assessments/{id}/appeals', tag: 'Chấm điểm', summary: 'Doanh nghiệp yêu cầu xem xét lại kết quả (kèm lý do và bằng chứng)', auth: 'user', body: { reason: 'string', evidenceKeys: 'string[] (khóa tệp)' },
+    run: async (s, core) => {
+      const r = await core.db.assessment(P(s, 'id'))
+      if (!r || r.org_id !== s.a!.activeOrgId) throw notFound('Không tìm thấy kết quả chấm điểm của tổ chức bạn')
+      const reason = String(B(s).reason ?? '').trim()
+      if (reason.length < 10) throw bad('Nêu rõ lý do (tối thiểu 10 ký tự)')
+      const keys = Array.isArray(B(s).evidenceKeys) ? (B(s).evidenceKeys as string[]) : []
+      for (const k of keys) if (typeof k !== 'string' || !(await core.db.fileOf(k, s.a!.activeOrgId))) throw bad('Bằng chứng chưa được tải lên bởi tổ chức này')
+      const id = uid('AP')
+      await core.db.createAppeal({ id, assessmentId: r.id, orgId: r.org_id, reason: reason.slice(0, 2000), evidenceKeys: keys, createdBy: s.a!.id })
+      await core.audit(s.a!.activeOrgId, s.a!.id, 'Yêu cầu xem xét lại điểm tín dụng', r.id, reason.slice(0, 200), s.req.id)
+      return { id, status: 'open' }
+    } },
+  { method: 'GET', path: '/v1/credit-assessments', tag: 'Vận hành FCC', summary: 'Kết quả tạm tính đủ điều kiện chờ phát hành chính thức (FCC)', auth: 'user',
+    run: async (s, core) => {
+      if (orgOf(core, s.a!.activeOrgId)?.type !== 'fcc') throw forbidden('Chỉ nhân sự FCC')
+      return (await core.db.assessmentsAwaitingIssue()).map((r) => ({ ...shape(r), result: undefined }))
+    } },
+  { method: 'GET', path: '/v1/appeals', tag: 'Chấm điểm', summary: 'Yêu cầu xem xét lại (doanh nghiệp: của mình; FCC: toàn bộ, lọc ?status=)', auth: 'user',
+    run: async (s, core) => core.db.appeals({ orgId: orgOf(core, s.a!.activeOrgId)?.type === 'fcc' ? undefined : s.a!.activeOrgId, status: s.query.status }) },
+  { method: 'POST', path: '/v1/appeals/{id}/resolve', tag: 'Vận hành FCC', summary: 'FCC xử lý yêu cầu xem xét lại: upheld (chấp nhận → chấm lại bằng dữ liệu hiện tại) hoặc rejected, có ghi chú', auth: 'user', body: { outcome: 'upheld|rejected', note: 'string' },
+    run: async (s, core) => {
+      if (orgOf(core, s.a!.activeOrgId)?.type !== 'fcc' || !['fcc_admin', 'fcc_reviewer'].includes(s.a!.role)) throw forbidden('Chỉ thẩm định viên FCC')
+      const ap = await core.db.appeal(P(s, 'id'))
+      if (!ap) throw notFound('Không tìm thấy yêu cầu')
+      const outcome = B(s).outcome
+      const note = String(B(s).note ?? '').trim()
+      if (!['upheld', 'rejected'].includes(String(outcome)) || !note) throw bad('Cần kết quả (upheld|rejected) và ghi chú')
+      const a = await core.db.assessment(ap.assessmentId)
+      let newId: string | undefined
+      if (outcome === 'upheld') newId = (await assess(core, a.kind as Kind, a.subject_id, s.a!.id)).row.id
+      if (!(await core.db.resolveAppeal(ap.id, { status: outcome as 'upheld' | 'rejected', note, by: s.a!.id, newAssessmentId: newId }))) throw new HttpError(409, 'Yêu cầu đã được xử lý')
+      await core.audit(s.a!.activeOrgId, s.a!.id, 'Xử lý yêu cầu xem xét lại điểm', ap.id, `${outcome}: ${note}`, s.req.id)
+      return { id: ap.id, status: outcome, newAssessmentId: newId }
+    } },
+  { method: 'GET', path: '/v1/operations/scorecard-versions', tag: 'Vận hành FCC', summary: 'Các phiên bản bộ chấm điểm và trạng thái duyệt', auth: 'user',
+    run: async (s, core) => {
+      if (orgOf(core, s.a!.activeOrgId)?.type !== 'fcc') throw forbidden('Chỉ nhân sự FCC')
+      return { default: DEFAULT_SCORECARD, versions: await core.db.scorecardVersions() }
+    } },
+  { method: 'POST', path: '/v1/operations/scorecard-versions', tag: 'Vận hành FCC', summary: 'Chủ mô hình đề xuất phiên bản mới (tham số). Có hiệu lực sau khi hai người khác duyệt; không sửa kết quả đã phát hành', auth: 'user', body: { name: 'string', params: 'ScorecardParams' },
+    run: async (s, core) => {
+      if (!['fcc_admin', 'fcc_model_owner'].includes(s.a!.role)) throw forbidden('Chỉ chủ mô hình hoặc quản trị FCC')
+      core.requireStepUp(s.a!)
+      const p = B(s).params as ScorecardParams | undefined
+      const cut = p?.ratingCutoffs
+      if (!Array.isArray(cut) || cut.length !== 6 || cut.some((x, i) => typeof x !== 'number' || (i > 0 && x >= cut[i - 1]))) throw bad('ratingCutoffs phải gồm 6 ngưỡng giảm dần')
+      if (!p?.industryMargin || !['manufacturing', 'trade', 'agri', 'tech'].every((k) => typeof p.industryMargin[k as 'trade'] === 'number')) throw bad('industryMargin cần đủ 4 nhóm ngành')
+      const id = uid('sc')
+      await core.db.createScorecard({ id, name: String(B(s).name ?? 'Phiên bản mới').slice(0, 120), params: { ratingCutoffs: cut, industryMargin: p.industryMargin, industryRisk: p.industryRisk ?? {} }, proposedBy: s.a!.id })
+      await core.audit(s.a!.activeOrgId, s.a!.id, 'Đề xuất phiên bản bộ chấm điểm', id, String(B(s).name ?? ''), s.req.id)
+      return { id, status: 'proposed', needs: 'hai người khác duyệt' }
+    } },
+  { method: 'POST', path: '/v1/operations/scorecard-versions/{id}/approve', tag: 'Vận hành FCC', summary: 'Duyệt một phiên bản bộ chấm điểm (hai người duyệt khác nhau, khác người đề xuất, mới có hiệu lực)', auth: 'user',
+    run: async (s, core) => {
+      if (!['fcc_admin', 'fcc_model_owner'].includes(s.a!.role)) throw forbidden('Chỉ chủ mô hình hoặc quản trị FCC')
+      core.requireStepUp(s.a!)
+      try {
+        const r = await core.db.approveScorecard(P(s, 'id'), s.a!.id)
+        await core.audit(s.a!.activeOrgId, s.a!.id, r.active ? 'Kích hoạt phiên bản bộ chấm điểm' : 'Duyệt phiên bản bộ chấm điểm', P(s, 'id'), `${r.approvals.length}/2 người duyệt`, s.req.id)
+        return r
+      } catch (e) {
+        const code = (e as { code?: string }).code
+        if (code === 'NOT_FOUND') throw notFound((e as Error).message)
+        if (code) throw new HttpError(409, (e as Error).message)
+        throw e
+      }
+    } },
+
   { method: 'POST', path: '/v1/organizations/{id}/financial-years', tag: 'Chấm điểm', summary: 'Khai/cập nhật BCTC một năm', auth: 'user', action: 'upsertFinancialYear', args: (s) => [P(s, 'id'), B(s)] },
   { method: 'POST', path: '/v1/organizations/{id}/credit-profile', tag: 'Chấm điểm', summary: 'Cập nhật dữ liệu hồ sơ tín dụng', auth: 'user', action: 'updateProfile', args: (s) => [P(s, 'id'), B(s)] },
   { method: 'POST', path: '/v1/listed/{symbol}/refresh', tag: 'Chấm điểm', summary: 'Nạp dữ liệu niêm yết của mã đã khai', auth: 'user', action: 'refreshListed', args: (s) => [P(s, 'symbol')] },

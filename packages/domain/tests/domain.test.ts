@@ -68,3 +68,24 @@ describe('Xếp hạng', () => {
     expect(toRating(39)).toBe('CCC')
   })
 })
+
+import { DEFAULT_SCORECARD, scoreSupplier, withScorecard } from '../src/credit'
+import type { CreditProfile, Org } from '../src/types'
+
+describe('tham số bộ chấm điểm (scorecard_versions)', () => {
+  const org: Org = { id: 's', name: 's', shortName: 's', taxCode: '1', type: 'supplier', vsic: '2592', industryLabel: 'x', industryGroup: 'manufacturing', foundedYear: 2012, employees: 50, province: 'HN', createdAt: '2026-01-01' }
+  const fy = (year: number, netProfit: number) => ({ year, revenue: 10_000_000_000, netProfit, ebit: 900_000_000, interestExpense: 100_000_000, depreciation: 200_000_000, totalAssets: 8e9, currentAssets: 5e9, currentLiabilities: 3e9, totalLiabilities: 4e9, equity: 4e9, operatingCashFlow: 600_000_000, debtService: 500_000_000, cash: 1e9, inventory: 1e9, receivables: 2e9, source: 'x', status: 'self_declared' as const })
+  const profile: CreditProfile = { orgId: 's', financials: [fy(2025, 450_000_000), fy(2024, 400_000_000)], collateral: [] }
+  const run = () => scoreSupplier({ org, profile, now: new Date('2026-10-16') } as never)
+
+  it('mặc định không đổi kết quả; đổi trung vị biên lợi nhuận hoặc ngưỡng hạng thì kết quả đổi, và khôi phục sau khi chạy', () => {
+    const base = run()
+    expect(withScorecard(DEFAULT_SCORECARD, run).score).toBe(base.score)
+    const strict = withScorecard({ ...DEFAULT_SCORECARD, industryMargin: { ...DEFAULT_SCORECARD.industryMargin, manufacturing: 0.2 } }, run)
+    expect(strict.score).toBeLessThan(base.score) // biên 4,5% thấp hơn nhiều so với trung vị 20%
+    const cut = withScorecard({ ...DEFAULT_SCORECARD, ratingCutoffs: [99, 98, 97, 96, 95, 94] }, run)
+    expect(cut.score).toBe(base.score)
+    expect(cut.rating).toBe('CCC')
+    expect(run().rating).toBe(base.rating) // tham số cũ được khôi phục
+  })
+})

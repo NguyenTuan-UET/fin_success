@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Check, Minus } from "lucide-react";
 import { api } from "@/lib/api";
 import { date, dateTime } from "@/lib/format";
@@ -42,6 +42,19 @@ export default function AdminPage() {
     setBusy(false);
   };
 
+  type Row = { id: string; status: string; kind: string; orgId: string; rating: string; score: number; coverage: number };
+  type Ver = { id: string; name: string; status: string; proposedBy: string; approvals: string[]; params: { ratingCutoffs: number[] } };
+  type Appeal = { id: string; assessmentId: string; orgId: string; reason: string; status: string };
+  const [toIssue, setToIssue] = useState<Row[]>([]);
+  const [appeals, setAppeals] = useState<Appeal[]>([]);
+  const [versions, setVersions] = useState<Ver[]>([]);
+  const loadScoring = useCallback(async () => {
+    setToIssue(await api<Row[]>("GET", "/v1/credit-assessments").catch(() => []));
+    setAppeals(await api<Appeal[]>("GET", "/v1/appeals?status=open").catch(() => []));
+    setVersions((await api<{ versions: Ver[] }>("GET", "/v1/operations/scorecard-versions").catch(() => ({ versions: [] }))).versions);
+  }, []);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { void loadScoring(); }, [loadScoring]);
   const orgs = data.orgs.filter((o) => o.type !== "fcc");
   const lendersPending = data.orgs.filter((o) => o.type === "lender" && !o.verified);
   const kycPending = data.orgs.filter((o) => o.kyc?.status === "pending");
@@ -98,6 +111,21 @@ export default function AdminPage() {
             ))}
           </div>
         ))}
+      </section>
+
+      <section className="card flush">
+        <div className="ch"><h2 className="ct">Chấm điểm tín dụng</h2><span className="muted">Phát hành điểm chính thức, xem xét lại, phiên bản bộ chấm điểm</span></div>
+        <div className="stack-sm" style={{ padding: "0 16px 12px" }}>
+          <strong style={{ fontSize: 13 }}>Chờ phát hành chính thức ({toIssue.length})</strong>
+          {toIssue.length === 0 && <span className="muted">Không có kết quả đủ điều kiện (cần độ bao phủ đạt ngưỡng).</span>}
+          {toIssue.map((a) => <div key={a.id} className="between soft"><span>{data.orgs.find((o) => o.id === a.orgId)?.shortName} · {a.kind} · {a.rating} {Math.round(a.score)} · bao phủ {Math.round(a.coverage * 100)}%</span><button className="btn bp sm" disabled={busy} onClick={() => run(async () => { await act("POST", `/v1/credit-assessments/${a.id}/issue`); await loadScoring(); }, "Đã phát hành điểm chính thức")}>Phát hành (MFA)</button></div>)}
+          <strong style={{ fontSize: 13 }}>Yêu cầu xem xét lại ({appeals.length})</strong>
+          {appeals.map((a) => <div key={a.id} className="between soft"><span><strong>{data.orgs.find((o) => o.id === a.orgId)?.shortName}</strong>: {a.reason}</span><span className="row" style={{ gap: 6 }}>
+            <button className="btn bp sm" disabled={busy} onClick={() => { const note = prompt("Ghi chú (chấp nhận → chấm lại bằng dữ liệu hiện tại)"); if (note) void run(async () => { await act("POST", `/v1/appeals/${a.id}/resolve`, { outcome: "upheld", note }); await loadScoring(); }, "Đã chấp nhận và chấm lại"); }}>Chấp nhận</button>
+            <button className="btn bs sm" disabled={busy} onClick={() => { const note = prompt("Lý do từ chối"); if (note) void run(async () => { await act("POST", `/v1/appeals/${a.id}/resolve`, { outcome: "rejected", note }); await loadScoring(); }, "Đã từ chối"); }}>Từ chối</button></span></div>)}
+          <strong style={{ fontSize: 13 }}>Phiên bản bộ chấm điểm</strong>
+          {versions.map((v) => <div key={v.id} className="between soft"><span><strong>{v.name}</strong> <span className="muted">· ngưỡng {v.params.ratingCutoffs.join("/")}</span></span><span className="row" style={{ gap: 6 }}><span className={`chip ${v.status === "active" ? "c-ok" : v.status === "proposed" ? "c-warn" : "c-neu"}`}>{{ active: "Đang dùng", proposed: `Chờ duyệt ${v.approvals.length}/2`, retired: "Đã thay" }[v.status]}</span>{v.status === "proposed" && <button className="btn bs sm" disabled={busy} onClick={() => run(async () => { await act("POST", `/v1/operations/scorecard-versions/${v.id}/approve`); await loadScoring(); }, "Đã duyệt")}>Duyệt (MFA)</button>}</span></div>)}
+        </div>
       </section>
 
       <section className="card flush">

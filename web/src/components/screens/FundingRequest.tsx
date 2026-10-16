@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Trash2 } from "lucide-react";
 import { classifyFunding, COLLATERAL_HAIRCUT, preliminaryValue, totalPreliminaryValue } from "@fcc/domain/collateral";
 import type { CollateralItem, CreditProfile, FinancialYear } from "@fcc/domain/types";
-import { dec, money, vnd } from "@/lib/format";
+import { api } from "@/lib/api";
+import { date, dec, money, vnd } from "@/lib/format";
 import { orgName, ratingTone } from "@/lib/model";
 import { useData } from "@/lib/session";
 import { useScores } from "@/lib/scores";
@@ -29,6 +30,13 @@ export function FundingRequest() {
   const [fy, setFy] = useState<Record<string, string>>({ year: String(new Date().getFullYear() - 1) });
   const [misc, setMisc] = useState({ cicGroup: String(profile?.cic?.worstDebtGroup ?? ""), cicLate: String(profile?.cic?.maxLateDays ?? ""), taxStatus: profile?.taxStatus ?? "", legalEvents: profile?.legalEvents ?? "", capitalNeed: String(profile?.capitalNeed ?? "") });
   const [busy, setBusy] = useState(false);
+
+  type Saved = { id: string; status: string; rating: string; score: number; coverage: number; inputHash: string; scorecardVersionId: string; createdAt: string; validUntil?: string };
+  const [saved, setSaved] = useState<Saved[]>([]);
+  const loadSaved = useCallback(() => api<Saved[]>("GET", `/v1/organizations/${org.id}/credit-assessments`).then(setSaved, () => undefined), [org.id]);
+   
+  useEffect(() => { void loadSaved(); }, [loadSaved]);
+  const [appealFor, setAppealFor] = useState<{ id: string; reason: string } | null>(null);
 
   const targets = data.receivables.filter((r) => r.sellerId === org.id && ["BUYER_CONFIRMED", "REJECTED"].includes(r.state));
   const [tid, setTid] = useState("");
@@ -82,6 +90,26 @@ export function FundingRequest() {
             </>
           )}
         </div>
+      </section>
+
+      <section className="card stack">
+        <div className="between"><h2 className="ct">Kết quả chấm điểm đã lưu</h2>
+          <button className="btn bp" disabled={busy} onClick={() => run(async () => { await api("POST", `/v1/organizations/${org.id}/credit-assessments`, {}); await loadSaved(); }, "Đã chấm điểm và lưu (bất biến)")}>Chấm điểm & lưu</button></div>
+        <div className="muted">Mỗi kết quả lưu kèm phiên bản bộ chấm điểm và mã băm đầu vào; cùng dữ liệu thì cho cùng kết quả. Điểm chính thức do thẩm định viên FCC phát hành khi độ bao phủ đủ.</div>
+        <div className="tw"><table>
+          <thead><tr><th>Ngày</th><th>Hạng</th><th className="r">Điểm</th><th className="r">Bao phủ</th><th>Phiên bản</th><th>Mã băm đầu vào</th><th>Trạng thái</th><th></th></tr></thead>
+          <tbody>
+            {saved.map((a) => <tr key={a.id}><td className="num">{date(a.createdAt)}</td><td><span className={`chip ${ratingTone(a.rating)}`}>{a.rating}</span></td><td className="r num">{dec(a.score, 0)}</td><td className="r num">{Math.round(a.coverage * 100)}%</td><td className="num">{a.scorecardVersionId}</td><td className="num muted">{a.inputHash.slice(0, 10)}…</td>
+              <td><span className={`chip ${a.status === "official" ? "c-ok" : a.status === "superseded" ? "c-neu" : "c-warn"}`}>{{ official: `Chính thức · đến ${date(a.validUntil)}`, provisional: "Tạm tính", superseded: "Đã thay thế" }[a.status]}</span></td>
+              <td>{a.status !== "superseded" && <button className="btn bs sm" onClick={() => setAppealFor({ id: a.id, reason: "" })}>Yêu cầu xem xét lại</button>}</td></tr>)}
+            {saved.length === 0 && <tr><td colSpan={8} className="empty">Chưa có kết quả nào được lưu.</td></tr>}
+          </tbody></table></div>
+        {appealFor && (
+          <div className="stack-sm">
+            <label className="field"><span>Lý do yêu cầu xem xét lại (tối thiểu 10 ký tự)</span><textarea className="input" rows={2} value={appealFor.reason} onChange={(e) => setAppealFor({ ...appealFor, reason: e.target.value })} /></label>
+            <div className="row" style={{ gap: 8 }}><button className="btn bs" onClick={() => setAppealFor(null)}>Hủy</button><button className="btn bp" disabled={busy || appealFor.reason.trim().length < 10} onClick={() => run(async () => { await api("POST", `/v1/credit-assessments/${appealFor.id}/appeals`, { reason: appealFor.reason }); setAppealFor(null); }, "Đã gửi yêu cầu xem xét lại tới thẩm định viên FCC")}>Gửi</button></div>
+          </div>
+        )}
       </section>
 
       <section className="card stack">

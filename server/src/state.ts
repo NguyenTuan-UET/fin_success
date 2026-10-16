@@ -127,6 +127,38 @@ CREATE TABLE IF NOT EXISTS webhook_outbox (
 );
 CREATE INDEX IF NOT EXISTS webhook_outbox_due ON webhook_outbox (next_attempt_at) WHERE delivered_at IS NULL AND dead_at IS NULL;
 CREATE TABLE IF NOT EXISTS sse_tickets (ticket_hash text PRIMARY KEY, session_hash text NOT NULL, expires_at timestamptz NOT NULL);
+-- WP6: phiên bản bộ chấm điểm, kết quả chấm bất biến, yêu cầu xem xét lại
+CREATE TABLE IF NOT EXISTS scorecard_versions (
+  id text PRIMARY KEY, name text NOT NULL, params jsonb NOT NULL, status text NOT NULL DEFAULT 'proposed' CHECK (status IN ('proposed', 'active', 'retired')),
+  proposed_by text NOT NULL, approvals text[] NOT NULL DEFAULT '{}', effective_from timestamptz, created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS credit_assessments (
+  id text PRIMARY KEY, kind text NOT NULL, subject_id text NOT NULL, org_id text NOT NULL, scorecard_version_id text NOT NULL REFERENCES scorecard_versions(id),
+  input_hash text NOT NULL, score numeric NOT NULL, rating text NOT NULL, coverage numeric NOT NULL, flags jsonb NOT NULL, result jsonb NOT NULL,
+  status text NOT NULL DEFAULT 'provisional' CHECK (status IN ('provisional', 'official', 'superseded')),
+  requested_by text NOT NULL, created_at timestamptz NOT NULL DEFAULT now(), issued_by text, issued_at timestamptz, valid_until timestamptz
+);
+CREATE INDEX IF NOT EXISTS credit_assessments_subject ON credit_assessments (kind, subject_id, created_at DESC);
+CREATE OR REPLACE FUNCTION credit_assessments_immutable() RETURNS trigger LANGUAGE plpgsql AS $f$
+BEGIN
+  IF TG_OP = 'DELETE' THEN RAISE EXCEPTION 'credit_assessments không được xóa'; END IF;
+  IF NEW.id <> OLD.id OR NEW.kind <> OLD.kind OR NEW.subject_id <> OLD.subject_id OR NEW.input_hash <> OLD.input_hash OR NEW.score <> OLD.score
+     OR NEW.rating <> OLD.rating OR NEW.coverage <> OLD.coverage OR NEW.result::text <> OLD.result::text OR NEW.flags::text <> OLD.flags::text
+     OR NEW.scorecard_version_id <> OLD.scorecard_version_id OR NEW.requested_by <> OLD.requested_by THEN
+    RAISE EXCEPTION 'Kết quả chấm điểm đã lưu là bất biến; chấm lại sẽ tạo bản ghi mới';
+  END IF;
+  IF OLD.issued_at IS NOT NULL AND (NEW.issued_at IS DISTINCT FROM OLD.issued_at OR NEW.issued_by IS DISTINCT FROM OLD.issued_by OR NEW.valid_until IS DISTINCT FROM OLD.valid_until) THEN
+    RAISE EXCEPTION 'Điểm đã phát hành không được sửa';
+  END IF;
+  RETURN NEW;
+END $f$;
+DROP TRIGGER IF EXISTS credit_assessments_guard ON credit_assessments;
+CREATE TRIGGER credit_assessments_guard BEFORE UPDATE OR DELETE ON credit_assessments FOR EACH ROW EXECUTE FUNCTION credit_assessments_immutable();
+CREATE TABLE IF NOT EXISTS credit_appeals (
+  id text PRIMARY KEY, assessment_id text NOT NULL REFERENCES credit_assessments(id), org_id text NOT NULL, reason text NOT NULL, evidence_keys text[] NOT NULL DEFAULT '{}',
+  status text NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'upheld', 'rejected')), resolution_note text, resolved_by text, resolved_at timestamptz,
+  created_by text NOT NULL, created_at timestamptz NOT NULL DEFAULT now(), new_assessment_id text
+);
 CREATE TABLE IF NOT EXISTS email_outbox (
   id bigserial PRIMARY KEY, to_email text NOT NULL, subject text NOT NULL, body text NOT NULL, kind text NOT NULL,
   dedupe_key text UNIQUE, created_at timestamptz NOT NULL DEFAULT now(), attempts int NOT NULL DEFAULT 0,
@@ -392,6 +424,81 @@ export class Database {
   async anyFile(key: string) {
     return (await this.pool.query<{ name: string; mime: string }>('SELECT name, mime FROM files WHERE key = $1 LIMIT 1', [key])).rows[0]
   }
+  // ---- chấm điểm ----
+  async scorecardVersion(id: string) {
+    return (await this.pool.query<{ id: string; name: string; params: unknown; status: string; proposedBy: string; approvals: string[] }>('SELECT id, name, params, status, proposed_by AS "proposedBy", approvals FROM scorecard_versions WHERE id = $1', [id])).rows[0]
+  }
+  async activeScorecard() {
+    return (await this.pool.query<{ id: string; name: string; params: unknown }>(`SELECT id, name, params FROM scorecard_versions WHERE status = 'active' ORDER BY effective_from DESC NULLS LAST, created_at DESC LIMIT 1`)).rows[0]
+  }
+  async scorecardVersions() {
+    return (await this.pool.query('SELECT id, name, params, status, proposed_by AS "proposedBy", approvals, effective_from AS "effectiveFrom", created_at AS "createdAt" FROM scorecard_versions ORDER BY created_at DESC')).rows
+  }
+  async createScorecard(v: { id: string; name: string; params: unknown; proposedBy: string; status?: string; approvals?: string[] }) {
+    await this.pool.query('INSERT INTO scorecard_versions (id, name, params, proposed_by, status, approvals, effective_from) VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT (id) DO NOTHING', [v.id, v.name, JSON.stringify(v.params), v.proposedBy, v.status ?? 'proposed', v.approvals ?? [], v.status === 'active' ? new Date() : null])
+  }
+  /** Thêm một người duyệt; đủ hai người duyệt khác nhau (không kể người đề xuất) thì kích hoạt và hạ phiên bản cũ. */
+  async approveScorecard(id: string, userId: string) {
+    const c = await this.pool.connect()
+    try {
+      await c.query('BEGIN')
+      const { rows } = await c.query<{ proposed_by: string; approvals: string[]; status: string }>('SELECT proposed_by, approvals, status FROM scorecard_versions WHERE id = $1 FOR UPDATE', [id])
+      const v = rows[0]
+      if (!v) throw Object.assign(new Error('Không tìm thấy phiên bản'), { code: 'NOT_FOUND' })
+      if (v.status !== 'proposed') throw Object.assign(new Error('Phiên bản không còn ở trạng thái đề xuất'), { code: 'STATE' })
+      if (v.proposed_by === userId) throw Object.assign(new Error('Người đề xuất không tự duyệt phiên bản của mình'), { code: 'SELF' })
+      if (v.approvals.includes(userId)) throw Object.assign(new Error('Bạn đã duyệt phiên bản này'), { code: 'DUP' })
+      const approvals = [...v.approvals, userId]
+      const active = approvals.length >= 2
+      if (active) await c.query(`UPDATE scorecard_versions SET status = 'retired' WHERE status = 'active'`)
+      await c.query(`UPDATE scorecard_versions SET approvals = $2, status = $3, effective_from = $4 WHERE id = $1`, [id, approvals, active ? 'active' : 'proposed', active ? new Date() : null])
+      await c.query('COMMIT')
+      return { approvals, active }
+    } catch (e) {
+      await c.query('ROLLBACK').catch(() => undefined)
+      throw e
+    } finally {
+      c.release()
+    }
+  }
+  async latestAssessment(kind: string, subjectId: string) {
+    return (await this.pool.query('SELECT * FROM credit_assessments WHERE kind = $1 AND subject_id = $2 AND status <> $3 ORDER BY created_at DESC LIMIT 1', [kind, subjectId, 'superseded'])).rows[0]
+  }
+  async assessment(id: string) {
+    return (await this.pool.query('SELECT * FROM credit_assessments WHERE id = $1', [id])).rows[0]
+  }
+  async assessmentsOf(kind: string, subjectId: string, limit = 20) {
+    return (await this.pool.query('SELECT * FROM credit_assessments WHERE kind = $1 AND subject_id = $2 ORDER BY created_at DESC LIMIT $3', [kind, subjectId, limit])).rows
+  }
+  async insertAssessment(a: { id: string; kind: string; subjectId: string; orgId: string; scorecardVersionId: string; inputHash: string; score: number; rating: string; coverage: number; flags: unknown; result: unknown; requestedBy: string }) {
+    await this.pool.query(
+      `INSERT INTO credit_assessments (id, kind, subject_id, org_id, scorecard_version_id, input_hash, score, rating, coverage, flags, result, requested_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+      [a.id, a.kind, a.subjectId, a.orgId, a.scorecardVersionId, a.inputHash, a.score, a.rating, a.coverage, JSON.stringify(a.flags), JSON.stringify(a.result), a.requestedBy],
+    )
+    // bản trước chưa phát hành bị thay thế; bản đã phát hành giữ nguyên cho tới khi hết hạn
+    await this.pool.query(`UPDATE credit_assessments SET status = 'superseded' WHERE kind = $1 AND subject_id = $2 AND id <> $3 AND status = 'provisional'`, [a.kind, a.subjectId, a.id])
+  }
+  async issueAssessment(id: string, by: string, validUntil: Date) {
+    const r = await this.pool.query(`UPDATE credit_assessments SET status = 'official', issued_by = $2, issued_at = now(), valid_until = $3 WHERE id = $1 AND issued_at IS NULL AND status = 'provisional'`, [id, by, validUntil])
+    return r.rowCount === 1
+  }
+  async assessmentsAwaitingIssue() {
+    return (await this.pool.query(`SELECT * FROM credit_assessments WHERE status = 'provisional' AND (result->>'official')::boolean ORDER BY created_at DESC LIMIT 100`)).rows
+  }
+  async createAppeal(a: { id: string; assessmentId: string; orgId: string; reason: string; evidenceKeys: string[]; createdBy: string }) {
+    await this.pool.query('INSERT INTO credit_appeals (id, assessment_id, org_id, reason, evidence_keys, created_by) VALUES ($1, $2, $3, $4, $5, $6)', [a.id, a.assessmentId, a.orgId, a.reason, a.evidenceKeys, a.createdBy])
+  }
+  async appeals(filter: { orgId?: string; status?: string }) {
+    return (await this.pool.query(`SELECT id, assessment_id AS "assessmentId", org_id AS "orgId", reason, evidence_keys AS "evidenceKeys", status, resolution_note AS "resolutionNote", created_at AS "createdAt", new_assessment_id AS "newAssessmentId" FROM credit_appeals WHERE ($1::text IS NULL OR org_id = $1) AND ($2::text IS NULL OR status = $2) ORDER BY created_at DESC`, [filter.orgId ?? null, filter.status ?? null])).rows
+  }
+  async appeal(id: string) {
+    return (await this.pool.query('SELECT id, assessment_id AS "assessmentId", org_id AS "orgId", status FROM credit_appeals WHERE id = $1', [id])).rows[0]
+  }
+  async resolveAppeal(id: string, r: { status: 'upheld' | 'rejected'; note: string; by: string; newAssessmentId?: string }) {
+    return (await this.pool.query(`UPDATE credit_appeals SET status = $2, resolution_note = $3, resolved_by = $4, resolved_at = now(), new_assessment_id = $5 WHERE id = $1 AND status = 'open'`, [id, r.status, r.note, r.by, r.newAssessmentId ?? null])).rowCount === 1
+  }
+
   // ---- tích hợp đối tác ----
   async createIntegrationKey(k: { id: string; orgId: string; name: string; scopes: string[]; keyHash: string; createdBy: string }) {
     await this.pool.query('INSERT INTO integration_keys (id, org_id, name, scopes, key_hash, created_by) VALUES ($1, $2, $3, $4, $5, $6)', [k.id, k.orgId, k.name, k.scopes, k.keyHash, k.createdBy])
