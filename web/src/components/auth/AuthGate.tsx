@@ -55,7 +55,7 @@ export function AuthGate({ role }: { role?: Role }) {
 
   return (
     <div className="auth-wrap">
-      <div className="card auth-card stack">
+      <div className={`card auth-card stack${mode === "register" ? "" : " narrow"}`}>
         <div className="row" style={{ gap: 12, alignItems: "center" }}>
           <Logo size={40} />
           <div>
@@ -106,7 +106,7 @@ function Login({ onForgot }: { onForgot: () => void }) {
     setBusy(false);
   };
   return (
-    <form onSubmit={submit} className="stack" style={{ maxWidth: 380 }}>
+    <form onSubmit={submit} className="stack" >
       {err && <div className="err">{err}</div>}
       <Field label="Email">
         <input className="input" type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} required />
@@ -144,7 +144,7 @@ function Forgot({ onBack }: { onBack: () => void }) {
     }
   };
   return (
-    <form onSubmit={submit} className="stack" style={{ maxWidth: 380 }}>
+    <form onSubmit={submit} className="stack" >
       {err && <div className="err">{err}</div>}
       {msg && <div className="okmsg">{msg}</div>}
       <Field label="Email đã đăng ký">

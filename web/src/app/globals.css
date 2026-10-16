@@ -1589,7 +1589,13 @@ input[type="range"] {
 }
 .auth-card {
   width: min(720px, 100%);
-  padding: 24px;
+  padding: 28px;
+}
+.auth-card.narrow {
+  width: min(440px, 100%);
+}
+.auth-card .tabs > .btn {
+  flex: 1;
 }
 .field {
   display: flex;

@@ -222,7 +222,7 @@ export class Database {
 
   private constructor(url: string, readonly schema: string) {
     if (!/^[a-z_][a-z0-9_]*$/.test(schema)) throw new Error(`Tên schema không hợp lệ: ${schema}`)
-    this.pool = new pg.Pool({ connectionString: url, options: `-c search_path=${schema},public`, max: 10 })
+    this.pool = new pg.Pool({ connectionString: url, options: `-c search_path=${schema},public`, max: 10, ssl: process.env.DATABASE_SSL === '1' ? { rejectUnauthorized: false } : undefined })
   }
 
   static async open(url: string, schema = 'public') {
