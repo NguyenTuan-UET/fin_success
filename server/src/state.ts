@@ -160,6 +160,28 @@ CREATE TABLE IF NOT EXISTS credit_appeals (
   status text NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'upheld', 'rejected')), resolution_note text, resolved_by text, resolved_at timestamptz,
   created_by text NOT NULL, created_at timestamptz NOT NULL DEFAULT now(), new_assessment_id text
 );
+-- WP15: biểu phí có phiên bản và phí đã phát sinh
+CREATE TABLE IF NOT EXISTS fee_schedules (
+  id text PRIMARY KEY, name text NOT NULL, params jsonb NOT NULL, effective_from timestamptz NOT NULL, created_by text NOT NULL, created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS fee_charges (
+  id text PRIMARY KEY, org_id text NOT NULL, source text NOT NULL CHECK (source IN ('transaction', 'saas', 'scoring', 'api', 'report', 'referral')),
+  amount bigint NOT NULL CHECK (amount >= 0), schedule_id text NOT NULL REFERENCES fee_schedules(id), ref text NOT NULL, description text NOT NULL,
+  period text NOT NULL, created_at timestamptz NOT NULL DEFAULT now(), paid_at timestamptz, paid_ref text,
+  UNIQUE (org_id, source, ref)
+);
+CREATE INDEX IF NOT EXISTS fee_charges_org ON fee_charges (org_id, period);
+CREATE OR REPLACE FUNCTION fee_charges_guard() RETURNS trigger LANGUAGE plpgsql AS $f$
+BEGIN
+  IF TG_OP = 'DELETE' THEN RAISE EXCEPTION 'fee_charges không được xóa'; END IF;
+  IF NEW.amount <> OLD.amount OR NEW.schedule_id <> OLD.schedule_id OR NEW.source <> OLD.source OR NEW.org_id <> OLD.org_id OR NEW.ref <> OLD.ref THEN
+    RAISE EXCEPTION 'Phí đã phát sinh không được sửa; đổi biểu phí chỉ áp dụng cho phí mới';
+  END IF;
+  RETURN NEW;
+END $f$;
+DROP TRIGGER IF EXISTS fee_charges_no_change ON fee_charges;
+CREATE TRIGGER fee_charges_no_change BEFORE UPDATE OR DELETE ON fee_charges FOR EACH ROW EXECUTE FUNCTION fee_charges_guard();
+CREATE TABLE IF NOT EXISTS api_usage (org_id text NOT NULL, period text NOT NULL, calls bigint NOT NULL DEFAULT 0, PRIMARY KEY (org_id, period));
 CREATE TABLE IF NOT EXISTS email_outbox (
   id bigserial PRIMARY KEY, to_email text NOT NULL, subject text NOT NULL, body text NOT NULL, kind text NOT NULL,
   dedupe_key text UNIQUE, created_at timestamptz NOT NULL DEFAULT now(), attempts int NOT NULL DEFAULT 0,
@@ -576,6 +598,42 @@ export class Database {
   }
   async useSseTicket(ticketHash: string) {
     return (await this.pool.query<{ sessionHash: string }>('DELETE FROM sse_tickets WHERE ticket_hash = $1 AND expires_at > now() RETURNING session_hash AS "sessionHash"', [ticketHash])).rows[0]?.sessionHash
+  }
+
+  // ---- phí và doanh thu ----
+  async activeFeeSchedule(at: Date) {
+    return (await this.pool.query<{ id: string; name: string; params: Record<string, unknown> }>('SELECT id, name, params FROM fee_schedules WHERE effective_from <= $1 ORDER BY effective_from DESC, created_at DESC LIMIT 1', [at])).rows[0]
+  }
+  async feeSchedules() {
+    return (await this.pool.query('SELECT id, name, params, effective_from AS "effectiveFrom", created_by AS "createdBy", created_at AS "createdAt" FROM fee_schedules ORDER BY effective_from DESC, created_at DESC')).rows
+  }
+  async createFeeSchedule(f: { id: string; name: string; params: unknown; effectiveFrom: Date; createdBy: string }) {
+    await this.pool.query('INSERT INTO fee_schedules (id, name, params, effective_from, created_by) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (id) DO NOTHING', [f.id, f.name, JSON.stringify(f.params), f.effectiveFrom, f.createdBy])
+  }
+  /** Ghi một khoản phí; trùng (org, nguồn, tham chiếu) thì bỏ qua — trả true nếu tạo mới. Phí 0 đồng không ghi. */
+  async addCharge(c: { id: string; orgId: string; source: string; amount: number; scheduleId: string; ref: string; description: string; period: string }) {
+    if (c.amount <= 0) return false
+    return (await this.pool.query('INSERT INTO fee_charges (id, org_id, source, amount, schedule_id, ref, description, period) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (org_id, source, ref) DO NOTHING', [c.id, c.orgId, c.source, c.amount, c.scheduleId, c.ref, c.description, c.period])).rowCount === 1
+  }
+  async chargesOf(orgId: string, period?: string) {
+    return (await this.pool.query('SELECT id, source, amount, description, period, created_at AS "createdAt", paid_at AS "paidAt", paid_ref AS "paidRef", schedule_id AS "scheduleId" FROM fee_charges WHERE org_id = $1 AND ($2::text IS NULL OR period = $2) ORDER BY created_at', [orgId, period ?? null])).rows
+  }
+  async markChargesPaid(orgId: string, period: string, ref: string) {
+    return (await this.pool.query('UPDATE fee_charges SET paid_at = now(), paid_ref = $3 WHERE org_id = $1 AND period = $2 AND paid_at IS NULL', [orgId, period, ref])).rowCount
+  }
+  async revenueBySource(from?: string, to?: string) {
+    return (await this.pool.query<{ source: string; period: string; total: string; n: string; paid: string }>(
+      `SELECT source, period, SUM(amount) AS total, COUNT(*) AS n, COALESCE(SUM(amount) FILTER (WHERE paid_at IS NOT NULL), 0) AS paid FROM fee_charges
+       WHERE ($1::text IS NULL OR period >= $1) AND ($2::text IS NULL OR period <= $2) GROUP BY source, period ORDER BY period, source`, [from ?? null, to ?? null])).rows
+  }
+  async countApiCall(orgId: string, period: string) {
+    await this.pool.query('INSERT INTO api_usage (org_id, period, calls) VALUES ($1, $2, 1) ON CONFLICT (org_id, period) DO UPDATE SET calls = api_usage.calls + 1', [orgId, period])
+  }
+  async apiUsage(orgId: string, period: string) {
+    return Number((await this.pool.query<{ calls: string }>('SELECT calls FROM api_usage WHERE org_id = $1 AND period = $2', [orgId, period])).rows[0]?.calls ?? 0)
+  }
+  async activeKeyOrgs() {
+    return (await this.pool.query<{ orgId: string; keys: string }>('SELECT org_id AS "orgId", COUNT(*) AS keys FROM integration_keys WHERE revoked_at IS NULL GROUP BY org_id')).rows
   }
 
   async emailPrefs(userId: string) {

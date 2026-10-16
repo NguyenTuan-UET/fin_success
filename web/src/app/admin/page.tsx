@@ -48,10 +48,16 @@ export default function AdminPage() {
   const [toIssue, setToIssue] = useState<Row[]>([]);
   const [appeals, setAppeals] = useState<Appeal[]>([]);
   const [versions, setVersions] = useState<Ver[]>([]);
+  type Rev = { bySource: { source: string; label: string; total: number; count: number; paid: number }[]; total: number; paid: number };
+  const [rev, setRev] = useState<Rev | null>(null);
+  const [schedules, setSchedules] = useState<{ id: string; name: string; params: Record<string, unknown>; effectiveFrom: string }[]>([]);
+  const [feeForm, setFeeForm] = useState<{ name: string; transactionPct: string; supplier: string; buyer: string; lender: string; scoringFee: string; apiMonthlyPerKey: string; reportFee: string; referralPctOfFees: string; effectiveFrom: string } | null>(null);
   const loadScoring = useCallback(async () => {
     setToIssue(await api<Row[]>("GET", "/v1/credit-assessments").catch(() => []));
     setAppeals(await api<Appeal[]>("GET", "/v1/appeals?status=open").catch(() => []));
     setVersions((await api<{ versions: Ver[] }>("GET", "/v1/operations/scorecard-versions").catch(() => ({ versions: [] }))).versions);
+    setRev(await api<Rev>("GET", "/v1/operations/revenue").catch(() => null));
+    setSchedules(await api<typeof schedules>("GET", "/v1/operations/fee-schedules").catch(() => []));
   }, []);
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { void loadScoring(); }, [loadScoring]);
@@ -127,6 +133,40 @@ export default function AdminPage() {
           {versions.map((v) => <div key={v.id} className="between soft"><span><strong>{v.name}</strong> <span className="muted">· ngưỡng {v.params.ratingCutoffs.join("/")}</span></span><span className="row" style={{ gap: 6 }}><span className={`chip ${v.status === "active" ? "c-ok" : v.status === "proposed" ? "c-warn" : "c-neu"}`}>{{ active: "Đang dùng", proposed: `Chờ duyệt ${v.approvals.length}/2`, retired: "Đã thay" }[v.status]}</span>{v.status === "proposed" && <button className="btn bs sm" disabled={busy} onClick={() => run(async () => { await act("POST", `/v1/operations/scorecard-versions/${v.id}/approve`); await loadScoring(); }, "Đã duyệt")}>Duyệt (MFA)</button>}</span></div>)}
         </div>
       </section>
+
+      <section className="card flush">
+        <div className="ch"><h2 className="ct">Doanh thu nền tảng · 6 nguồn thu</h2>
+          <span className="row" style={{ gap: 8 }}>
+            <button className="btn bs sm" disabled={busy} onClick={() => run(async () => { const r = await act<{ created: number }>("POST", "/v1/operations/billing-run", { period: new Date().toISOString().slice(0, 7) }); await loadScoring(); toast(`Đã tính phí định kỳ: ${r.created} khoản mới`); }, "Hoàn tất")}>Chạy tính phí tháng này</button>
+            <button className="btn bs sm" onClick={() => setFeeForm({ name: "Biểu phí mới", transactionPct: "0.3", supplier: "0", buyer: "0", lender: "0", scoringFee: "0", apiMonthlyPerKey: "0", reportFee: "0", referralPctOfFees: "0", effectiveFrom: new Date().toISOString().slice(0, 10) })}>Tạo biểu phí mới</button>
+          </span></div>
+        <div className="tw"><table>
+          <thead><tr><th>Nguồn thu</th><th className="r">Số khoản</th><th className="r">Phát sinh (đ)</th><th className="r">Đã thu (đ)</th></tr></thead>
+          <tbody>
+            {rev?.bySource.map((x) => <tr key={x.source}><td>{x.label}</td><td className="r num">{x.count}</td><td className="r num">{x.total.toLocaleString("vi-VN")}</td><td className="r num">{x.paid.toLocaleString("vi-VN")}</td></tr>)}
+            <tr><th>Tổng</th><th></th><th className="r num">{(rev?.total ?? 0).toLocaleString("vi-VN")}</th><th className="r num">{(rev?.paid ?? 0).toLocaleString("vi-VN")}</th></tr>
+          </tbody></table></div>
+        <div className="muted" style={{ padding: "0 16px 12px" }}>Biểu phí đang dùng: {schedules[0]?.name ?? "—"} · phiên bản biểu phí cũ không đổi phí đã phát sinh.</div>
+      </section>
+
+      {feeForm && (
+        <div className="modal-scrim" role="dialog" aria-modal="true">
+          <div className="card modal wide">
+            <h2 className="ct">Biểu phí mới</h2>
+            <div className="grid-fields">
+              {([["name", "Tên"], ["transactionPct", "Phí giao dịch (% số tiền ứng)"], ["supplier", "SaaS nhà cung cấp (đ/tháng)"], ["buyer", "SaaS bên mua (đ/tháng)"], ["lender", "SaaS tổ chức tài chính (đ/tháng)"], ["scoringFee", "Phí chấm điểm chính thức (đ)"], ["apiMonthlyPerKey", "Phí API (đ/khóa/tháng)"], ["reportFee", "Phí xuất báo cáo (đ/lần)"], ["referralPctOfFees", "Hoa hồng (% phí xử lý)"]] as const).map(([k, label]) => (
+                <label key={k} className="field"><span>{label}</span><input className="input" value={feeForm[k]} onChange={(e) => setFeeForm({ ...feeForm, [k]: e.target.value })} /></label>
+              ))}
+              <label className="field"><span>Hiệu lực từ</span><input className="input num" type="date" value={feeForm.effectiveFrom} onChange={(e) => setFeeForm({ ...feeForm, effectiveFrom: e.target.value })} /></label>
+            </div>
+            <div className="muted">Biểu phí mới chỉ áp dụng cho phí phát sinh từ ngày hiệu lực; cần MFA.</div>
+            <div className="row" style={{ justifyContent: "flex-end", gap: 8 }}>
+              <button className="btn bs" onClick={() => setFeeForm(null)}>Hủy</button>
+              <button className="btn bp" disabled={busy} onClick={() => run(async () => { const f = feeForm; await act("POST", "/v1/operations/fee-schedules", { name: f.name, effectiveFrom: f.effectiveFrom, params: { transactionPct: Number(f.transactionPct), saasMonthly: { supplier: Number(f.supplier), buyer: Number(f.buyer), lender: Number(f.lender) }, scoringFee: Number(f.scoringFee), apiMonthlyPerKey: Number(f.apiMonthlyPerKey), reportFee: Number(f.reportFee), referralPctOfFees: Number(f.referralPctOfFees) } }); setFeeForm(null); await loadScoring(); }, "Đã tạo biểu phí")}>Tạo</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <section className="card flush">
         <div className="ch"><h2 className="ct">Tổ chức</h2></div>

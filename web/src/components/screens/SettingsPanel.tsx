@@ -172,6 +172,8 @@ export function SettingsPanel({ role }: { role: Role }) {
         </section>
       )}
 
+      <FeesSection />
+
       <section className="card flush">
         <div className="ch"><h2 className="ct">Nhật ký hoạt động</h2><span className="muted">Chỉ thêm, không sửa; nối chuỗi băm kiểm tra toàn vẹn</span></div>
         <div className="tw"><table>
@@ -183,5 +185,31 @@ export function SettingsPanel({ role }: { role: Role }) {
       </section>
       <span className="muted">Đang đăng nhập: {me.name} · {me.email} · vai trò {me.role} · {role}</span>
     </>
+  );
+}
+
+type Charge = { id: string; sourceLabel: string; amount: number; description: string; period: string; paidAt?: string };
+/** Phí dịch vụ của tổ chức: biểu phí đang áp dụng, phí đã phát sinh theo tháng, bảng kê in được. */
+function FeesSection() {
+  const { org } = useData();
+  const [period, setPeriod] = useState(new Date().toISOString().slice(0, 7));
+  const [data, setData] = useState<{ charges: Charge[]; total: number } | null>(null);
+  const [sch, setSch] = useState<{ active: { name: string; transactionPct: number }; } | null>(null);
+  useEffect(() => { api<typeof data>("GET", `/v1/fees?period=${period}`).then(setData, () => undefined); }, [period]);
+  useEffect(() => { api<typeof sch>("GET", "/v1/fee-schedule").then(setSch, () => undefined); }, []);
+  if (org.type === "fcc") return null;
+  const open = async () => { const l = await api<{ url: string }>("GET", `/v1/fees/invoice-link?period=${period}`); window.open(l.url, "_blank"); };
+  return (
+    <section className="card flush">
+      <div className="ch"><h2 className="ct">Phí dịch vụ</h2>
+        <span className="row" style={{ gap: 8 }}><input className="input num" style={{ maxWidth: 130 }} type="month" value={period} onChange={(e) => setPeriod(e.target.value)} /><button className="btn bs sm" onClick={open}>Bảng kê (in PDF)</button></span></div>
+      <div className="muted" style={{ padding: "0 16px 8px" }}>Biểu phí đang áp dụng: {sch?.active.name ?? "—"}. Phí được công bố trước khi phát sinh; FCC không giữ tiền của bạn.</div>
+      <div className="tw"><table>
+        <thead><tr><th>Nội dung</th><th>Nguồn</th><th className="r">Số tiền (đ)</th><th>Thanh toán</th></tr></thead>
+        <tbody>
+          {data?.charges.map((c) => <tr key={c.id}><td className="wrap">{c.description}</td><td>{c.sourceLabel}</td><td className="r num">{c.amount.toLocaleString("vi-VN")}</td><td>{c.paidAt ? <span className="chip c-ok">Đã thanh toán</span> : <span className="chip c-neu">Chưa</span>}</td></tr>)}
+          {(data?.charges.length ?? 0) === 0 && <tr><td colSpan={4} className="empty">Không phát sinh phí trong tháng.</td></tr>}
+        </tbody></table></div>
+    </section>
   );
 }

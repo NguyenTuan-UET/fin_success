@@ -17,6 +17,8 @@ import { provisionSimBanks } from '../sim/provision'
 import { assertCanAssess, assess, canSeeAssessment, OFFICIAL_VALID_DAYS, shape, type Kind } from '../assessments'
 import { DEFAULT_SCORECARD, type ScorecardParams } from '@fcc/domain/credit'
 import { uid } from '../core'
+import { billingRun, chargeReport, chargeScoring, feeSourceLabel, scheduleAt } from '../billing'
+import { FEE_SOURCES, validateSchedule, type FeeSchedule } from '@fcc/domain/fees'
 
 type Json = Record<string, unknown>
 interface Src {
@@ -67,6 +69,7 @@ function page<T extends { id?: string }>(items: T[], q: Src['query'], idOf: (t: 
   return { items: slice, nextCursor: start + limit < items.length ? idOf(slice[slice.length - 1]) : null }
 }
 
+const csv = (head: string[], rows: (string | number)[][]) => [head, ...rows].map((r) => r.map((c) => (/[",\n]/.test(String(c)) ? `"${String(c).replace(/"/g, '""')}"` : String(c))).join(',')).join('\n') + '\n'
 const view = (core: Core, orgId: string) => viewFor(core.getState(), orgId, core.clock()) as State
 const orgOf = (core: Core, id: string) => core.getState().orgs.find((o) => o.id === id)
 
@@ -221,6 +224,7 @@ export const ENDPOINTS: Endpoint[] = [
       if (r.status !== 'provisional') throw new HttpError(409, 'Chỉ phát hành bản tạm tính mới nhất')
       if (!(r.result as { official?: boolean }).official) throw new HttpError(422, `Độ bao phủ ${Math.round(Number(r.coverage) * 100)}% hoặc thiếu dữ liệu bắt buộc — chưa phát hành điểm chính thức`)
       if (!(await core.db.issueAssessment(r.id, s.a!.id, new Date(core.clock().getTime() + OFFICIAL_VALID_DAYS * 86_400_000)))) throw new HttpError(409, 'Kết quả đã được phát hành hoặc bị thay thế')
+      await chargeScoring(core, r.org_id, r.id)
       await core.audit(s.a!.activeOrgId, s.a!.id, 'Phát hành điểm tín dụng chính thức', r.id, `${r.rating} · hiệu lực ${OFFICIAL_VALID_DAYS} ngày`, s.req.id)
       return shape(await core.db.assessment(r.id))
     } },
@@ -326,6 +330,86 @@ export const ENDPOINTS: Endpoint[] = [
     run: async (s, core) => {
       if (orgOf(core, s.a!.activeOrgId)?.type !== 'fcc') throw forbidden('Chỉ nhân sự FCC')
       return core.db.verifyAudit()
+    } },
+
+  // ---- phí, hóa đơn phí, doanh thu ----
+  { method: 'GET', path: '/v1/fee-schedule', tag: 'Phí', summary: 'Biểu phí đang hiệu lực (công khai cho người dùng trước khi phát sinh phí)', auth: 'user',
+    run: async (_s, core) => ({ active: await scheduleAt(core.db, core.clock()), sources: FEE_SOURCES }) },
+  { method: 'GET', path: '/v1/fees', tag: 'Phí', summary: 'Phí đã phát sinh của tổ chức (lọc ?period=YYYY-MM)', auth: 'user',
+    run: async (s, core) => {
+      const rows = await core.db.chargesOf(s.a!.activeOrgId, s.query.period)
+      return { charges: rows.map((r) => ({ ...r, sourceLabel: feeSourceLabel(r.source), amount: Number(r.amount) })), total: rows.reduce((t, r) => t + Number(r.amount), 0) }
+    } },
+  { method: 'GET', path: '/v1/fees/invoice-link', tag: 'Phí', summary: 'Liên kết ký (10 phút) tới hóa đơn phí tháng, mở/in thành PDF từ trình duyệt', auth: 'user',
+    run: (s, core) => {
+      const period = s.query.period ?? new Date().toISOString().slice(0, 7)
+      if (!/^\d{4}-\d{2}$/.test(period)) throw bad('period phải có dạng YYYY-MM')
+      const exp = Math.floor(core.clock().getTime() / 1000) + 600
+      const v = `${s.a!.activeOrgId}|${period}`
+      return { url: `/v1/fees/invoice?org=${encodeURIComponent(s.a!.activeOrgId)}&period=${period}&exp=${exp}&sig=${core.files.signValue(v, exp)}` }
+    } },
+  { method: 'GET', path: '/v1/operations/revenue', tag: 'Vận hành FCC', summary: 'Doanh thu theo nguồn và tháng (FCC)', auth: 'user',
+    run: async (s, core) => {
+      if (orgOf(core, s.a!.activeOrgId)?.type !== 'fcc') throw forbidden('Chỉ nhân sự FCC')
+      const rows = await core.db.revenueBySource(s.query.from, s.query.to)
+      const bySource = Object.keys(FEE_SOURCES).map((k) => ({ source: k, label: feeSourceLabel(k), total: rows.filter((r) => r.source === k).reduce((t, r) => t + Number(r.total), 0), count: rows.filter((r) => r.source === k).reduce((t, r) => t + Number(r.n), 0), paid: rows.filter((r) => r.source === k).reduce((t, r) => t + Number(r.paid), 0) }))
+      return { bySource, byPeriod: rows.map((r) => ({ period: r.period, source: r.source, total: Number(r.total), count: Number(r.n), paid: Number(r.paid) })), total: bySource.reduce((t, x) => t + x.total, 0), paid: bySource.reduce((t, x) => t + x.paid, 0) }
+    } },
+  { method: 'GET', path: '/v1/operations/fee-schedules', tag: 'Vận hành FCC', summary: 'Các phiên bản biểu phí', auth: 'user',
+    run: async (s, core) => {
+      if (orgOf(core, s.a!.activeOrgId)?.type !== 'fcc') throw forbidden('Chỉ nhân sự FCC')
+      return core.db.feeSchedules()
+    } },
+  { method: 'POST', path: '/v1/operations/fee-schedules', tag: 'Vận hành FCC', summary: 'Tạo phiên bản biểu phí mới có hiệu lực từ ngày chỉ định (không đổi phí đã phát sinh; cần MFA)', auth: 'user', body: { name: 'string', params: 'FeeSchedule', effectiveFrom: 'YYYY-MM-DD (từ hôm nay trở đi)' },
+    run: async (s, core) => {
+      if (s.a!.role !== 'fcc_admin') throw forbidden('Chỉ quản trị FCC')
+      core.requireStepUp(s.a!)
+      const p = (B(s).params ?? {}) as Partial<FeeSchedule>
+      const errs = validateSchedule(p)
+      if (errs.length) throw bad(errs.join('; '))
+      const from = new Date(`${String(B(s).effectiveFrom)}T00:00:00Z`)
+      if (Number.isNaN(from.getTime()) || from.toISOString().slice(0, 10) < core.clock().toISOString().slice(0, 10)) throw bad('Ngày hiệu lực phải từ hôm nay trở đi')
+      const id = uid('fee')
+      await core.db.createFeeSchedule({ id, name: String(B(s).name ?? 'Biểu phí mới').slice(0, 120), params: p, effectiveFrom: from, createdBy: s.a!.id })
+      await core.audit(s.a!.activeOrgId, s.a!.id, 'Tạo phiên bản biểu phí', id, String(B(s).name ?? ''), s.req.id)
+      return { id }
+    } },
+  { method: 'POST', path: '/v1/operations/billing-run', tag: 'Vận hành FCC', summary: 'Chạy tính phí định kỳ (thuê bao SaaS, kết nối API) cho một tháng; chạy lại không tạo trùng', auth: 'user', body: { period: 'YYYY-MM' },
+    run: async (s, core) => {
+      if (s.a!.role !== 'fcc_admin') throw forbidden('Chỉ quản trị FCC')
+      const period = String(B(s).period ?? '')
+      if (!/^\d{4}-\d{2}$/.test(period)) throw bad('period phải có dạng YYYY-MM')
+      const r = await billingRun(core, period)
+      await core.audit(s.a!.activeOrgId, s.a!.id, 'Chạy tính phí định kỳ', period, `${r.created} khoản mới`, s.req.id)
+      return r
+    } },
+  { method: 'POST', path: '/v1/operations/fees/mark-paid', tag: 'Vận hành FCC', summary: 'Ghi nhận khách hàng đã thanh toán phí của một tháng', auth: 'user', body: { orgId: 'string', period: 'YYYY-MM', reference: 'string' },
+    run: async (s, core) => {
+      if (s.a!.role !== 'fcc_admin') throw forbidden('Chỉ quản trị FCC')
+      const n = await core.db.markChargesPaid(String(B(s).orgId), String(B(s).period), String(B(s).reference ?? '').slice(0, 100) || 'manual')
+      await core.audit(s.a!.activeOrgId, s.a!.id, 'Ghi nhận thanh toán phí', String(B(s).orgId), `${B(s).period}: ${n} khoản`, s.req.id)
+      return { updated: n }
+    } },
+
+  // ---- xuất báo cáo CSV (có thể có phí báo cáo theo biểu phí) ----
+  { method: 'GET', path: '/v1/exports/receivables.csv', tag: 'Báo cáo', summary: 'Xuất danh sách khoản phải thu của tổ chức (CSV)', auth: 'user',
+    run: async (s, core) => {
+      const v = view(core, s.a!.activeOrgId)
+      const type = orgOf(core, s.a!.activeOrgId)?.type
+      if (type !== 'supplier' && type !== 'buyer') throw forbidden('Chỉ nhà cung cấp và bên mua')
+      const mine = v.receivables.filter((r) => (type === 'supplier' ? r.sellerId : r.buyerId) === s.a!.activeOrgId)
+      await chargeReport(core, s.a!.activeOrgId, 'khoản phải thu', `${s.a!.id}:${core.clock().getTime()}`)
+      s.reply.type('text/csv; charset=utf-8').header('content-disposition', 'attachment; filename="khoan-phai-thu.csv"')
+      return csv(['ma', 'so_hoa_don', 'doi_tac', 'so_tien', 'ngay_lap', 'han_thanh_toan', 'trang_thai'], mine.map((r) => [r.code, `${r.invoiceSeries}-${r.invoiceNumber}`, v.orgs.find((o) => o.id === (type === 'supplier' ? r.buyerId : r.sellerId))?.name ?? '', r.amount, r.issueDate, r.dueDate, r.state]))
+    } },
+  { method: 'GET', path: '/v1/exports/portfolio.csv', tag: 'Báo cáo', summary: 'Xuất danh mục hồ sơ tài trợ của tổ chức tài chính (CSV)', auth: 'user',
+    run: async (s, core) => {
+      if (orgOf(core, s.a!.activeOrgId)?.type !== 'lender') throw forbidden('Chỉ tổ chức tài chính')
+      const v = view(core, s.a!.activeOrgId)
+      const apps = v.applications.filter((a) => a.lenderId === s.a!.activeOrgId)
+      await chargeReport(core, s.a!.activeOrgId, 'danh mục', `${s.a!.id}:${core.clock().getTime()}`)
+      s.reply.type('text/csv; charset=utf-8').header('content-disposition', 'attachment; filename="danh-muc.csv"')
+      return csv(['ho_so', 'hoa_don', 'doanh_nghiep', 'trang_thai', 'ung_truoc', 'lai_suat', 'du_no'], apps.map((a) => { const r = v.receivables.find((x) => x.id === a.receivableId); return [a.id, r?.code ?? '', r ? v.orgs.find((o) => o.id === r.sellerId)?.name ?? '' : '', a.state, a.offer?.advanceVnd ?? '', a.offer?.ratePct ?? '', a.outstanding ?? ''] }))
     } },
 
   // ---- cập nhật tức thời (SSE) ----
@@ -539,6 +623,26 @@ export function v1Routes(app: FastifyInstance, core: Core) {
     })
   })
 
+  // Hóa đơn phí in được (HTML → in thành PDF từ trình duyệt). Truy cập bằng liên kết ký ngắn hạn từ /v1/fees/invoice-link.
+  app.get('/v1/fees/invoice', async (req, reply) => {
+    const q = req.query as { org?: string; period?: string; exp?: string; sig?: string }
+    if (!q.org || !q.period || !core.files.verifyValue(`${q.org}|${q.period}`, Number(q.exp), String(q.sig ?? ''), core.clock().getTime())) throw new HttpError(403, 'Liên kết không hợp lệ hoặc đã hết hạn')
+    const org = core.getState().orgs.find((o) => o.id === q.org)
+    if (!org) throw notFound('Không tìm thấy tổ chức')
+    const rows = await core.db.chargesOf(org.id, q.period)
+    const esc = (v: unknown) => String(v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!)
+    const total = rows.reduce((t, r) => t + Number(r.amount), 0)
+    return reply.type('text/html; charset=utf-8').send(`<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>Hóa đơn phí FCC ${esc(q.period)}</title>
+<style>body{font:14px system-ui;margin:32px;color:#10201b}h1{font-size:20px}table{border-collapse:collapse;width:100%;margin-top:16px}td,th{border-bottom:1px solid #ddd;padding:8px;text-align:left}td.r,th.r{text-align:right}.muted{color:#5e6e67}@media print{button{display:none}}</style></head><body>
+<button onclick="print()">In / lưu PDF</button>
+<h1>Bảng kê phí dịch vụ FCC — tháng ${esc(q.period)}</h1>
+<p>${esc(org.name)} · MST ${esc(org.taxCode)}</p>
+<table><thead><tr><th>Nội dung</th><th>Nguồn</th><th>Biểu phí</th><th class="r">Số tiền (₫)</th><th>Thanh toán</th></tr></thead><tbody>
+${rows.map((r) => `<tr><td>${esc(r.description)}</td><td>${esc(feeSourceLabel(r.source))}</td><td>${esc(r.scheduleId)}</td><td class="r">${Number(r.amount).toLocaleString('vi-VN')}</td><td>${r.paidAt ? 'Đã thanh toán' : 'Chưa'}</td></tr>`).join('') || '<tr><td colspan="5" class="muted">Không phát sinh phí trong tháng.</td></tr>'}
+</tbody><tfoot><tr><th colspan="3">Tổng</th><th class="r">${total.toLocaleString('vi-VN')}</th><th></th></tr></tfoot></table>
+<p class="muted">Bảng kê này không phải hóa đơn giá trị gia tăng. FCC không giữ tiền của khách hàng; phí được tính theo biểu phí đã công bố tại thời điểm phát sinh.</p></body></html>`)
+  })
+
   app.get('/v1/openapi.json', async () => openApi())
 }
 
@@ -558,6 +662,7 @@ export function openApi() {
   }
   paths['/v1/events'] = { get: { tags: ['Tức thời'], summary: 'Luồng SSE (?ticket= từ POST /v1/events/ticket); sự kiện hello, change', parameters: [{ name: 'ticket', in: 'query', required: true, schema: { type: 'string' } }], responses: { 200: { description: 'text/event-stream' } } } }
   paths['/v1/openapi.json'] = { get: { tags: ['Tài liệu'], summary: 'Tài liệu OpenAPI này', responses: { 200: { description: 'OpenAPI 3.1' } } } }
+  paths['/v1/fees/invoice'] = { get: { tags: ['Phí'], summary: 'Bảng kê phí tháng (HTML in được) bằng liên kết ký từ /v1/fees/invoice-link', parameters: ['org', 'period', 'exp', 'sig'].map((n) => ({ name: n, in: 'query', required: true, schema: { type: 'string' } })), responses: { 200: { description: 'text/html' }, 403: { description: 'Liên kết hết hạn' } } } }
   paths['/v1/files/{key}'] = { get: { tags: ['Tệp'], summary: 'Tải tệp bằng URL ký (?exp=&sig= từ GET /api/files/{key}/url)', parameters: [{ name: 'key', in: 'path', required: true, schema: { type: 'string' } }], responses: { 200: { description: 'Nội dung tệp' }, 403: { description: 'Liên kết hết hạn' } } } }
   return {
     openapi: '3.1.0',

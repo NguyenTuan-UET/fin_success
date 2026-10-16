@@ -78,6 +78,16 @@ export class ObjectStore {
     return sig.length === expect.length && timingSafeEqual(Buffer.from(sig), Buffer.from(expect))
   }
 
+  /** Ký một giá trị tùy ý (đường dẫn tải hóa đơn phí…) đến thời điểm exp (giây UNIX). */
+  signValue(value: string, exp: number) {
+    return createHmac('sha256', this.key).update(`val:${value}:${exp}`).digest('hex')
+  }
+  verifyValue(value: string, exp: number, sig: string, now = Date.now()) {
+    if (!Number.isFinite(exp) || exp < Math.floor(now / 1000)) return false
+    const expect = this.signValue(value, exp)
+    return sig.length === expect.length && timingSafeEqual(Buffer.from(sig), Buffer.from(expect))
+  }
+
   private sign(key: string, exp: number) {
     return createHmac('sha256', this.key).update(`file:${key}:${exp}`).digest('hex')
   }

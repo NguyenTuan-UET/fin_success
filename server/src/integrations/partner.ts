@@ -38,6 +38,7 @@ export async function partnerAuth(db: Database, req: FastifyRequest, need: Scope
   if (!ok) throw new HttpError(401, 'Khóa tích hợp không hợp lệ hoặc đã bị thu hồi')
   if (!k.scopes.includes(need)) throw new HttpError(403, `Khóa tích hợp thiếu phạm vi ${need}`)
   await db.touchIntegrationKey(k.id)
+  await db.countApiCall(k.orgId, new Date().toISOString().slice(0, 7)) // số lượt gọi theo tháng (cơ sở báo cáo sử dụng API)
   return { keyId: k.id, orgId: k.orgId, scopes: k.scopes as Scope[] }
 }
 

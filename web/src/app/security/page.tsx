@@ -16,7 +16,7 @@ export default function SecurityPage() {
   const [pw, setPw] = useState({ current: "", password: "" });
   const [kinds, setKinds] = useState<{ kind: string; label: string; enabled: boolean; locked: boolean }[]>([]);
   const loadKinds = useCallback(() => api<{ kinds: typeof kinds }>("GET", "/api/auth/email-prefs").then((r) => setKinds(r.kinds), () => undefined), []);
-  // eslint-disable-next-line react-hooks/set-state-in-effect
+   
   useEffect(() => { void loadKinds(); }, [loadKinds]);
   if (status === "loading") return <div className="auth-wrap muted">Đang tải…</div>;
   if (status !== "ready" || !me) return <AuthGate />;

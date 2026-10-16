@@ -11,6 +11,7 @@ import { orgRoutes } from './routes/org'
 import { businessRoutes } from './routes/business'
 import { v1Routes } from './routes/v1'
 import { ensureDefaultScorecard } from './assessments'
+import { chargeFromEvents, ensureFeeSchedule } from './billing'
 import { deliverWebhooks } from './integrations/partner'
 import { createMailer, deliverEmails, emailKind, type Mailer } from './integrations/mailer'
 
@@ -81,6 +82,8 @@ export async function buildApp(opt: AppOptions): Promise<FccApp> {
   })
 
   await ensureDefaultScorecard(db)
+  await ensureFeeSchedule(db)
+  core.onEvents((events) => chargeFromEvents(core, events))
   const { openSession } = authRoutes(app, core)
   orgRoutes(app, core, openSession)
   businessRoutes(app, core, { ollamaKey: opt.ollamaKey, ollamaBase: opt.ollamaBase })
