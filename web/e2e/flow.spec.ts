@@ -9,7 +9,7 @@ async function as(browser: Browser, role: "supplier" | "buyer" | "lender" | "adm
   const ctx = await browser.newContext();
   const page = await ctx.newPage();
   await page.goto(`/${role}`);
-  await expect(page.getByRole("link", { name: "Tổng quan" }).first()).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole("navigation", { name: "Điều hướng chính" })).toBeVisible({ timeout: 30_000 });
   return page;
 }
 
@@ -94,9 +94,25 @@ test("hóa đơn → xác nhận → RFQ → báo giá → thẩm định → đ
   // Bên mua ghi nhận thanh toán → tất toán
   await buyer.goto("/buyer/invoices");
   await buyer.getByRole("button", { name: "Ghi nhận đã thanh toán" }).first().click();
+  await buyer.getByRole("button", { name: "Ghi nhận", exact: true }).click();
   await expect(buyer.getByText(/Đã ghi nhận thanh toán/)).toBeVisible();
+  // Tiền về tài khoản tổ chức tài chính: bên mua tự báo chưa đủ để tất toán — tổ chức tài chính xác nhận đúng số còn phải thu
+  await lender.goto("/lender/appraisal");
+  const owed = await lender.getByLabel("Số tiền về (đ)").getAttribute("placeholder");
+  expect(Number(owed)).toBeGreaterThan(0);
+  await lender.getByLabel("Số tiền về (đ)").fill(String(owed));
+  await lender.getByRole("button", { name: /Ghi nhận tiền về/ }).click();
+  await expect(lender.getByText("Đã ghi nhận tiền về")).toBeVisible();
   await supplier.goto("/supplier/disbursement");
   await expect(supplier.getByText("Đã tất toán").first()).toBeVisible({ timeout: 15_000 });
+
+  // FCC: bảng điều khiển có chỉ số thật và trang nguồn dữ liệu công khai
+  const admin = await as(browser, "admin");
+  admin.on("pageerror", (e) => errors.push(e.message));
+  await expect(admin.getByText("Giá trị đã tài trợ")).toBeVisible({ timeout: 15_000 });
+  await admin.goto("/admin/sources");
+  await expect(admin.getByRole("heading", { name: "Danh mục nguồn" })).toBeVisible();
+  await expect(admin.getByText("Báo chí (tin bất lợi)")).toBeVisible();
 
   expect(errors).toEqual([]);
 });
