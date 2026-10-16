@@ -2,9 +2,9 @@ import { Link } from 'react-router-dom'
 import { Check, X } from 'lucide-react'
 import { useStore } from '../store'
 import { useOrgMap } from '../hooks'
-import { PRODUCT_TYPE_LABEL } from '../domain/marketplace'
+import { PRODUCT_TYPE_LABEL } from '@fcc/domain/marketplace'
 import { Badge, Button, Card, Empty, Table } from '../components/ui'
-import { computeEsg } from '../domain/esg'
+import { computeEsg } from '@fcc/domain/esg'
 import { date, vnd } from '../lib/format'
 
 export function Admin() {

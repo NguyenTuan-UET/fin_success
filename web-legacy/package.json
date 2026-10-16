@@ -7,10 +7,10 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "preview": "vite preview",
-    "test": "vitest run"
+    "preview": "vite preview"
   },
   "dependencies": {
+    "@fcc/domain": "file:../packages/domain",
     "clsx": "^2.1.1",
     "lucide-react": "^1.55.0",
     "pdfjs-dist": "^6.4.299",

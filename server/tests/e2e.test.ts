@@ -1,16 +1,12 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createHmac } from 'node:crypto'
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { buildApp } from '../src/app'
-import type { FinancingProduct, FundingApplication, Receivable, Rfq } from '../../web-legacy/src/domain/types'
+import { dropSchema, newSchema, startApp } from './helpers'
+import type { FinancingProduct, FundingApplication, Receivable, Rfq } from '@fcc/domain/types'
 
-const dir = mkdtempSync(join(tmpdir(), 'fcc-test-'))
-const dbPath = join(dir, 'fcc.db')
+const schema = newSchema()
 const ADMIN = { email: 'ops@example.test', password: 'ops-password-123' }
 const PW = 'correct-horse-battery'
-let app = buildApp({ dbPath, listedDir: '../web-legacy/public/listed', admin: ADMIN })
+let app = await startApp(schema, { admin: ADMIN })
 const iso = (d: Date) => d.toISOString().slice(0, 10)
 const due = iso(new Date(Date.now() + 40 * 86_400_000))
 
@@ -40,7 +36,7 @@ const product = (name: string): Partial<FinancingProduct> => ({
 
 afterAll(async () => {
   await app.close()
-  rmSync(dir, { recursive: true, force: true })
+  await dropSchema(schema)
 })
 
 describe('luồng tài trợ chuỗi cung ứng — không có dữ liệu mẫu', () => {
@@ -125,8 +121,11 @@ describe('luồng tài trợ chuỗi cung ứng — không có dữ liệu mẫu
     expect((await act(L1.token, 'respondRfq', rfq.id, { productId: p1, kind: 'quote', advancePct: 80, ratePct: 9.5, feesVnd: 1_000_000, validUntil: iso(new Date(Date.now() + 3 * 86_400_000)) })).status).toBe(200)
     expect((await act(L2.token, 'respondRfq', rfq.id, { productId: p2, kind: 'decline', conditions: 'Ngoài khẩu vị' })).status).toBe(200)
     expect((await act(S.token, 'selectQuote', rfq.id, L2.orgId)).status).toBe(400) // L2 từ chối, không có báo giá
-    const sel = await act(S.token, 'selectQuote', rfq.id, L1.orgId)
-    expect(sel.status).toBe(200)
+    // hai yêu cầu chọn báo giá gửi cùng lúc: chỉ một thành công, chỉ một hồ sơ được tạo
+    const [s1, s2] = await Promise.all([act(S.token, 'selectQuote', rfq.id, L1.orgId), act(S.token, 'selectQuote', rfq.id, L1.orgId)])
+    expect([s1.status, s2.status].sort()).toEqual([200, 409])
+    const sel = s1.status === 200 ? s1 : s2
+    expect(sel.body.state.applications.filter((a: FundingApplication) => a.receivableId === rec.id)).toHaveLength(1)
     fa = sel.body.state.applications.find((a: FundingApplication) => a.rfqId === rfq.id)
     expect(fa.lenderId).toBe(L1.orgId)
     const st = await getState(S.token)
@@ -216,7 +215,7 @@ describe('luồng tài trợ chuỗi cung ứng — không có dữ liệu mẫu
   it('dữ liệu và tài khoản còn nguyên sau khi khởi động lại; thu hồi phiên khi đăng xuất', async () => {
     const before = app.getState().receivables.map((r) => r.id)
     await app.close()
-    app = buildApp({ dbPath, listedDir: '../web-legacy/public/listed', admin: ADMIN })
+    app = await startApp(schema, { admin: ADMIN })
     expect(app.getState().receivables.map((r) => r.id)).toEqual(before)
     const lg = await post('/api/auth/login', { email: B.email, password: PW })
     expect(lg.status).toBe(200)

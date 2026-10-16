@@ -1,6 +1,6 @@
 // Biểu đồ theo quy tắc dataviz: nét mảnh, lưới mờ, một trục, tooltip, legend khi ≥ 2 chuỗi, màu chuỗi cố định thứ tự.
 import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import type { ForecastPoint } from '../domain/cashflow'
+import type { ForecastPoint } from '@fcc/domain/cashflow'
 import { date, vnd } from '../lib/format'
 
 const C = { s1: '#2a78d6', s2: '#eb6834', s3: '#1baf7a', grid: '#e1e0d9', axis: '#898781', ink: '#0b0b0b', ink2: '#52514e', critical: '#d03b3b' }

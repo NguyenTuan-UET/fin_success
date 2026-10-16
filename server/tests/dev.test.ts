@@ -1,11 +1,15 @@
 import { afterAll, describe, expect, it } from 'vitest'
-import { buildApp } from '../src/app'
+import { dropSchema, newSchema, startApp } from './helpers'
 
-const on = buildApp({ dbPath: ':memory:', listedDir: '../web-legacy/public/listed', devAutologin: true })
-const off = buildApp({ dbPath: ':memory:', listedDir: '../web-legacy/public/listed' })
+const sOn = newSchema()
+const sOff = newSchema()
+const on = await startApp(sOn, { devAutologin: true })
+const off = await startApp(sOff)
 afterAll(async () => {
   await on.close()
   await off.close()
+  await dropSchema(sOn)
+  await dropSchema(sOff)
 })
 
 const post = async (app: typeof on, url: string, body: unknown, token?: string) => {

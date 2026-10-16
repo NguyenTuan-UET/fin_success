@@ -10,7 +10,8 @@ export default defineConfig(({ mode }) => {
   }
   return {
     plugins: [react(), tailwindcss()],
-    server: { proxy: api },
+    // @fcc/domain nằm ở ../packages/domain (liên kết qua node_modules) nên cho phép Vite đọc thư mục cha
+    server: { proxy: api, fs: { allow: ['..'] } },
     preview: { proxy: api },
   }
 })

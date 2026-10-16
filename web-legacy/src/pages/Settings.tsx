@@ -4,7 +4,7 @@ import { useActiveOrg, useStore } from '../store'
 import { useOrgMap } from '../hooks'
 import { Badge, Button, Callout, Card, Field, inputCls, Table, Tabs } from '../components/ui'
 import { api } from '../lib/api'
-import type { Org } from '../domain/types'
+import type { Org } from '@fcc/domain/types'
 import { pingAi, TEXT_MODEL, VISION_MODEL } from '../lib/ai'
 import { date, dateTime } from '../lib/format'
 

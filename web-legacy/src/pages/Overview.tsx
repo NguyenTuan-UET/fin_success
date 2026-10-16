@@ -7,9 +7,9 @@ import { Badge, Button, Callout, Card, Empty, Progress, Stat, Table } from '../c
 import { EsgBadge, RatingBadge, StateBadge } from '../components/domain'
 import { CashflowChart, HBar } from '../components/charts'
 import { date, daysFromNow, median, pct, vnd, num } from '../lib/format'
-import { INDUSTRY_RISK } from '../domain/credit'
-import { ESG_BADGE } from '../domain/esg'
-import { PRODUCT_TYPE_LABEL } from '../domain/marketplace'
+import { INDUSTRY_RISK } from '@fcc/domain/credit'
+import { ESG_BADGE } from '@fcc/domain/esg'
+import { PRODUCT_TYPE_LABEL } from '@fcc/domain/marketplace'
 
 export function Overview() {
   const org = useActiveOrg()

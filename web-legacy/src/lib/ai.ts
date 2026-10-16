@@ -1,8 +1,8 @@
 // Lớp AI: gọi ollama.com qua backend FCC /api/ollama (khóa API chỉ nằm ở máy chủ).
 // AI chỉ trích xuất, đề xuất, giải thích — điểm số luôn do bộ chấm xác định tính (SPEC 1.2, 4.5, 5.3).
-import type { EsgIndicatorDef } from '../domain/esg'
-import type { ScoreResult } from '../domain/credit'
-import type { IndicatorLevel } from '../domain/types'
+import type { EsgIndicatorDef } from '@fcc/domain/esg'
+import type { ScoreResult } from '@fcc/domain/credit'
+import type { IndicatorLevel } from '@fcc/domain/types'
 import { authHeaders } from './api'
 
 export const TEXT_MODEL = 'gpt-oss:120b'

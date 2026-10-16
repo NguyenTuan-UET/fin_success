@@ -8,9 +8,9 @@ import { useMatches, useOrgMap, useScores } from '../hooks'
 import { Badge, Button, Callout, Card, Empty, Field, inputCls, Modal, Table, Tabs } from '../components/ui'
 import { RatingBadge, StateBadge } from '../components/domain'
 import { date, daysFromNow, vnd, num } from '../lib/format'
-import { estimateCost, PRODUCT_TYPE_LABEL, tenorOf, type MatchResult } from '../domain/marketplace'
-import { RATING_ORDER } from '../domain/credit'
-import type { FinancingProduct, ProductType, Rating, Rfq } from '../domain/types'
+import { estimateCost, PRODUCT_TYPE_LABEL, tenorOf, type MatchResult } from '@fcc/domain/marketplace'
+import { RATING_ORDER } from '@fcc/domain/credit'
+import type { FinancingProduct, ProductType, Rating, Rfq } from '@fcc/domain/types'
 import { PUBLIC_PRODUCTS } from '../data/publicProducts'
 
 export function Marketplace() {

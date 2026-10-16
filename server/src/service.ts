@@ -6,10 +6,10 @@ import { join } from 'node:path'
 import type {
   AccountingConnection, Consent, CreditProfile, EarlyPaymentOffer, EsgAssessment, EsgDocument, EsgIndicatorResult, FinancialYear,
   FinancingProduct, FundingApplication, LedgerItem, ListedSnapshot, Org, Receivable, ReceivableState, Rfq, RfqResponse,
-} from '../../web-legacy/src/domain/types'
-import { iso } from '../../web-legacy/src/domain/util'
-import { applicationScoreOf, buyerScoreOf, esgOf, supplierScoreOf } from '../../web-legacy/src/domain/engine'
-import { matchProduct } from '../../web-legacy/src/domain/marketplace'
+} from '@fcc/domain/types'
+import { iso } from '@fcc/domain/util'
+import { applicationScoreOf, buyerScoreOf, esgOf, supplierScoreOf } from '@fcc/domain/engine'
+import { matchProduct } from '@fcc/domain/marketplace'
 import { bad, conflict, forbidden, notFound, unprocessable } from './errors'
 import type { State } from './state'
 

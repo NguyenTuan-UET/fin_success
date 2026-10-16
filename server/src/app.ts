@@ -1,14 +1,17 @@
 import Fastify, { type FastifyInstance, type FastifyRequest } from 'fastify'
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
-import { Database, type State, type UserRow } from './state'
+import { ConstraintError, Database, type State, type UserRow } from './state'
 import { actions, fundApplication, runSweep, type Ctx, type Role } from './service'
 import { viewFor } from './views'
 import { FailureLimiter, hashPassword, hashToken, newToken, verifyPassword } from './auth'
 import { HttpError, bad, notFound } from './errors'
-import type { IndustryGroup, Org, OrgType } from '../../web-legacy/src/domain/types'
+import type { IndustryGroup, Org, OrgType } from '@fcc/domain/types'
 
 export interface AppOptions {
-  dbPath: string
+  /** Chuỗi kết nối PostgreSQL */
+  dbUrl: string
+  /** Schema dùng cho ứng dụng (mặc định public); kiểm thử dùng schema riêng cho mỗi lần chạy */
+  dbSchema?: string
   listedDir: string
   /** Tài khoản nhân sự FCC (thẩm định ESG, duyệt sản phẩm, xác minh tổ chức tài chính) tạo khi khởi động nếu chưa có */
   admin?: { email: string; password: string }
@@ -24,9 +27,11 @@ const SESSION_TTL = 12 * 3600_000
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/
 const uid = (p: string) => `${p}-${randomBytes(5).toString('hex')}`
 
-export function buildApp(opt: AppOptions): FastifyInstance & { db: Database; sweep: () => void; getState: () => State } {
-  const db = new Database(opt.dbPath)
-  let state = db.load()
+export type FccApp = FastifyInstance & { db: Database; sweep: () => Promise<void>; getState: () => State }
+
+export async function buildApp(opt: AppOptions): Promise<FccApp> {
+  const db = await Database.open(opt.dbUrl, opt.dbSchema)
+  let state = await db.load()
   let version = 1 // tăng sau mỗi thay đổi; trình duyệt dùng để hỏi “có gì mới không” mà không tải lại toàn bộ
   const clock = opt.now ?? (() => new Date())
   const app = Fastify({ logger: process.env.NODE_ENV === 'test' ? false : { level: 'info', redact: ['req.headers.authorization'] }, bodyLimit: 25 * 1024 * 1024 })
@@ -53,15 +58,16 @@ export function buildApp(opt: AppOptions): FastifyInstance & { db: Database; swe
   })
 
   type Authed = Omit<UserRow, 'passwordHash'>
-  function auth(req: FastifyRequest): { user: Authed; token: string } {
+  async function auth(req: FastifyRequest): Promise<{ user: Authed; token: string }> {
     const h = req.headers.authorization
     const token = h?.startsWith('Bearer ') ? h.slice(7) : ''
-    const user = token ? db.sessionUser(hashToken(token)) : undefined
+    const user = token ? await db.sessionUser(hashToken(token)) : undefined
     if (!user) throw new HttpError(401, 'Chưa đăng nhập hoặc phiên đã hết hạn')
     return { user, token }
   }
 
-  function makeCtx(draft: State, user: Authed | { orgId: string; id: string; role: string }): Ctx {
+  type Actor = Authed | { orgId: string; id: string; role: string }
+  function makeCtx(draft: State, user: Actor, passwordHash?: string): Ctx {
     const actor = draft.orgs.find((o) => o.id === user.orgId)
     if (!actor) throw new HttpError(401, 'Tổ chức không tồn tại')
     return {
@@ -70,8 +76,7 @@ export function buildApp(opt: AppOptions): FastifyInstance & { db: Database; swe
         if (opt.devAutologin && actor.type !== 'fcc' && 'email' in user && String(user.email).endsWith(DEV_DOMAIN)) return // chế độ dev: tài khoản dev không có mật khẩu
         const key = `u:${user.id}`
         if (reauthLimit.blocked(key)) throw new HttpError(429, 'Nhập sai mật khẩu quá nhiều lần, thử lại sau 15 phút')
-        const row = db.userById(user.id)
-        if (!password || !row || !verifyPassword(password, row.passwordHash)) {
+        if (!password || !passwordHash || !verifyPassword(password, passwordHash)) {
           reauthLimit.fail(key)
           throw new HttpError(401, 'Mật khẩu xác thực không đúng')
         }
@@ -80,14 +85,35 @@ export function buildApp(opt: AppOptions): FastifyInstance & { db: Database; swe
     }
   }
 
-  /** Chạy một hàm trên bản nháp, chỉ chốt (ghi DB) khi không lỗi. Đồng bộ nên không có xen kẽ giữa các yêu cầu. */
-  function mutate<T>(user: Authed | { orgId: string; id: string; role: string }, fn: (c: Ctx) => T): T {
-    const draft: State = { ...state }
-    const result = fn(makeCtx(draft, user))
-    db.save(draft)
+  // Mọi thay đổi chạy tuần tự qua một hàng đợi: bản nháp luôn dựng từ trạng thái đã ghi mới nhất.
+  let chain: Promise<unknown> = Promise.resolve()
+  function serial<T>(f: () => Promise<T>): Promise<T> {
+    const p = chain.then(f, f)
+    chain = p.catch(() => undefined)
+    return p
+  }
+
+  /** Ghi bản nháp trong một giao dịch; chỉ thay trạng thái trong bộ nhớ khi CSDL đã chốt. */
+  async function commit(draft: State) {
+    try {
+      await db.save(draft)
+    } catch (e) {
+      if (e instanceof ConstraintError) throw new HttpError(409, e.message)
+      throw e
+    }
     state = draft
     version++
-    return result
+  }
+
+  /** Chạy một hàm nghiệp vụ trên bản nháp, chỉ chốt khi không lỗi và CSDL chấp nhận. */
+  function mutate<T>(user: Actor, fn: (c: Ctx) => T): Promise<T> {
+    return serial(async () => {
+      const passwordHash = 'email' in user ? (await db.userById(user.id))?.passwordHash : undefined
+      const draft: State = { ...state }
+      const result = fn(makeCtx(draft, user, passwordHash))
+      await commit(draft)
+      return result
+    })
   }
 
   const me = (u: Authed) => ({ id: u.id, email: u.email, name: u.name, title: u.title, role: u.role, orgId: u.orgId })
@@ -122,7 +148,7 @@ export function buildApp(opt: AppOptions): FastifyInstance & { db: Database; swe
     if (!Number.isInteger(employees) || employees < 0) throw bad('Số lao động không hợp lệ')
     const listedSymbol = type === 'buyer' && typeof o.listedSymbol === 'string' && o.listedSymbol.trim() ? o.listedSymbol.trim().toUpperCase() : undefined
     if (listedSymbol && !/^[A-Z0-9]{2,6}$/.test(listedSymbol)) throw bad('Mã chứng khoán không hợp lệ')
-    if (db.userByEmail(email)) throw new HttpError(409, 'Email đã được đăng ký')
+    if (await db.userByEmail(email)) throw new HttpError(409, 'Email đã được đăng ký')
     if (state.orgs.some((x) => x.taxCode === taxCode)) throw new HttpError(409, 'Mã số thuế đã được đăng ký trên hệ thống')
 
     const org: Org = {
@@ -132,6 +158,7 @@ export function buildApp(opt: AppOptions): FastifyInstance & { db: Database; swe
       foundedYear, employees, province: str(o.province, 'tỉnh/thành'), createdAt: clock().toISOString(), verified: type === 'lender' ? false : undefined,
     }
     const user = { id: uid('u'), email, passwordHash: hashPassword(b.password), orgId: org.id, name: str(b.name, 'họ tên', 80), title: str(b.title, 'chức danh', 80), role: 'member' }
+    await serial(async () => {
     const draft: State = { ...state }
     draft.orgs = [...draft.orgs, org]
     draft.audit = [{ id: uid('EV'), at: clock().toISOString(), actorOrgId: org.id, action: 'Đăng ký tổ chức', entity: org.id, detail: `${org.name} (${type})` }, ...draft.audit]
@@ -140,12 +167,11 @@ export function buildApp(opt: AppOptions): FastifyInstance & { db: Database; swe
         draft.notifications = [{ id: uid('N'), orgId: f.id, at: clock().toISOString(), title: 'Tổ chức tài chính mới chờ xác minh', body: `${org.name} (MST ${org.taxCode})`, link: '/admin', read: false }, ...draft.notifications]
       }
     }
-    db.save(draft)
-    db.createUser(user)
-    state = draft
-    version++
+    await commit(draft)
+    await db.createUser(user)
+    })
     const token = newToken()
-    db.createSession(hashToken(token), user.id, SESSION_TTL)
+    await db.createSession(hashToken(token), user.id, SESSION_TTL)
     return reply.code(201).send({ token, ...snapshot({ ...user, passwordHash: undefined } as never) })
   })
 
@@ -153,7 +179,7 @@ export function buildApp(opt: AppOptions): FastifyInstance & { db: Database; swe
     const { email, password } = (req.body ?? {}) as { email?: string; password?: string }
     const key = `${String(email).toLowerCase()}|${req.ip}`
     if (loginLimit.blocked(key)) throw new HttpError(429, 'Đăng nhập sai quá nhiều lần, thử lại sau 15 phút')
-    const u = typeof email === 'string' ? db.userByEmail(email.toLowerCase()) : undefined
+    const u = typeof email === 'string' ? await db.userByEmail(email.toLowerCase()) : undefined
     // luôn băm một lần để thời gian phản hồi không lộ email nào tồn tại
     const ok = verifyPassword(typeof password === 'string' ? password : '', u?.passwordHash ?? hashPassword('dummy-password'))
     if (!u || !ok) {
@@ -162,12 +188,12 @@ export function buildApp(opt: AppOptions): FastifyInstance & { db: Database; swe
     }
     loginLimit.clear(key)
     const token = newToken()
-    db.createSession(hashToken(token), u.id, SESSION_TTL)
+    await db.createSession(hashToken(token), u.id, SESSION_TTL)
     return { token, ...snapshot(u) }
   })
 
   app.post('/api/auth/logout', async (req) => {
-    db.deleteSession(hashToken(auth(req).token))
+    await db.deleteSession(hashToken((await auth(req)).token))
     return { ok: true }
   })
 
@@ -187,40 +213,39 @@ export function buildApp(opt: AppOptions): FastifyInstance & { db: Database; swe
     const d = Object.hasOwn(DEV_ORGS, role) ? DEV_ORGS[role] : undefined
     if (!d) throw bad('Bên không hợp lệ (supplier | buyer | lender | fcc)')
     const email = `${role}${DEV_DOMAIN}`
-    let u = db.userByEmail(email)
-    if (!u) {
+    const u = await serial(async () => {
+      const found = await db.userByEmail(email)
+      if (found) return found
       const draft: State = { ...state }
       let org = draft.orgs.find((o) => o.taxCode === d.tax)
       if (!org) {
         org = { id: uid(d.type[0]), name: d.name, shortName: d.user, taxCode: d.tax, type: d.type, vsic: '0000', industryLabel: 'Chưa khai báo', industryGroup: 'manufacturing', foundedYear: clock().getFullYear(), employees: 0, province: 'Chưa khai báo', createdAt: clock().toISOString(), verified: d.type === 'lender' ? true : undefined }
         draft.orgs = [...draft.orgs, org]
-        db.save(draft)
-        state = draft
-        version++
+        await commit(draft)
       }
-      db.createUser({ id: uid('u'), email, passwordHash: hashPassword(randomBytes(24).toString('hex')), orgId: org.id, name: d.user, title: 'Tài khoản dev', role: role === 'fcc' ? 'fcc_reviewer' : 'member' })
-      u = db.userByEmail(email)!
-    }
+      await db.createUser({ id: uid('u'), email, passwordHash: hashPassword(randomBytes(24).toString('hex')), orgId: org.id, name: d.user, title: 'Tài khoản dev', role: role === 'fcc' ? 'fcc_reviewer' : 'member' })
+      return (await db.userByEmail(email))!
+    })
     const token = newToken()
-    db.createSession(hashToken(token), u.id, SESSION_TTL)
+    await db.createSession(hashToken(token), u.id, SESSION_TTL)
     return { token, ...snapshot(u) }
   })
 
   app.get('/api/state', async (req) => {
-    const { user } = auth(req)
+    const { user } = await auth(req)
     const since = Number((req.query as { since?: string }).since)
     if (since === version) return { version, unchanged: true }
     return snapshot(user)
   })
 
   app.post('/api/actions/:name', async (req) => {
-    const { user } = auth(req)
+    const { user } = await auth(req)
     const name = (req.params as { name: string }).name
     const fn = Object.hasOwn(actions, name) ? actions[name] : undefined
     if (!fn) throw notFound(`Không có hành động ${name}`)
     const args = (req.body as { args?: unknown[] } | undefined)?.args ?? []
     if (!Array.isArray(args)) throw bad('args phải là mảng')
-    const result = mutate(user, (c) => fn(c, ...args))
+    const result = await mutate(user, (c) => fn(c, ...args))
     return { result: result ?? null, ...snapshot(user) }
   })
 
@@ -228,37 +253,37 @@ export function buildApp(opt: AppOptions): FastifyInstance & { db: Database; swe
   // Mỗi tổ chức tài chính có khóa riêng (POST /api/webhook-secret). Chữ ký HMAC-SHA256(khóa, thân thô) ở header
   // x-fcc-signature, định danh tổ chức ở x-fcc-org, x-idempotency-key chống xử lý lặp.
   app.post('/api/webhook-secret', async (req) => {
-    const { user } = auth(req)
+    const { user } = await auth(req)
     const org = state.orgs.find((o) => o.id === user.orgId)
     if (org?.type !== 'lender' || !org.verified) throw new HttpError(403, 'Chỉ tổ chức tài chính đã được FCC xác minh mới có khóa webhook')
     const secret = randomBytes(32).toString('hex')
-    db.setWebhookSecret(org.id, secret)
+    await db.setWebhookSecret(org.id, secret)
     return { orgId: org.id, secret, note: 'Chỉ hiển thị một lần; tạo mới sẽ vô hiệu khóa cũ.' }
   })
 
   app.post('/api/webhooks/funding', async (req, reply) => {
     const raw = (req as FastifyRequest & { rawBody?: string }).rawBody ?? ''
     const orgId = String(req.headers['x-fcc-org'] ?? '')
-    const secret = db.getWebhookSecret(orgId)
+    const secret = await db.getWebhookSecret(orgId)
     const sig = String(req.headers['x-fcc-signature'] ?? '')
     const expect = createHmac('sha256', secret ?? randomBytes(32)).update(raw).digest('hex')
     if (!secret || sig.length !== expect.length || !timingSafeEqual(Buffer.from(sig), Buffer.from(expect))) throw new HttpError(401, 'Chữ ký không hợp lệ')
     const key = `${orgId}:${String(req.headers['x-idempotency-key'] ?? '')}`
     if (key.endsWith(':')) throw bad('Thiếu x-idempotency-key')
-    const prior = db.getIdempotent(key)
+    const prior = await db.getIdempotent(key)
     if (prior) return reply.header('x-idempotent-replay', 'true').send(JSON.parse(prior))
     const { applicationId } = (req.body ?? {}) as { applicationId?: string }
     const ap = state.applications.find((x) => x.id === applicationId)
     if (!ap || ap.lenderId !== orgId) throw notFound('Không tìm thấy hồ sơ của tổ chức này')
-    const changed = mutate({ id: `webhook:${orgId}`, orgId, role: 'member' }, (c) => fundApplication(c, ap, 'webhook của tổ chức tài chính'))
+    const changed = await mutate({ id: `webhook:${orgId}`, orgId, role: 'member' }, (c) => fundApplication(c, ap, 'webhook của tổ chức tài chính'))
     const body = { ok: true, applicationId, changed }
-    db.putIdempotent(key, JSON.stringify(body))
+    await db.putIdempotent(key, JSON.stringify(body))
     return body
   })
 
   // ---------------- proxy AI (khóa API chỉ nằm ở máy chủ) ----------------
   app.post('/api/ollama/:path', async (req, reply) => {
-    auth(req)
+    await auth(req)
     const path = (req.params as { path: string }).path
     if (path !== 'chat') throw notFound('Không hỗ trợ')
     if (!opt.ollamaKey) return reply.code(503).send({ error: 'Máy chủ chưa cấu hình OLLAMA_API_KEY' })
@@ -278,42 +303,40 @@ export function buildApp(opt: AppOptions): FastifyInstance & { db: Database; swe
 
   // ---------------- khởi tạo & tác vụ định kỳ ----------------
   if (opt.admin) {
-    if (!db.userByEmail(opt.admin.email.toLowerCase())) {
+    if (!(await db.userByEmail(opt.admin.email.toLowerCase()))) {
       const draft: State = { ...state }
       let fcc = draft.orgs.find((o) => o.type === 'fcc')
       if (!fcc) {
         fcc = { id: uid('f'), name: 'Vận hành nền tảng FCC', shortName: 'FCC', taxCode: 'FCC-OPS', type: 'fcc', vsic: '6399', industryLabel: 'Vận hành nền tảng', industryGroup: 'tech', foundedYear: clock().getFullYear(), employees: 0, province: '—', createdAt: clock().toISOString() }
         draft.orgs = [...draft.orgs, fcc]
-        db.save(draft)
-        state = draft
+        await commit(draft)
       }
-      db.createUser({ id: uid('u'), email: opt.admin.email.toLowerCase(), passwordHash: hashPassword(opt.admin.password), orgId: fcc.id, name: 'Quản trị FCC', title: 'Thẩm định & vận hành', role: 'fcc_reviewer' })
+      await db.createUser({ id: uid('u'), email: opt.admin.email.toLowerCase(), passwordHash: hashPassword(opt.admin.password), orgId: fcc.id, name: 'Quản trị FCC', title: 'Thẩm định & vận hành', role: 'fcc_reviewer' })
     }
   } else if (!opt.devAutologin && !state.orgs.some((o) => o.type === 'fcc')) {
     app.log.warn('Chưa có tài khoản nhân sự FCC (đặt ADMIN_EMAIL và ADMIN_PASSWORD): chưa ai xác minh được tổ chức tài chính hay thẩm định ESG')
   }
 
-  const sweep = () => {
-    try {
-      db.purgeSessions()
-      const draft: State = { ...state }
-      const ctx = makeCtx(draft, { id: 'system', orgId: draft.orgs[0]?.id ?? '', role: 'member' })
-      ctx.actor = { ...ctx.actor, id: 'system', shortName: 'Hệ thống' } // nhật ký ghi tác nhân là hệ thống
-      if (runSweep(ctx) > 0) {
-        db.save(draft)
-        state = draft
-        version++
+  const sweep = () =>
+    serial(async () => {
+      try {
+        await db.purgeSessions()
+        if (!state.orgs.length) return
+        const draft: State = { ...state }
+        const ctx = makeCtx(draft, { id: 'system', orgId: draft.orgs[0].id, role: 'member' })
+        ctx.actor = { ...ctx.actor, id: 'system', shortName: 'Hệ thống' } // nhật ký ghi tác nhân là hệ thống
+        if (runSweep(ctx) > 0) await commit(draft)
+      } catch (e) {
+        app.log.error(e, 'sweep failed')
       }
-    } catch (e) {
-      if (state.orgs.length) app.log.error(e, 'sweep failed')
-    }
-  }
-  const timer = setInterval(sweep, 60_000)
+    })
+  const timer = setInterval(() => void sweep(), 60_000)
   timer.unref()
   app.addHook('onClose', async () => {
     clearInterval(timer)
-    db.close()
+    await chain
+    await db.close()
   })
 
-  return Object.assign(app, { db, sweep, getState: () => state })
+  return Object.assign(app, { db, sweep, getState: () => state }) as FccApp
 }

@@ -9,11 +9,11 @@ import { AiTag, Badge, Button, Callout, Card, Empty, Progress, Table, Tabs } fro
 import { EsgBadge } from '../components/domain'
 import { HBar } from '../components/charts'
 import { PillarBars } from './Overview'
-import { computeEsg, ESG_BADGE, ESG_LEVEL_ACTION, ESG_OFFICIAL_COVERAGE, ESG_WEIGHTS, GRID_EMISSION_FACTOR, INDICATOR_BY_CODE, INDICATORS, INDUSTRY_GROUP_LABEL, ISSUES } from '../domain/esg'
-import { greenEligible, PRODUCT_TYPE_LABEL } from '../domain/marketplace'
+import { computeEsg, ESG_BADGE, ESG_LEVEL_ACTION, ESG_OFFICIAL_COVERAGE, ESG_WEIGHTS, GRID_EMISSION_FACTOR, INDICATOR_BY_CODE, INDICATORS, INDUSTRY_GROUP_LABEL, ISSUES } from '@fcc/domain/esg'
+import { greenEligible, PRODUCT_TYPE_LABEL } from '@fcc/domain/marketplace'
 import { classifyEvidence, fileToImage, proposeLevel, type EvidenceExtraction } from '../lib/ai'
 import { date, num, pct } from '../lib/format'
-import type { EsgAssessment, EsgIndicatorResult, IndicatorLevel, IndustryGroup } from '../domain/types'
+import type { EsgAssessment, EsgIndicatorResult, IndicatorLevel, IndustryGroup } from '@fcc/domain/types'
 
 export function Esg() {
   const org = useActiveOrg()

@@ -7,8 +7,8 @@ import { hasConsent, useOrgMap, useScores } from '../hooks'
 import { Badge, Button, Callout, Card, Field, inputCls, Modal } from '../components/ui'
 import { RatingBadge, ScorePanel, StateBadge } from '../components/domain'
 import { date, daysFromNow, vnd } from '../lib/format'
-import { SEGMENT_LABEL } from '../domain/credit'
-import type { ReceivableState } from '../domain/types'
+import { SEGMENT_LABEL } from '@fcc/domain/credit'
+import type { ReceivableState } from '@fcc/domain/types'
 
 const FLOW: { s: ReceivableState[]; label: string }[] = [
   { s: ['DRAFT'], label: 'Tạo hồ sơ' },

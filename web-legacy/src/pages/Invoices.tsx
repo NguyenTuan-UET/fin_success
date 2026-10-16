@@ -8,7 +8,7 @@ import { EsgBadge, RatingBadge, STATE_META, StateBadge } from '../components/dom
 import { date, vnd } from '../lib/format'
 import { invoiceFingerprint, parseEInvoiceXml, type ParsedInvoice } from '../lib/einvoice'
 import { extractInvoice, fileToImage, type AiOutcome, type ExtractedInvoice } from '../lib/ai'
-import type { ReceivableState } from '../domain/types'
+import type { ReceivableState } from '@fcc/domain/types'
 
 export function Invoices() {
   const org = useActiveOrg()

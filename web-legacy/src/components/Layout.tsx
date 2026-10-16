@@ -4,7 +4,7 @@ import clsx from 'clsx'
 import { Bell, Building2, Calculator, Database, FileText, Gauge, LayoutDashboard, Leaf, LogOut, Menu, Settings, ShieldCheck, Store, X } from 'lucide-react'
 import { SESSION_ROLES, useActiveOrg, useStore } from '../store'
 import { dateTime } from '../lib/format'
-import type { OrgType } from '../domain/types'
+import type { OrgType } from '@fcc/domain/types'
 
 const ROLE_LABEL: Record<OrgType, string> = { buyer: 'Bên mua', supplier: 'Nhà cung cấp', lender: 'Tổ chức tài chính', fcc: 'Nhân sự FCC' }
 

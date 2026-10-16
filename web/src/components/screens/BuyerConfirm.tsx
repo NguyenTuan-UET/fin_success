@@ -64,18 +64,14 @@ export function BuyerConfirm() {
   const s = PENDING.find((p) => p.id === sel) ?? PENDING[0];
   const left = PENDING.filter((p) => !dec[p.id]);
 
-  let pay = 0;
-  let save = 0;
   const rows = EARLY.map((e) => {
     const on = !!early[e.id];
     const sv = e.amt * e.d;
     const y = (e.d / e.days) * 365;
-    if (on) {
-      pay += e.amt - sv;
-      save += sv;
-    }
     return { ...e, on, sv, y };
   });
+  const pay = rows.reduce((a, r) => (r.on ? a + r.amt - r.sv : a), 0);
+  const save = rows.reduce((a, r) => (r.on ? a + r.sv : a), 0);
 
   const decide = (id: string, v: "ok" | "no") => {
     setDec((d) => ({ ...d, [id]: v }));

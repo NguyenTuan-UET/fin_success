@@ -5,7 +5,7 @@ import { api, ApiError, getToken, setToken } from './lib/api'
 import type {
   AppData, AuditEvent, CreditProfile, EarlyPaymentOffer, EsgAssessment, EsgDocument, EsgIndicatorResult, FinancialYear,
   FinancingProduct, FundingApplication, LedgerItem, Org, Receivable, Rfq, RfqResponse,
-} from './domain/types'
+} from '@fcc/domain/types'
 import type { Me } from './lib/api'
 
 type ServerState = AppData & { audit: AuditEvent[] }

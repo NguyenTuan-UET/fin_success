@@ -1,7 +1,7 @@
 // Dữ liệu trả về cho trình duyệt được lọc theo tổ chức đăng nhập: không gửi chứng từ, hồ sơ, sổ công nợ…
 // của tổ chức khác khi chưa có quyền chia sẻ (consent) còn hiệu lực.
-import type { Consent, Receivable } from '../../web-legacy/src/domain/types'
-import { iso } from '../../web-legacy/src/domain/util'
+import type { Consent, Receivable } from '@fcc/domain/types'
+import { iso } from '@fcc/domain/util'
 import type { State } from './state'
 
 type Scope = Consent['scopes'][number]

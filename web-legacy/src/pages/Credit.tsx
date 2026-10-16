@@ -8,9 +8,9 @@ import { AiTag, Badge, Button, Callout, Card, Empty, Field, inputCls, Modal, Tab
 import { RatingBadge, ScorePanel } from '../components/domain'
 import { PriceLine, QuarterBars } from '../components/charts'
 import { date, dateTime, vnd, num } from '../lib/format'
-import { detectAnomalies } from '../domain/credit'
+import { detectAnomalies } from '@fcc/domain/credit'
 import { extractFinancials, fileToImage, type AiOutcome, type ExtractedFinancials } from '../lib/ai'
-import type { CollateralItem, FinancialYear, ListedSnapshot, Org } from '../domain/types'
+import type { CollateralItem, FinancialYear, ListedSnapshot, Org } from '@fcc/domain/types'
 
 export function Credit() {
   const org = useActiveOrg()

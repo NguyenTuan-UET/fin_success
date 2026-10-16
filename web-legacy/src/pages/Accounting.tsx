@@ -7,7 +7,7 @@ import { hasConsent, useForecast, useOrgMap } from '../hooks'
 import { Badge, Button, Callout, Card, Empty, Field, inputCls, Modal, Table } from '../components/ui'
 import { CashflowChart } from '../components/charts'
 import { date, dateTime, daysFromNow, vnd } from '../lib/format'
-import type { LedgerItem } from '../domain/types'
+import type { LedgerItem } from '@fcc/domain/types'
 
 export function Accounting() {
   const org = useActiveOrg()

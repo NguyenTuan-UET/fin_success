@@ -42,7 +42,7 @@ Mỗi trang tự vào phiên của vai trò đó, dùng một tổ chức trốn
 - Backend ([server/](server/)): Fastify + SQLite. Luật nghiệp vụ và phân quyền ở [server/src/service.ts](server/src/service.ts); dữ liệu trả về trình duyệt được lọc theo quyền chia sẻ ở [server/src/views.ts](server/src/views.ts). Trình duyệt tự đồng bộ mỗi 4 giây nên nhiều người dùng thấy thay đổi của nhau.
 - AI: trình duyệt gọi `/api/ollama/chat` (cần có phiên); backend gắn khóa ollama.com (chỉ ở `server/.env`). Khi AI lỗi, tác vụ báo lỗi để nhập tay — không tự điền số liệu thay AI.
 - Tác vụ định kỳ mỗi phút: RFQ quá hạn → hết hạn và thu hồi quyền xem; đề nghị quá hạn chấp thuận → rút lại; khoản đến hạn chưa thanh toán → `OVERDUE`.
-- Kiểm thử: `cd server && npm test` (luồng end-to-end qua API từ CSDL trống, kèm phân quyền, webhook, khởi động lại); `cd web-legacy && npm test` (công thức chấm điểm).
+- Kiểm thử: `cd server && npm test` (luồng end-to-end qua API từ CSDL trống, kèm phân quyền, webhook, khởi động lại); `cd packages/domain && npm test` (công thức chấm điểm, dùng chung cho server và giao diện).
 
 ## Dữ liệu bên mua niêm yết (vnstock)
 

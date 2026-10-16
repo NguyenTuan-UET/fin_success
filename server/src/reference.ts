@@ -1,4 +1,4 @@
-import type { DataSource } from '../../web-legacy/src/domain/types'
+import type { DataSource } from '@fcc/domain/types'
 
 /** Danh mục nguồn dữ liệu đang được hệ thống sử dụng thật (cấu hình tham chiếu, không lưu trong DB). */
 export const SOURCES: DataSource[] = [

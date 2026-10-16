@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { computeEsg } from '../esg'
-import { estimateCost } from '../marketplace'
-import { toRating } from '../credit'
-import type { EsgIndicatorResult, FinancingProduct, IndicatorLevel } from '../types'
+import { computeEsg } from '../src/esg'
+import { estimateCost } from '../src/marketplace'
+import { toRating } from '../src/credit'
+import type { EsgIndicatorResult, FinancingProduct, IndicatorLevel } from '../src/types'
 
 const lv = (m: Record<string, number>): EsgIndicatorResult[] => Object.entries(m).map(([code, l]) => ({ code, finalLevel: l as IndicatorLevel }))
 

@@ -1,10 +1,10 @@
 import { useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { useStore } from './store'
-import { applicationScoreOf, buyerScoreOf, esgOf, supplierScoreOf } from './domain/engine'
-import { matchProduct, rankMatches, type MatchResult } from './domain/marketplace'
-import { forecastCash } from './domain/cashflow'
-import type { Consent, LedgerItem, Receivable } from './domain/types'
+import { applicationScoreOf, buyerScoreOf, esgOf, supplierScoreOf } from '@fcc/domain/engine'
+import { matchProduct, rankMatches, type MatchResult } from '@fcc/domain/marketplace'
+import { forecastCash } from '@fcc/domain/cashflow'
+import type { Consent, LedgerItem, Receivable } from '@fcc/domain/types'
 
 export function useData() {
   return useStore(useShallow((s) => ({ orgs: s.orgs, profiles: s.profiles, listed: s.listed, receivables: s.receivables, esg: s.esg, external: s.external, applications: s.applications })))

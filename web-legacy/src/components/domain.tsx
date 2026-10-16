@@ -3,9 +3,9 @@ import { num } from '../lib/format'
 import { AlertTriangle, ChevronDown, ChevronUp, FileSearch, Sparkles, TrendingDown, TrendingUp } from 'lucide-react'
 import clsx from 'clsx'
 import { AiTag, Badge, Button, Progress, type Tone } from './ui'
-import type { ScoreResult } from '../domain/credit'
-import type { Rating, ReceivableState } from '../domain/types'
-import { ESG_BADGE, esgLevel } from '../domain/esg'
+import type { ScoreResult } from '@fcc/domain/credit'
+import type { Rating, ReceivableState } from '@fcc/domain/types'
+import { ESG_BADGE, esgLevel } from '@fcc/domain/esg'
 import { explainScore, templateExplanation, type AiOutcome } from '../lib/ai'
 
 export const STATE_META: Record<ReceivableState, { label: string; tone: Tone }> = {
