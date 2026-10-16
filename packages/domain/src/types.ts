@@ -22,6 +22,34 @@ export interface Org {
   createdAt: string
   /** Tổ chức tài chính chỉ được công bố sản phẩm sau khi FCC xác minh pháp nhân/giấy phép */
   verified?: boolean
+  /** Xác minh danh tính người đại diện (eKYC qua nhà cung cấp, hoặc FCC đối chiếu giấy tờ) */
+  kyc?: OrgKyc
+}
+
+export interface OrgKyc {
+  status: 'pending' | 'verified' | 'rejected'
+  method: 'manual_documents' | 'ekyc_provider'
+  provider?: string
+  representativeName: string
+  /** Khóa đối tượng (SHA-256) của giấy tờ đã tải lên kho tệp */
+  documentKeys: string[]
+  submittedAt: string
+  submittedBy: string
+  decidedAt?: string
+  decidedBy?: string
+  note?: string
+}
+
+/** Bằng chứng ký khi doanh nghiệp đồng ý chia sẻ dữ liệu hoặc chấp thuận đề nghị. */
+export interface SignatureEvidence {
+  /** digital_signature: ký số từ xa qua nhà cung cấp chứng thực; mfa_snapshot: xác thực MFA + băm nội dung đã đồng ý */
+  method: 'digital_signature' | 'mfa_snapshot' | 'dev_session'
+  provider?: string
+  /** SHA-256 của nội dung đã ký (chuẩn hóa) */
+  contentSha256: string
+  userId: string
+  signedAt: string
+  certificateSerial?: string
 }
 
 export interface FinancialYear {
@@ -345,15 +373,20 @@ export interface Consent {
   grantedAt: string
   expiresAt: string
   revokedAt?: string
+  signature?: SignatureEvidence
 }
 
 export interface AuditEvent {
   id: string
   at: string
   actorOrgId: string
+  /** Người dùng thực hiện (không có với tác vụ hệ thống, webhook) */
+  actorUserId?: string
   action: string
   entity: string
   detail: string
+  /** Mã truy vết yêu cầu, nối nhật ký với log máy chủ */
+  correlationId?: string
 }
 
 export interface Notification {

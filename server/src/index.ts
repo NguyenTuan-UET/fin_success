@@ -1,5 +1,6 @@
 import { resolve } from 'node:path'
 import { buildApp } from './app'
+import { ObjectStore } from './storage'
 
 // FCC_ENV: dev (mặc định) | staging | production.
 // dev: không đăng nhập, mỗi vai trò (/supplier, /buyer, /lender, /fcc) tự vào phiên của vai trò đó — ai vào được cổng là dùng
@@ -21,6 +22,10 @@ if (!dbUrl) throw new Error('Thiếu DATABASE_URL')
 const app = await buildApp({
   devAutologin: dev,
   dbUrl,
+  // khóa mã hóa tệp và secret MFA: dev tự tạo ở data/data.key, staging/production bắt buộc FCC_DATA_KEY
+  dataKey: ObjectStore.keyFor(dev, resolve('data')),
+  filesDir: resolve(process.env.FILES_DIR ?? 'data/objects'),
+  appUrl: process.env.APP_URL ?? 'http://localhost:3000',
   listedDir: resolve(process.env.LISTED_DIR ?? '../web-legacy/public/listed'),
   admin: !dev && email && password ? { email, password } : undefined,
   ollamaKey: process.env.OLLAMA_API_KEY || undefined,

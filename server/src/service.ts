@@ -1,10 +1,10 @@
 // Luật nghiệp vụ FCC chạy phía máy chủ. Mỗi hành động kiểm tra quyền theo tổ chức đăng nhập (actor),
 // kiểm tra trạng thái hợp lệ, rồi mới thay đổi dữ liệu. Chuyển từ web-legacy/src/store.ts (trước đây chạy ở trình duyệt).
-import { randomBytes } from 'node:crypto'
+import { createHash, randomBytes } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type {
-  AccountingConnection, Consent, CreditProfile, EarlyPaymentOffer, EsgAssessment, EsgDocument, EsgIndicatorResult, FinancialYear,
+  AccountingConnection, Consent, CreditProfile, SignatureEvidence, EarlyPaymentOffer, EsgAssessment, EsgDocument, EsgIndicatorResult, FinancialYear,
   FinancingProduct, FundingApplication, LedgerItem, ListedSnapshot, Org, Receivable, ReceivableState, Rfq, RfqResponse,
 } from '@fcc/domain/types'
 import { iso } from '@fcc/domain/util'
@@ -12,21 +12,39 @@ import { applicationScoreOf, buyerScoreOf, esgOf, supplierScoreOf } from '@fcc/d
 import { matchProduct } from '@fcc/domain/marketplace'
 import { bad, conflict, forbidden, notFound, unprocessable } from './errors'
 import type { State } from './state'
+import type { MemberRole } from './auth/roles'
+import { canonical } from './state'
 
-export type Role = 'member' | 'fcc_reviewer'
+export type Role = MemberRole | 'system'
 
 export interface Ctx {
   actor: Org
+  /** Vai trò của người dùng ở tổ chức đang hoạt động; 'system' cho tác vụ định kỳ và webhook đã xác thực */
   role: Role
+  /** Người dùng thực hiện (không có với tác vụ hệ thống/webhook) */
+  userId?: string
+  /** Mã truy vết yêu cầu */
+  correlationId?: string
   /** Bản nháp trạng thái — chỉ được ghi nhận khi hành động thành công. */
   s: State
   now: Date
   listedDir: string
   /** Chế độ dev: sản phẩm của tổ chức tài chính được công bố ngay, không chờ FCC duyệt */
   autoApprove: boolean
-  /** Xác thực lại người dùng bằng mật khẩu cho thao tác có giá trị pháp lý; ném lỗi nếu sai. */
-  checkPassword: (password: string | undefined) => void
+  /** Phương thức xác thực của thao tác có giá trị pháp lý (route đã kiểm tra MFA trước khi gọi), dùng cho nhật ký và bằng chứng ký */
+  authMethod: 'mfa' | 'dev_session' | 'system'
 }
+
+/** Bằng chứng ký: băm nội dung đã đồng ý + phương thức xác thực của người ký. */
+export function signatureOf(c: Ctx, content: unknown): SignatureEvidence {
+  return {
+    method: c.authMethod === 'mfa' ? 'mfa_snapshot' : 'dev_session',
+    contentSha256: createHash('sha256').update(canonical(content)).digest('hex'),
+    userId: c.userId ?? 'system',
+    signedAt: c.now.toISOString(),
+  }
+}
+const authNote = (c: Ctx) => (c.authMethod === 'mfa' ? 'xác thực MFA' : c.authMethod === 'dev_session' ? 'phiên dev (không xác thực)' : 'hệ thống')
 
 const uid = (p: string) => `${p}-${randomBytes(4).toString('hex').toUpperCase()}`
 const vnd = (n: number) => n.toLocaleString('vi-VN')
@@ -36,13 +54,14 @@ const ACTIVE_APP = (a: FundingApplication) => !['REJECTED', 'WITHDRAWN'].include
 // ---------------- helper ----------------
 const orgName = (c: Ctx, id: string) => c.s.orgs.find((o) => o.id === id)?.shortName ?? id
 function log(c: Ctx, action: string, entity: string, detail: string) {
-  c.s.audit = [{ id: uid('EV'), at: c.now.toISOString(), actorOrgId: c.actor.id, action, entity, detail }, ...c.s.audit].slice(0, 1000)
+  c.s.audit = [{ id: uid('EV'), at: c.now.toISOString(), actorOrgId: c.actor.id, actorUserId: c.userId, action, entity, detail, correlationId: c.correlationId }, ...c.s.audit].slice(0, 1000)
 }
 function notify(c: Ctx, orgId: string, title: string, body: string, link?: string) {
   c.s.notifications = [{ id: uid('N'), orgId, at: c.now.toISOString(), title, body, link, read: false }, ...c.s.notifications]
 }
-function grantConsent(c: Ctx, k: Omit<Consent, 'id' | 'grantedAt'>) {
-  c.s.consents = [{ ...k, id: uid('CS'), grantedAt: iso(c.now) }, ...c.s.consents]
+function grantConsent(c: Ctx, k: Omit<Consent, 'id' | 'grantedAt' | 'signature'>) {
+  // nội dung đồng ý (bên nhận, mục đích, loại dữ liệu, thời hạn) được băm và ký bằng phương thức xác thực của người thao tác
+  c.s.consents = [{ ...k, id: uid('CS'), grantedAt: iso(c.now), signature: signatureOf(c, k) }, ...c.s.consents]
 }
 function patchRecv(c: Ctx, id: string, patch: Partial<Receivable>) {
   c.s.receivables = c.s.receivables.map((r) => (r.id === id ? { ...r, ...patch } : r))
@@ -148,15 +167,14 @@ export const actions: Record<string, Action> = {
     notify(c, r.buyerId, `Yêu cầu xác nhận ${r.code}`, `${orgName(c, r.sellerId)} đề nghị xác nhận khoản phải trả ${vnd(r.amount)} ₫.`, '/invoices')
     log(c, 'Gửi lời mời xác nhận', r.code, `Tới ${orgName(c, r.buyerId)}`)
   },
-  buyerDecision(c, id: string, confirm: boolean, reason?: string, password?: string) {
+  buyerDecision(c, id: string, confirm: boolean, reason?: string) {
     const r = recv(c, id)
     requireSelf(c, r.buyerId)
     requireState('Khoản phải thu', r.state, ['BUYER_PENDING'])
-    if (confirm) c.checkPassword(password)
-    else if (!reason?.trim()) throw bad('Cần nêu lý do tranh chấp')
+    if (!confirm && !reason?.trim()) throw bad('Cần nêu lý do tranh chấp')
     patchRecv(c, id, confirm ? { state: 'BUYER_CONFIRMED', confirmedAt: iso(c.now), disputeReason: undefined } : { state: 'BUYER_DISPUTED', disputeReason: reason!.trim().slice(0, 500) })
     notify(c, r.sellerId, confirm ? `${r.code} đã được xác nhận` : `${r.code} bị tranh chấp`, confirm ? `${orgName(c, r.buyerId)} xác nhận nghĩa vụ thanh toán phiên bản v${r.version}. Có thể đưa lên Marketplace.` : `Lý do: ${reason}`, '/invoices')
-    log(c, confirm ? 'Bên mua xác nhận' : 'Bên mua nêu tranh chấp', r.code, confirm ? `Phiên bản v${r.version}, xác thực lại bằng mật khẩu` : reason!)
+    log(c, confirm ? 'Bên mua xác nhận' : 'Bên mua nêu tranh chấp', r.code, confirm ? `Phiên bản v${r.version}, ${authNote(c)}` : reason!)
   },
   reviseDisputed(c, id: string, amount: number, note: string) {
     const r = recv(c, id)
@@ -304,17 +322,16 @@ export const actions: Record<string, Action> = {
     notify(c, r.sellerId, `${appId} bị từ chối`, reason, '/invoices')
     log(c, 'Đối tác từ chối hồ sơ', appId, reason)
   },
-  acceptOffer(c, appId: string, password?: string) {
+  acceptOffer(c, appId: string) {
     const a = app(c, appId)
     const r = recv(c, a.receivableId)
     requireSelf(c, r.sellerId)
     requireState('Hồ sơ', a.state, ['OFFERED'])
     if (a.offer && a.offer.expiresAt < iso(c.now)) throw conflict('Đề nghị đã hết hạn chấp thuận')
-    c.checkPassword(password)
     patchApp(c, appId, { state: 'ACCEPTED' })
     patchRecv(c, a.receivableId, { state: 'ACCEPTED' })
     notify(c, a.lenderId, `${appId}: doanh nghiệp chấp thuận đề nghị`, 'Tiến hành ký hợp đồng và giải ngân trên kênh của tổ chức tài chính.')
-    log(c, 'Doanh nghiệp chấp thuận đề nghị', appId, 'Xác thực lại bằng mật khẩu')
+    log(c, 'Doanh nghiệp chấp thuận đề nghị', appId, authNote(c))
   },
   fundApp(c, appId: string) {
     const a = app(c, appId)
@@ -400,6 +417,32 @@ export const actions: Record<string, Action> = {
     c.s.orgs = c.s.orgs.map((x) => (x.id === orgId ? { ...x, verified } : x))
     notify(c, orgId, verified ? 'Tổ chức đã được FCC xác minh' : 'FCC đã thu hồi xác minh', verified ? 'Bạn có thể đăng sản phẩm lên Marketplace.' : 'Sản phẩm đang công bố vẫn hiển thị cho đến khi FCC tạm dừng.')
     log(c, verified ? 'FCC xác minh tổ chức tài chính' : 'FCC thu hồi xác minh', orgId, o.name)
+  },
+
+  // ===== Xác minh danh tính người đại diện (eKYC / đối chiếu giấy tờ) =====
+  /** Chủ tổ chức nộp hồ sơ người đại diện; giấy tờ đã tải lên kho tệp (route kiểm tra tệp thuộc tổ chức). */
+  submitKyc(c, input: { representativeName: string; documentKeys: string[] }) {
+    if (c.actor.type === 'fcc') throw forbidden('Tổ chức FCC không cần eKYC')
+    const name = String(input?.representativeName ?? '').trim()
+    if (!name || name.length > 120) throw bad('Cần họ tên người đại diện theo pháp luật')
+    const keys = Array.isArray(input?.documentKeys) ? input.documentKeys : []
+    if (!keys.length || keys.length > 10 || !keys.every((k) => /^[0-9a-f]{64}$/.test(k))) throw bad('Cần 1–10 giấy tờ đã tải lên (CCCD/hộ chiếu, giấy phép đăng ký kinh doanh)')
+    if (c.actor.kyc?.status === 'verified') throw conflict('Tổ chức đã được xác minh')
+    const kyc = { status: 'pending' as const, method: 'manual_documents' as const, representativeName: name, documentKeys: keys, submittedAt: iso(c.now), submittedBy: c.userId ?? 'system' }
+    c.s.orgs = c.s.orgs.map((o) => (o.id === c.actor.id ? { ...o, kyc } : o))
+    for (const f of c.s.orgs.filter((x) => x.type === 'fcc')) notify(c, f.id, 'Hồ sơ xác minh người đại diện mới', `${c.actor.name} (MST ${c.actor.taxCode})`, '/admin')
+    log(c, 'Nộp hồ sơ xác minh người đại diện', c.actor.id, `${name} · ${keys.length} giấy tờ`)
+  },
+  decideKyc(c, orgId: string, approve: boolean, note?: string) {
+    requireType(c, 'fcc')
+    const o = c.s.orgs.find((x) => x.id === orgId)
+    if (!o?.kyc) throw notFound('Tổ chức chưa nộp hồ sơ xác minh')
+    requireState('Hồ sơ xác minh', o.kyc.status, ['pending'])
+    if (!approve && !note?.trim()) throw bad('Cần nêu lý do không xác minh')
+    const kyc = { ...o.kyc, status: approve ? ('verified' as const) : ('rejected' as const), decidedAt: iso(c.now), decidedBy: c.userId ?? 'system', note: note?.trim() || undefined }
+    c.s.orgs = c.s.orgs.map((x) => (x.id === orgId ? { ...x, kyc } : x))
+    notify(c, orgId, approve ? 'Người đại diện đã được xác minh' : 'Hồ sơ xác minh chưa đạt', approve ? 'FCC đã đối chiếu giấy tờ người đại diện.' : `Lý do: ${note}`, '/settings')
+    log(c, approve ? 'FCC xác minh người đại diện' : 'FCC từ chối hồ sơ xác minh', orgId, note?.trim() || o.kyc.representativeName)
   },
 
   // ===== Thanh toán sớm =====

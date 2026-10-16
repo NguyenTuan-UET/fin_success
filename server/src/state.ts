@@ -16,7 +16,10 @@ export const KEYS = {
 export type CollectionName = keyof typeof KEYS
 const NAMES = Object.keys(KEYS) as CollectionName[]
 
-export interface UserRow { id: string; email: string; passwordHash: string; orgId: string; name: string; title: string; role: string }
+export interface UserRow { id: string; email: string; passwordHash: string; orgId: string; name: string; title: string; role: string; mfaEnabled: boolean }
+export interface Membership { orgId: string; role: string; status: 'active' | 'revoked' }
+export interface SessionInfo { id: string; email: string; name: string; title: string; mfaEnabled: boolean; activeOrgId: string; role: string; mfaAt: Date | null }
+export interface MemberRow { userId: string; email: string; name: string; title: string; role: string; status: string; mfaEnabled: boolean; createdAt: Date }
 
 /** Ràng buộc nghiệp vụ ở mức CSDL → thông báo cho người dùng khi bị vi phạm. */
 const CONSTRAINT_MESSAGES: Record<string, string> = {
@@ -84,6 +87,38 @@ CREATE TABLE IF NOT EXISTS users (id text PRIMARY KEY, email text NOT NULL UNIQU
 CREATE TABLE IF NOT EXISTS sessions (token_hash text PRIMARY KEY, user_id text NOT NULL REFERENCES users(id) ON DELETE CASCADE, created_at timestamptz NOT NULL DEFAULT now(), expires_at timestamptz NOT NULL);
 CREATE TABLE IF NOT EXISTS webhook_keys (org_id text PRIMARY KEY, secret text NOT NULL, created_at timestamptz NOT NULL DEFAULT now());
 CREATE TABLE IF NOT EXISTS idempotency (key text PRIMARY KEY, response text NOT NULL, created_at timestamptz NOT NULL DEFAULT now());
+
+-- WP2: thành viên nhiều tổ chức, MFA, mời thành viên, đặt lại mật khẩu, hàng đợi email
+ALTER TABLE users ADD COLUMN IF NOT EXISTS mfa_secret text;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS mfa_enabled boolean NOT NULL DEFAULT false;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS mfa_last_step bigint NOT NULL DEFAULT 0;
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS active_org_id text;
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS mfa_at timestamptz;
+CREATE TABLE IF NOT EXISTS memberships (
+  user_id text NOT NULL REFERENCES users(id) ON DELETE CASCADE, org_id text NOT NULL, role text NOT NULL,
+  status text NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'revoked')),
+  created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY (user_id, org_id)
+);
+INSERT INTO memberships (user_id, org_id, role)
+  SELECT id, org_id, CASE WHEN role = 'fcc_reviewer' THEN 'fcc_admin' ELSE 'owner' END FROM users
+  ON CONFLICT DO NOTHING;
+CREATE TABLE IF NOT EXISTS invitations (
+  token_hash text PRIMARY KEY, org_id text NOT NULL, email text NOT NULL, role text NOT NULL, invited_by text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(), expires_at timestamptz NOT NULL, accepted_at timestamptz, accepted_by text
+);
+CREATE TABLE IF NOT EXISTS password_resets (
+  token_hash text PRIMARY KEY, user_id text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at timestamptz NOT NULL DEFAULT now(), expires_at timestamptz NOT NULL, used_at timestamptz
+);
+CREATE TABLE IF NOT EXISTS files (
+  key text NOT NULL, org_id text NOT NULL, name text NOT NULL, mime text NOT NULL, size bigint NOT NULL, kind text NOT NULL,
+  uploaded_by text NOT NULL, created_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY (key, org_id)
+);
+CREATE TABLE IF NOT EXISTS email_outbox (
+  id bigserial PRIMARY KEY, to_email text NOT NULL, subject text NOT NULL, body text NOT NULL, kind text NOT NULL,
+  dedupe_key text UNIQUE, created_at timestamptz NOT NULL DEFAULT now(), attempts int NOT NULL DEFAULT 0,
+  next_attempt_at timestamptz NOT NULL DEFAULT now(), sent_at timestamptz, last_error text
+);
 `
 
 export class Database {
@@ -199,11 +234,23 @@ export class Database {
     return { ok: true, count: rows.length, lastHash: prev }
   }
 
-  // ---- người dùng, phiên, khóa webhook ----
+  // ---- người dùng, thành viên, phiên ----
+  /** Tạo người dùng và thành viên đầu tiên (tổ chức gốc). */
   async createUser(u: { id: string; email: string; passwordHash: string; orgId: string; name: string; title: string; role: string }) {
-    await this.pool.query('INSERT INTO users (id, email, password_hash, org_id, name, title, role) VALUES ($1, $2, $3, $4, $5, $6, $7)', [u.id, u.email, u.passwordHash, u.orgId, u.name, u.title, u.role])
+    const c = await this.pool.connect()
+    try {
+      await c.query('BEGIN')
+      await c.query('INSERT INTO users (id, email, password_hash, org_id, name, title, role) VALUES ($1, $2, $3, $4, $5, $6, $7)', [u.id, u.email, u.passwordHash, u.orgId, u.name, u.title, u.role])
+      await c.query('INSERT INTO memberships (user_id, org_id, role) VALUES ($1, $2, $3)', [u.id, u.orgId, u.role])
+      await c.query('COMMIT')
+    } catch (e) {
+      await c.query('ROLLBACK').catch(() => undefined)
+      throw e
+    } finally {
+      c.release()
+    }
   }
-  private static USER_COLS = 'id, email, password_hash AS "passwordHash", org_id AS "orgId", name, title, role'
+  private static USER_COLS = 'id, email, password_hash AS "passwordHash", org_id AS "orgId", name, title, role, mfa_enabled AS "mfaEnabled"'
   async userByEmail(email: string) {
     return (await this.pool.query<UserRow>(`SELECT ${Database.USER_COLS} FROM users WHERE email = $1`, [email])).rows[0]
   }
@@ -213,16 +260,59 @@ export class Database {
   async countUsers() {
     return Number((await this.pool.query<{ n: string }>('SELECT COUNT(*) AS n FROM users')).rows[0].n)
   }
-  async createSession(tokenHash: string, userId: string, ttlMs: number) {
-    await this.pool.query('INSERT INTO sessions (token_hash, user_id, expires_at) VALUES ($1, $2, $3)', [tokenHash, userId, new Date(Date.now() + ttlMs)])
+  async setPassword(userId: string, passwordHash: string) {
+    await this.pool.query('UPDATE users SET password_hash = $2 WHERE id = $1', [userId, passwordHash])
+    await this.pool.query('DELETE FROM sessions WHERE user_id = $1', [userId]) // đổi mật khẩu thì thu hồi mọi phiên
   }
+  async membershipsOf(userId: string) {
+    return (await this.pool.query<Membership>(`SELECT org_id AS "orgId", role, status FROM memberships WHERE user_id = $1 AND status = 'active' ORDER BY created_at`, [userId])).rows
+  }
+  async addMembership(userId: string, orgId: string, role: string) {
+    await this.pool.query(
+      `INSERT INTO memberships (user_id, org_id, role) VALUES ($1, $2, $3)
+       ON CONFLICT (user_id, org_id) DO UPDATE SET role = excluded.role, status = 'active', updated_at = now()`,
+      [userId, orgId, role],
+    )
+  }
+  async membersOf(orgId: string) {
+    return (
+      await this.pool.query<MemberRow>(
+        `SELECT m.user_id AS "userId", u.email, u.name, u.title, m.role, m.status, u.mfa_enabled AS "mfaEnabled", m.created_at AS "createdAt"
+         FROM memberships m JOIN users u ON u.id = m.user_id WHERE m.org_id = $1 ORDER BY m.created_at`,
+        [orgId],
+      )
+    ).rows
+  }
+  async setMemberRole(orgId: string, userId: string, role: string) {
+    return (await this.pool.query(`UPDATE memberships SET role = $3, updated_at = now() WHERE org_id = $1 AND user_id = $2 AND status = 'active'`, [orgId, userId, role])).rowCount === 1
+  }
+  async revokeMember(orgId: string, userId: string) {
+    return (await this.pool.query(`UPDATE memberships SET status = 'revoked', updated_at = now() WHERE org_id = $1 AND user_id = $2 AND status = 'active'`, [orgId, userId])).rowCount === 1
+  }
+  async countActiveRole(orgId: string, role: string) {
+    return Number((await this.pool.query<{ n: string }>(`SELECT COUNT(*) AS n FROM memberships WHERE org_id = $1 AND role = $2 AND status = 'active'`, [orgId, role])).rows[0].n)
+  }
+
+  async createSession(tokenHash: string, userId: string, ttlMs: number, activeOrgId: string, mfaAt: Date | null = null) {
+    await this.pool.query('INSERT INTO sessions (token_hash, user_id, expires_at, active_org_id, mfa_at) VALUES ($1, $2, $3, $4, $5)', [tokenHash, userId, new Date(Date.now() + ttlMs), activeOrgId, mfaAt])
+  }
+  /** Người dùng của phiên + vai trò ở tổ chức đang hoạt động. Thành viên đã bị thu hồi thì không có phiên hợp lệ. */
   async sessionUser(tokenHash: string) {
     return (
-      await this.pool.query<Omit<UserRow, 'passwordHash'>>(
-        'SELECT u.id, u.email, u.org_id AS "orgId", u.name, u.title, u.role FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now()',
+      await this.pool.query<SessionInfo>(
+        `SELECT u.id, u.email, u.name, u.title, u.mfa_enabled AS "mfaEnabled", s.active_org_id AS "activeOrgId", m.role, s.mfa_at AS "mfaAt"
+         FROM sessions s JOIN users u ON u.id = s.user_id
+         JOIN memberships m ON m.user_id = u.id AND m.org_id = s.active_org_id AND m.status = 'active'
+         WHERE s.token_hash = $1 AND s.expires_at > now()`,
         [tokenHash],
       )
     ).rows[0]
+  }
+  async setActiveOrg(tokenHash: string, orgId: string) {
+    await this.pool.query('UPDATE sessions SET active_org_id = $2 WHERE token_hash = $1', [tokenHash, orgId])
+  }
+  async markSessionMfa(tokenHash: string, at: Date) {
+    await this.pool.query('UPDATE sessions SET mfa_at = $2 WHERE token_hash = $1', [tokenHash, at])
   }
   async deleteSession(tokenHash: string) {
     await this.pool.query('DELETE FROM sessions WHERE token_hash = $1', [tokenHash])
@@ -230,6 +320,69 @@ export class Database {
   async purgeSessions() {
     await this.pool.query('DELETE FROM sessions WHERE expires_at <= now()')
   }
+
+  // ---- MFA ----
+  async getMfa(userId: string) {
+    return (await this.pool.query<{ secret: string | null; enabled: boolean; lastStep: string }>('SELECT mfa_secret AS secret, mfa_enabled AS enabled, mfa_last_step AS "lastStep" FROM users WHERE id = $1', [userId])).rows[0]
+  }
+  async setMfaSecret(userId: string, sealedSecret: string | null, enabled: boolean) {
+    await this.pool.query('UPDATE users SET mfa_secret = $2, mfa_enabled = $3, mfa_last_step = 0 WHERE id = $1', [userId, sealedSecret, enabled])
+  }
+  async enableMfa(userId: string) {
+    await this.pool.query('UPDATE users SET mfa_enabled = true WHERE id = $1 AND mfa_secret IS NOT NULL', [userId])
+  }
+  /** Ghi nhận bước TOTP đã dùng; trả false nếu mã đã dùng (chống phát lại). */
+  async useMfaStep(userId: string, step: number) {
+    return (await this.pool.query('UPDATE users SET mfa_last_step = $2 WHERE id = $1 AND mfa_last_step < $2', [userId, step])).rowCount === 1
+  }
+
+  // ---- mời thành viên, đặt lại mật khẩu, email ----
+  async createInvitation(i: { tokenHash: string; orgId: string; email: string; role: string; invitedBy: string; ttlMs: number }) {
+    await this.pool.query('INSERT INTO invitations (token_hash, org_id, email, role, invited_by, expires_at) VALUES ($1, $2, $3, $4, $5, $6)', [i.tokenHash, i.orgId, i.email, i.role, i.invitedBy, new Date(Date.now() + i.ttlMs)])
+  }
+  async invitation(tokenHash: string) {
+    return (
+      await this.pool.query<{ orgId: string; email: string; role: string; expiresAt: Date; acceptedAt: Date | null }>(
+        'SELECT org_id AS "orgId", email, role, expires_at AS "expiresAt", accepted_at AS "acceptedAt" FROM invitations WHERE token_hash = $1',
+        [tokenHash],
+      )
+    ).rows[0]
+  }
+  async pendingInvitations(orgId: string) {
+    return (
+      await this.pool.query<{ email: string; role: string; createdAt: Date; expiresAt: Date }>(
+        'SELECT email, role, created_at AS "createdAt", expires_at AS "expiresAt" FROM invitations WHERE org_id = $1 AND accepted_at IS NULL AND expires_at > now() ORDER BY created_at DESC',
+        [orgId],
+      )
+    ).rows
+  }
+  /** Đánh dấu đã dùng (một lần); trả false nếu đã dùng hoặc hết hạn. */
+  async consumeInvitation(tokenHash: string, userId: string) {
+    return (await this.pool.query('UPDATE invitations SET accepted_at = now(), accepted_by = $2 WHERE token_hash = $1 AND accepted_at IS NULL AND expires_at > now()', [tokenHash, userId])).rowCount === 1
+  }
+  async createPasswordReset(tokenHash: string, userId: string, ttlMs: number) {
+    await this.pool.query('INSERT INTO password_resets (token_hash, user_id, expires_at) VALUES ($1, $2, $3)', [tokenHash, userId, new Date(Date.now() + ttlMs)])
+  }
+  async consumePasswordReset(tokenHash: string) {
+    return (await this.pool.query<{ userId: string }>('UPDATE password_resets SET used_at = now() WHERE token_hash = $1 AND used_at IS NULL AND expires_at > now() RETURNING user_id AS "userId"', [tokenHash])).rows[0]?.userId
+  }
+  // ---- tệp: metadata theo tổ chức (nội dung ở kho tệp mã hóa) ----
+  async addFile(f: { key: string; orgId: string; name: string; mime: string; size: number; kind: string; uploadedBy: string }) {
+    await this.pool.query(
+      'INSERT INTO files (key, org_id, name, mime, size, kind, uploaded_by) VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT (key, org_id) DO NOTHING',
+      [f.key, f.orgId, f.name, f.mime, f.size, f.kind, f.uploadedBy],
+    )
+  }
+  async fileOf(key: string, orgId: string) {
+    return (await this.pool.query<{ key: string; name: string; mime: string; size: string; kind: string }>('SELECT key, name, mime, size, kind FROM files WHERE key = $1 AND org_id = $2', [key, orgId])).rows[0]
+  }
+  async anyFile(key: string) {
+    return (await this.pool.query<{ name: string; mime: string }>('SELECT name, mime FROM files WHERE key = $1 LIMIT 1', [key])).rows[0]
+  }
+  async queueEmail(m: { to: string; subject: string; body: string; kind: string; dedupeKey?: string }) {
+    await this.pool.query('INSERT INTO email_outbox (to_email, subject, body, kind, dedupe_key) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (dedupe_key) DO NOTHING', [m.to, m.subject, m.body, m.kind, m.dedupeKey ?? null])
+  }
+
   async getWebhookSecret(orgId: string) {
     return (await this.pool.query<{ secret: string }>('SELECT secret FROM webhook_keys WHERE org_id = $1', [orgId])).rows[0]?.secret
   }

@@ -1,12 +1,20 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createHmac } from 'node:crypto'
 import { dropSchema, newSchema, startApp } from './helpers'
+import { totp } from '../src/auth/totp'
 import type { FinancingProduct, FundingApplication, Receivable, Rfq } from '@fcc/domain/types'
 
 const schema = newSchema()
 const ADMIN = { email: 'ops@example.test', password: 'ops-password-123' }
 const PW = 'correct-horse-battery'
-let app = await startApp(schema, { admin: ADMIN })
+// Đồng hồ của app tiến 30 giây mỗi khi test cần một mã TOTP mới (mã đã dùng không dùng lại được).
+let offset = 0
+const now = () => new Date(Date.now() + offset)
+const code = (secret: string) => {
+  offset += 30_000
+  return totp(secret, now().getTime())
+}
+let app = await startApp(schema, { admin: ADMIN, now })
 const iso = (d: Date) => d.toISOString().slice(0, 10)
 const due = iso(new Date(Date.now() + 40 * 86_400_000))
 
@@ -17,6 +25,20 @@ async function post(path: string, body: unknown, token?: string, headers: Record
 }
 const act = (token: string, name: string, ...args: unknown[]) => post(`/api/actions/${name}`, { args }, token)
 const getState = async (token: string) => (await app.inject({ method: 'GET', url: '/api/state', headers: { authorization: `Bearer ${token}` } })).json().state as Json
+
+/** Bật MFA cho tài khoản của phiên; trả secret để tạo mã về sau. */
+const secrets = new Map<string, string>()
+const nextCode = code
+async function enableMfa(token: string) {
+  const s = await post('/api/auth/mfa/setup', {}, token)
+  expect(s.status, JSON.stringify(s.body)).toBe(200)
+  const e = await post('/api/auth/mfa/enable', { code: code(s.body.secret) }, token)
+  expect(e.status, JSON.stringify(e.body)).toBe(200)
+  secrets.set(token, s.body.secret)
+  return s.body.secret as string
+}
+/** Làm cũ thời điểm MFA của phiên (giả lập đã quá 10 phút). */
+const staleMfa = (token: string) => app.db.rawQuery(`UPDATE sessions SET mfa_at = $2 WHERE token_hash = encode(sha256($1::bytea), 'hex')`, [token, new Date(now().getTime() - 11 * 60_000)])
 
 let mst = 3_000_000_000
 async function register(type: 'buyer' | 'supplier' | 'lender', name: string, extra: Record<string, unknown> = {}) {
@@ -47,6 +69,7 @@ describe('luồng tài trợ chuỗi cung ứng — không có dữ liệu mẫu
     const r = await post('/api/auth/login', ADMIN)
     expect(r.status).toBe(200)
     admin = r.body.token
+    await enableMfa(admin)
   })
 
   it('CSDL mới hoàn toàn trống ngoài tài khoản FCC', async () => {
@@ -101,18 +124,28 @@ describe('luồng tài trợ chuỗi cung ứng — không có dữ liệu mẫu
     expect((await act(S.token, 'createReceivable', { ...input, invoiceNumber: '3', buyerId: L1.orgId })).status).toBe(400)
   })
 
-  it('bên mua phải nhập lại mật khẩu mới xác nhận được; người khác không xác nhận hộ', async () => {
+  it('bên mua phải có MFA (bật và xác thực trong 10 phút) mới xác nhận được; người khác không xác nhận hộ', async () => {
     expect((await act(S.token, 'sendToBuyer', rec.id)).status).toBe(200)
-    expect((await act(S.token, 'buyerDecision', rec.id, true, undefined, PW)).status).toBe(403)
-    expect((await act(B.token, 'buyerDecision', rec.id, true)).status).toBe(401)
-    expect((await act(B.token, 'buyerDecision', rec.id, true, undefined, 'sai-mat-khau')).status).toBe(401)
-    const ok = await act(B.token, 'buyerDecision', rec.id, true, undefined, PW)
+    expect((await act(S.token, 'buyerDecision', rec.id, true)).status).toBe(403)
+    const noMfa = await act(B.token, 'buyerDecision', rec.id, true)
+    expect(noMfa.status).toBe(403) // chưa bật MFA
+    expect(noMfa.body.error).toContain('MFA')
+    const secret = await enableMfa(B.token)
+    await staleMfa(B.token)
+    expect((await act(B.token, 'buyerDecision', rec.id, true)).status).toBe(401) // MFA đã quá 10 phút
+    expect((await post('/api/auth/mfa/verify', { code: '000000' }, B.token)).status).toBe(401)
+    expect((await post('/api/auth/mfa/verify', { code: nextCode(secret) }, B.token)).status).toBe(200)
+    const ok = await act(B.token, 'buyerDecision', rec.id, true)
     expect(ok.status).toBe(200)
     expect(ok.body.state.receivables.find((r: Receivable) => r.id === rec.id).state).toBe('BUYER_CONFIRMED')
   })
 
   it('RFQ → báo giá của tổ chức tài chính thật (không có phản hồi giả lập) → chọn báo giá', async () => {
     expect((await act(S.token, 'simulateRfqResponses', 'x')).status).toBe(404)
+    expect((await act(S.token, 'createRfq', rec.id, [p1, p2])).status).toBe(403) // chia sẻ dữ liệu cần MFA
+    await enableMfa(S.token)
+    await enableMfa(L1.token)
+    await enableMfa(L2.token)
     const c = await act(S.token, 'createRfq', rec.id, [p1, p2])
     expect(c.status, JSON.stringify(c.body)).toBe(200)
     rfq = c.body.result
@@ -153,9 +186,13 @@ describe('luồng tài trợ chuỗi cung ứng — không có dữ liệu mẫu
     const offer = { advanceVnd: 1_200_000_000, ratePct: 9.5, feesVnd: 1_000_000, tenorDays: 40, conditions: 'Có truy đòi', expiresAt: iso(new Date(Date.now() + 5 * 86_400_000)) }
     expect((await act(L1.token, 'makeOffer', fa.id, { ...offer, advanceVnd: 9_999_999_999 })).status).toBe(400)
     expect((await act(L1.token, 'makeOffer', fa.id, offer)).status).toBe(200)
+    await staleMfa(S.token)
     expect((await act(S.token, 'acceptOffer', fa.id)).status).toBe(401)
-    expect((await act(S.token, 'acceptOffer', fa.id, 'sai-mat-khau')).status).toBe(401)
-    expect((await act(S.token, 'acceptOffer', fa.id, PW)).status).toBe(200)
+    expect((await post('/api/auth/mfa/verify', { code: nextCode(secrets.get(S.token)!) }, S.token)).status).toBe(200)
+    const acc = await act(S.token, 'acceptOffer', fa.id)
+    expect(acc.status).toBe(200)
+    const consent = acc.body.state.consents.find((k: Json) => k.recipientId === L1.orgId && k.purpose.startsWith('Hồ sơ đầy đủ'))
+    expect(consent.signature).toMatchObject({ method: 'mfa_snapshot', contentSha256: expect.stringMatching(/^[0-9a-f]{64}$/) })
     expect((await act(S.token, 'fundApp', fa.id)).status).toBe(403)
 
     const k1 = await post('/api/webhook-secret', {}, L1.token)
@@ -215,10 +252,13 @@ describe('luồng tài trợ chuỗi cung ứng — không có dữ liệu mẫu
   it('dữ liệu và tài khoản còn nguyên sau khi khởi động lại; thu hồi phiên khi đăng xuất', async () => {
     const before = app.getState().receivables.map((r) => r.id)
     await app.close()
-    app = await startApp(schema, { admin: ADMIN })
+    app = await startApp(schema, { admin: ADMIN, now })
     expect(app.getState().receivables.map((r) => r.id)).toEqual(before)
-    const lg = await post('/api/auth/login', { email: B.email, password: PW })
-    expect(lg.status).toBe(200)
+    const needCode = await post('/api/auth/login', { email: B.email, password: PW })
+    expect(needCode.status).toBe(401)
+    expect(needCode.body.mfaRequired).toBe(true)
+    const lg = await post('/api/auth/login', { email: B.email, password: PW, code: nextCode(secrets.get(B.token)!) })
+    expect(lg.status, JSON.stringify(lg.body)).toBe(200)
     expect((await post('/api/auth/logout', {}, lg.body.token)).status).toBe(200)
     expect((await app.inject({ method: 'GET', url: '/api/state', headers: { authorization: `Bearer ${lg.body.token}` } })).statusCode).toBe(401)
   })
