@@ -1,10 +1,37 @@
 # FCC — đặc tả hoàn thiện chức năng (từ hiện trạng tới pilot)
 
-**Phiên bản:** 1.1 · **Ngày:** 16/10/2026 · **Đọc kèm:** [SPEC_FCC_MVP.md](SPEC_FCC_MVP.md) (v2.0), [REPPORT_FINSUCCESS.md](REPPORT_FINSUCCESS.md) (hồ sơ dự án)
+**Phiên bản:** 1.2 · **Ngày:** 16/10/2026 · **Đọc kèm:** [SPEC_FCC_MVP.md](SPEC_FCC_MVP.md) (v2.0), [REPPORT_FINSUCCESS.md](REPPORT_FINSUCCESS.md) (hồ sơ dự án)
 
 `SPEC_FCC_MVP.md` mô tả **hệ thống cần có**: nguyên tắc, yêu cầu F01–F27, mô hình dữ liệu, API, pháp lý. Tài liệu này mô tả **cách đi từ code hiện tại tới đủ chức năng** mà hồ sơ dự án cam kết: hiện trạng từng yêu cầu, quyết định phạm vi, gói việc (WP) kèm tiêu chí nghiệm thu, và thứ tự làm. Khi hai tài liệu khác nhau về phạm vi, tài liệu này áp dụng cho phase hiện tại; nguyên tắc ở mục 1.2 của SPEC v2.0 vẫn giữ nguyên.
 
 **Thay đổi so với 1.0:** phía ngân hàng/tổ chức tài chính được **giả lập** thay vì bỏ trống; mọi chức năng khác trong hồ sơ dự án đều làm thật. Bổ sung theo hồ sơ dự án: tài sản bảo đảm và định giá sơ bộ, phân loại (i)/(ii)/(iii), xác thực hóa đơn với cơ quan thuế, đồng bộ hóa đơn điện tử, chữ ký số khi chia sẻ dữ liệu, sổ nhật ký chống sửa (thay blockchain), bút toán khi giải ngân/tất toán, phí và doanh thu, phát hiện gian lận. vnstock chuyển từ "ưu tiên thấp" sang nguồn chính cho bên mua đầu chuỗi niêm yết.
+
+## 0. Trạng thái thực hiện (cập nhật cuối ngày 16/10/2026)
+
+Các mục 1 và 3 bên dưới là **hiện trạng trước khi thực hiện** (giữ để đối chiếu). Bảng này là trạng thái sau khi thực hiện.
+
+| Gói | Trạng thái | Ghi chú / còn lại |
+| --- | --- | --- |
+| WP0 Dọn nền | Xong | `packages/domain` dùng chung; `web-legacy/` đã gỡ (ảnh mẫu chuyển `ocr_lab/samples/`); CI còn `server`, `web`, `packages/domain`, `sim-bank`. Chưa sinh client TypeScript từ OpenAPI (giao diện dùng `api()` gọi trực tiếp) |
+| WP1 Dữ liệu | Xong | PostgreSQL, ràng buộc duy nhất, nhật ký chuỗi băm, kho tệp mã hóa, sao lưu + diễn tập khôi phục, di chuyển từ SQLite |
+| WP2 Danh tính | Xong, trừ phần nhà cung cấp ngoài | Nhiều tổ chức/vai trò, MFA TOTP, step-up, KYC bằng giấy tờ FCC đối chiếu. Chữ ký số từ xa và eKYC qua nhà cung cấp: chưa tích hợp (chờ chọn nhà cung cấp, quyết định 8) |
+| WP3 API | Xong | `/v1` + OpenAPI sinh từ bảng endpoint, SSE, khóa tích hợp theo phạm vi, webhook hai chiều ký HMAC, `Idempotency-Key`, cursor |
+| WP4 Giao diện | Xong | `web/` nối backend, không còn dữ liệu cứng; PWA (manifest, service worker chỉ lưu vỏ ứng dụng, không lưu API); e2e Playwright 4 ngữ cảnh |
+| WP5 Hóa đơn | Xong, trừ tra cứu tự động | Luật bất thường, hóa đơn điều chỉnh, hàng đợi cờ, đối chiếu thuế nhập thủ công có hỗ trợ (cổng thuế không cho tự động hóa — xem WP10). OCR dùng AI thị giác (`gemma4:31b`), người dùng xác nhận trước khi lưu; `ocr_lab/` giữ làm thí nghiệm đối chiếu |
+| WP6 Chấm điểm tín dụng | Xong | Chấm ở máy chủ, bất biến (trigger), tái lập theo `input_hash`, xem xét lại, phiên bản bộ chấm điểm cần hai người duyệt. Tham số vẫn là giá trị khởi tạo cần chuyên gia hiệu chỉnh (quyết định 5) |
+| WP7 ESG | Xong | Luật bằng chứng/lý do/bao phủ ở máy chủ; phát hành cần FCC reviewer + MFA |
+| WP8 Marketplace, tài trợ, thu hồi | Xong | Đủ vòng RFQ → giải ngân → thu hồi phí → lãi → gốc (lãi quá hạn), một phần, đối soát, thanh lý tài sản, hoàn phần dư; định giá sơ bộ tài sản bảo đảm và phân loại (i)/(ii)/(iii); EWS. Loại sản phẩm bảo lãnh/LC để sau |
+| WP9 Kế toán, dòng tiền | Xong | Bút toán đề xuất TT133/TT200 (xuất file), sao kê giả lập, dự báo 3 kịch bản lưu kèm sai số. Chưa có connector trực tiếp (MISA…), dùng nhập CSV |
+| WP10 Dữ liệu ngoài | Xong theo phạm vi cho phép | Crawl loại A (website doanh nghiệp tự khai) có robots.txt, giới hạn tần suất, SSRF, dừng khi CAPTCHA/đăng nhập, bản chụp có băm, parser lỗi không ghi dữ liệu, khiếu nại; nguồn nhà nước loại B nhập thủ công có hỗ trợ. **Kết quả khảo sát 16/10/2026:** cổng thuế và cổng bản án không kết nối được; đăng ký kinh doanh/BHXH chuyển hướng, robots 404; muasamcong, hóa đơn điện tử là ứng dụng một trang có mã xác thực; báo chí chặn truy cập tự động → không có nguồn nhà nước nào tự động hóa được. vnstock: FCC xác minh ánh xạ MST ↔ mã trước khi nạp, ý kiến kiểm toán/diện cảnh báo nhập tay có nguồn. Chưa làm: job nạp vnstock định kỳ (chạy script tay), dọn bản chụp quá 24 tháng |
+| WP11 Thông báo | Xong | Hàng đợi email có thử lại (SMTP), tùy chọn theo loại thông báo |
+| WP12 Quản trị | Xong, trừ việc hạ tầng | KPI thật, xuất và kiểm tra nhật ký, auditor chỉ đọc + ghi lại mọi lần truy cập, rate limit, tiêu đề bảo mật, [VAN_HANH.md](VAN_HANH.md). Việc cần người triển khai: TLS ở proxy, secret manager, cảnh báo job, neo băm ra ngoài, quyết định AI nội bộ hay dịch vụ ngoài |
+| WP13 Trợ lý | Một phần | Trợ lý chỉ diễn giải dữ kiện do máy chủ trả (`facts.ts`) và có luật từ chối ngoài phạm vi. Chưa có bộ câu hỏi mẫu tự động vì cần mô hình thật chạy |
+| WP14 Ngân hàng giả lập | Xong | 3 tổ chức hư cấu qua API đối tác + webhook, bảng điều khiển kịch bản |
+| WP15 Phí, doanh thu | Xong | Biểu phí có phiên bản, 6 nguồn thu, hóa đơn phí in được, xuất CSV, quy trình tính phí hằng tháng |
+
+**Kiểm thử:** `server` 78 test, `packages/domain` 37, `sim-bank` 5, e2e Playwright 2 kịch bản (cần CSDL mới mỗi lần chạy).
+
+**Việc còn lại trước pilot (không thuộc code):** các quyết định ở mục 6 (AI, giấy phép vnstock, pháp chế cho nguồn crawl, nhà cung cấp chữ ký số/eKYC/email, biểu phí, hiệu chỉnh tham số chấm điểm); hạ tầng staging có TLS; đổi khóa Ollama đã lộ trong hội thoại phát triển.
 
 ## 1. Hiện trạng code (16/10/2026)
 
