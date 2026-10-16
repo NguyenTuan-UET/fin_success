@@ -782,7 +782,12 @@ export const actions: Record<string, Action> = {
     const snap: ListedSnapshot = { ...j.snapshot, orgId: c.actor.id }
     const financials = j.financials.map((f) => ({ ...f, status: 'public_reference' as const }))
     c.s.listed = [snap, ...c.s.listed.filter((l) => l.orgId !== snap.orgId)]
-    c.s.profiles = c.s.profiles.map((p) => (p.orgId === snap.orgId && financials.length ? { ...p, financials } : p))
+    if (financials.length) {
+      // bên mua chưa có hồ sơ tín dụng thì tạo mới, nếu không BCTC vừa nạp bị bỏ và điểm báo "Thiếu BCTC"
+      c.s.profiles = c.s.profiles.some((p) => p.orgId === snap.orgId)
+        ? c.s.profiles.map((p) => (p.orgId === snap.orgId ? { ...p, financials } : p))
+        : [...c.s.profiles, { orgId: snap.orgId, financials, collateral: [] }]
+    }
     log(c, 'Cập nhật dữ liệu niêm yết', snap.symbol, `${snap.provider} · ${financials.length} năm BCTC`)
     return snap
   },

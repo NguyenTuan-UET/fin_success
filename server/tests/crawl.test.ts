@@ -183,6 +183,10 @@ describe('dữ liệu niêm yết (vnstock): chỉ nạp sau khi FCC xác minh �
     expect((await post(`/v1/organizations/${buyer.id}/listed-verification`, { note: 'Đối chiếu MST với công bố thông tin trên HOSE ngày 16/10/2026' }, F)).status).toBe(200)
     expect((await act(B, 'refreshListed', 'HPG')).status).toBe(200)
     expect(app.getState().listed.find((l) => l.orgId === buyer.id)?.symbol).toBe('HPG')
+    // BCTC từ vnstock phải vào hồ sơ tín dụng ngay cả khi bên mua chưa có hồ sơ; điểm không còn báo thiếu BCTC
+    const fin = app.getState().profiles.find((p) => p.orgId === buyer.id)?.financials ?? []
+    expect(fin.map((f) => f.year)).toEqual([2025, 2024, 2023])
+    expect(fin.every((f) => f.status === 'public_reference')).toBe(true)
     expect((await post(`/v1/organizations/${buyer.id}/listed-flags`, { auditOpinion: 'qualified', note: 'x' }, F)).status).toBe(422)
     expect((await post(`/v1/organizations/${buyer.id}/listed-flags`, { auditOpinion: 'qualified', tradingStatus: 'warning', note: 'BCTC kiểm toán 2025 công bố trên HOSE' }, F)).status).toBe(200)
     expect(app.getState().listed.find((l) => l.orgId === buyer.id)).toMatchObject({ auditOpinion: 'qualified', tradingStatus: 'warning' })
