@@ -36,6 +36,8 @@ export interface Ctx {
   autoApprove: boolean
   /** Sự kiện nghiệp vụ phát sinh trong hành động; sau khi ghi thành công được chuyển tới webhook của đối tác */
   events?: DomainEvent[]
+  /** Thông báo vừa tạo; sau khi ghi thành công được chuyển thành email cho thành viên của tổ chức nhận (theo tùy chọn) */
+  notices?: { id: string; orgId: string; title: string; body: string; link?: string }[]
   /** Phương thức xác thực của thao tác có giá trị pháp lý (route đã kiểm tra MFA trước khi gọi), dùng cho nhật ký và bằng chứng ký */
   authMethod: 'mfa' | 'dev_session' | 'system'
 }
@@ -75,7 +77,9 @@ function log(c: Ctx, action: string, entity: string, detail: string) {
   c.s.audit = [{ id: uid('EV'), at: c.now.toISOString(), actorOrgId: c.actor.id, actorUserId: c.userId, action, entity, detail, correlationId: c.correlationId }, ...c.s.audit].slice(0, 1000)
 }
 function notify(c: Ctx, orgId: string, title: string, body: string, link?: string) {
-  c.s.notifications = [{ id: uid('N'), orgId, at: c.now.toISOString(), title, body, link, read: false }, ...c.s.notifications]
+  const n = { id: uid('N'), orgId, at: c.now.toISOString(), title, body, link, read: false }
+  c.s.notifications = [n, ...c.s.notifications]
+  c.notices?.push({ id: n.id, orgId, title, body, link })
 }
 function grantConsent(c: Ctx, k: Omit<Consent, 'id' | 'grantedAt' | 'signature'>) {
   // nội dung đồng ý (bên nhận, mục đích, loại dữ liệu, thời hạn) được băm và ký bằng phương thức xác thực của người thao tác

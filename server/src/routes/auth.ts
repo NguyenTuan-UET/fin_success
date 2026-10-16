@@ -8,6 +8,7 @@ import { newTotpSecret, otpauthUri, verifyTotp } from '../auth/totp'
 import { seal, unseal } from '../auth/seal'
 import { ROLE_LABEL, type MemberRole } from '../auth/roles'
 import { HttpError, bad, notFound } from '../errors'
+import { EMAIL_KINDS } from '../integrations/mailer'
 
 export const SESSION_TTL = 12 * 3600_000
 const RESET_TTL = 60 * 60_000
@@ -176,6 +177,24 @@ export function authRoutes(app: FastifyInstance, core: Core) {
     await checkCode(a.id, (req.body as { code?: string } | undefined)?.code)
     await db.setMfaSecret(a.id, null, false)
     await logSecurity(a, 'Tắt xác thực hai lớp (MFA)')
+    return { ok: true }
+  })
+
+  // ---- tùy chọn nhận email ----
+  app.get('/api/auth/email-prefs', async (req) => {
+    const a = await core.auth(req)
+    const prefs = await db.emailPrefs(a.id)
+    return { kinds: Object.entries(EMAIL_KINDS).map(([k, label]) => ({ kind: k, label, enabled: k === 'account' ? true : prefs[k] !== false, locked: k === 'account' })) }
+  })
+  app.post('/api/auth/email-prefs', async (req) => {
+    const a = await core.auth(req)
+    const body = ((req.body ?? {}) as { prefs?: Record<string, unknown> }).prefs ?? {}
+    const clean: Record<string, boolean> = {}
+    for (const [k, v] of Object.entries(body)) {
+      if (!(k in EMAIL_KINDS)) throw bad(`Loại thông báo không hợp lệ: ${k}`)
+      if (k !== 'account') clean[k] = !!v
+    }
+    await db.setEmailPrefs(a.id, { ...(await db.emailPrefs(a.id)), ...clean })
     return { ok: true }
   })
 

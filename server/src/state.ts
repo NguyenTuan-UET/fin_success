@@ -90,6 +90,7 @@ CREATE TABLE IF NOT EXISTS idempotency (key text PRIMARY KEY, response text NOT 
 
 -- WP2: thành viên nhiều tổ chức, MFA, mời thành viên, đặt lại mật khẩu, hàng đợi email
 ALTER TABLE users ADD COLUMN IF NOT EXISTS mfa_secret text;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS email_prefs jsonb NOT NULL DEFAULT '{}';
 ALTER TABLE users ADD COLUMN IF NOT EXISTS mfa_enabled boolean NOT NULL DEFAULT false;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS mfa_last_step bigint NOT NULL DEFAULT 0;
 ALTER TABLE sessions ADD COLUMN IF NOT EXISTS active_org_id text;
@@ -164,6 +165,8 @@ CREATE TABLE IF NOT EXISTS email_outbox (
   dedupe_key text UNIQUE, created_at timestamptz NOT NULL DEFAULT now(), attempts int NOT NULL DEFAULT 0,
   next_attempt_at timestamptz NOT NULL DEFAULT now(), sent_at timestamptz, last_error text
 );
+ALTER TABLE email_outbox ADD COLUMN IF NOT EXISTS dead_at timestamptz;
+CREATE INDEX IF NOT EXISTS email_outbox_due ON email_outbox (next_attempt_at) WHERE sent_at IS NULL AND dead_at IS NULL;
 `
 
 export class Database {
@@ -575,6 +578,32 @@ export class Database {
     return (await this.pool.query<{ sessionHash: string }>('DELETE FROM sse_tickets WHERE ticket_hash = $1 AND expires_at > now() RETURNING session_hash AS "sessionHash"', [ticketHash])).rows[0]?.sessionHash
   }
 
+  async emailPrefs(userId: string) {
+    return ((await this.pool.query<{ prefs: Record<string, boolean> }>('SELECT email_prefs AS prefs FROM users WHERE id = $1', [userId])).rows[0]?.prefs ?? {}) as Record<string, boolean>
+  }
+  async setEmailPrefs(userId: string, prefs: Record<string, boolean>) {
+    await this.pool.query('UPDATE users SET email_prefs = $2 WHERE id = $1', [userId, JSON.stringify(prefs)])
+  }
+  async claimEmails(limit: number, now: Date) {
+    return (
+      await this.pool.query<{ id: string; to: string; subject: string; body: string; attempts: number }>(
+        `UPDATE email_outbox SET next_attempt_at = $2::timestamptz + interval '2 minutes'
+         WHERE id IN (SELECT id FROM email_outbox WHERE sent_at IS NULL AND dead_at IS NULL AND next_attempt_at <= $2 ORDER BY id LIMIT $1 FOR UPDATE SKIP LOCKED)
+         RETURNING id, to_email AS "to", subject, body, attempts`,
+        [limit, now],
+      )
+    ).rows
+  }
+  async emailResult(id: string, r: { ok: boolean; error?: string; dead?: boolean; nextAttemptAt?: Date }) {
+    await this.pool.query(
+      `UPDATE email_outbox SET attempts = attempts + 1, last_error = $2, sent_at = CASE WHEN $3 THEN now() END, dead_at = CASE WHEN $4 THEN now() END, next_attempt_at = COALESCE($5, next_attempt_at) WHERE id = $1`,
+      [id, r.error ?? null, r.ok, !!r.dead, r.nextAttemptAt ?? null],
+    )
+  }
+  async emailsOf(toEmail: string, kind?: string) {
+    return (await this.pool.query<{ subject: string; body: string; kind: string; sentAt: Date | null; attempts: number; lastError: string | null; deadAt: Date | null }>(
+      `SELECT subject, body, kind, sent_at AS "sentAt", attempts, last_error AS "lastError", dead_at AS "deadAt" FROM email_outbox WHERE to_email = $1 AND ($2::text IS NULL OR kind = $2) ORDER BY id`, [toEmail, kind ?? null])).rows
+  }
   async queueEmail(m: { to: string; subject: string; body: string; kind: string; dedupeKey?: string }) {
     await this.pool.query('INSERT INTO email_outbox (to_email, subject, body, kind, dedupe_key) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (dedupe_key) DO NOTHING', [m.to, m.subject, m.body, m.kind, m.dedupeKey ?? null])
   }

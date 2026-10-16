@@ -12,10 +12,12 @@
   "dependencies": {
     "@fcc/domain": "file:../packages/domain",
     "fastify": "^5.0.0",
+    "nodemailer": "^7.0.13",
     "pg": "^8.23.1"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "@types/nodemailer": "^7.0.12",
     "@types/pg": "^8.23.1",
     "tsx": "^4.19.0",
     "typescript": "^5.6.0",

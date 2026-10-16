@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { useFcc } from "@/lib/session";
@@ -14,6 +14,10 @@ export default function SecurityPage() {
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
   const [pw, setPw] = useState({ current: "", password: "" });
+  const [kinds, setKinds] = useState<{ kind: string; label: string; enabled: boolean; locked: boolean }[]>([]);
+  const loadKinds = useCallback(() => api<{ kinds: typeof kinds }>("GET", "/api/auth/email-prefs").then((r) => setKinds(r.kinds), () => undefined), []);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { void loadKinds(); }, [loadKinds]);
   if (status === "loading") return <div className="auth-wrap muted">Đang tải…</div>;
   if (status !== "ready" || !me) return <AuthGate />;
   const home = org ? ROLES[roleOfOrgType(org.type)].home : "/";
@@ -59,6 +63,16 @@ export default function SecurityPage() {
               <button className="btn bp" disabled={code.length !== 6} onClick={() => run(async () => { await api("POST", "/api/auth/mfa/enable", { code }); setSetup(null); setCode(""); }, "Đã bật MFA")}>Bật MFA</button>
             </>
           )}
+        </section>
+
+        <section className="stack">
+          <h2 className="ct">Thông báo qua email</h2>
+          <p className="sub">Chọn loại thông báo gửi tới {me.email}. Thông báo trong ứng dụng luôn có.</p>
+          {kinds.map((k) => (
+            <label key={k.kind} style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <input type="checkbox" checked={k.enabled} disabled={k.locked} onChange={(e) => run(async () => { await api("POST", "/api/auth/email-prefs", { prefs: { [k.kind]: e.target.checked } }); await loadKinds(); }, "Đã lưu tùy chọn")} /> {k.label}
+            </label>
+          ))}
         </section>
 
         <section className="stack">

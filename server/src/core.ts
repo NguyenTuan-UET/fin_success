@@ -39,6 +39,7 @@ export function createCore(db: Database, files: ObjectStore, dataKey: Buffer, in
   const clock = opt.now ?? (() => new Date())
   const listeners = new Set<(v: number) => void>()
   const eventSinks = new Set<(events: DomainEvent[]) => Promise<void>>()
+  const noticeSinks = new Set<(notices: NonNullable<Ctx['notices']>) => Promise<void>>()
 
   // Mọi thay đổi chạy tuần tự: bản nháp luôn dựng từ trạng thái đã ghi mới nhất.
   let chain: Promise<unknown> = Promise.resolve()
@@ -65,7 +66,7 @@ export function createCore(db: Database, files: ObjectStore, dataKey: Buffer, in
     const orgId = who.kind === 'user' ? who.user.activeOrgId : who.orgId
     const actor = draft.orgs.find((o) => o.id === orgId)
     if (!actor) throw new HttpError(401, 'Tổ chức không tồn tại')
-    const base = { s: draft, now: clock(), listedDir: opt.listedDir, autoApprove: !!opt.devAutologin, correlationId: who.correlationId, events: [] as DomainEvent[] }
+    const base = { s: draft, now: clock(), listedDir: opt.listedDir, autoApprove: !!opt.devAutologin, correlationId: who.correlationId, events: [] as DomainEvent[], notices: [] as NonNullable<Ctx['notices']> }
     if (who.kind === 'system') return { ...base, actor, role: 'system' as Role, authMethod: 'system' }
     if (who.kind === 'partner') return { ...base, actor, role: who.role, userId: `key:${who.keyId}`, authMethod: 'system' }
     return { ...base, actor, role: who.user.role, userId: who.user.id, authMethod: opt.devAutologin ? 'dev_session' : 'mfa' }
@@ -78,17 +79,18 @@ export function createCore(db: Database, files: ObjectStore, dataKey: Buffer, in
       const c = ctxFor(draft, who)
       const result = fn(c)
       await commit(draft)
-      await dispatch(c.events ?? [])
+      await dispatch(c.events ?? [], c.notices ?? [])
       return result
     })
   }
-  async function dispatch(events: DomainEvent[]) {
+  async function dispatch(events: DomainEvent[], notices: NonNullable<Ctx['notices']> = []) {
     if (events.length) for (const sink of eventSinks) await sink(events)
+    if (notices.length) for (const sink of noticeSinks) await sink(notices)
   }
   /** Chạy với một ngữ cảnh đã dựng sẵn (tác vụ định kỳ), cùng quy tắc chốt và phát sự kiện. */
-  async function commitWithEvents(draft: State, events: DomainEvent[]) {
+  async function commitWithEvents(draft: State, events: DomainEvent[], notices: NonNullable<Ctx['notices']> = []) {
     await commit(draft)
-    await dispatch(events)
+    await dispatch(events, notices)
   }
 
   async function auth(req: FastifyRequest): Promise<Authed> {
@@ -134,6 +136,7 @@ export function createCore(db: Database, files: ObjectStore, dataKey: Buffer, in
     getState: () => state,
     version: () => version,
     onChange: (l: (v: number) => void) => (listeners.add(l), () => listeners.delete(l)),
+    onNotices: (sink: (notices: NonNullable<Ctx['notices']>) => Promise<void>) => (noticeSinks.add(sink), () => noticeSinks.delete(sink)),
     onEvents: (sink: (events: DomainEvent[]) => Promise<void>) => (eventSinks.add(sink), () => eventSinks.delete(sink)),
     commitWithEvents,
     sessionTokenHash: (token: string) => hashToken(token),

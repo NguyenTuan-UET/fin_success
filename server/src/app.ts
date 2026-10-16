@@ -12,6 +12,7 @@ import { businessRoutes } from './routes/business'
 import { v1Routes } from './routes/v1'
 import { ensureDefaultScorecard } from './assessments'
 import { deliverWebhooks } from './integrations/partner'
+import { createMailer, deliverEmails, emailKind, type Mailer } from './integrations/mailer'
 
 export interface AppOptions {
   /** Chuỗi kết nối PostgreSQL */
@@ -32,9 +33,11 @@ export interface AppOptions {
   ollamaKey?: string
   ollamaBase?: string
   now?: () => Date
+  /** Gửi email (kiểm thử truyền bản giả); mặc định SMTP_URL hoặc chỉ ghi log */
+  mailer?: Mailer
 }
 
-export type FccApp = FastifyInstance & { db: Database; core: Core; sweep: () => Promise<void>; getState: () => State; deliverWebhooks: () => Promise<unknown>; routes: { method: string; url: string }[] }
+export type FccApp = FastifyInstance & { db: Database; core: Core; sweep: () => Promise<void>; getState: () => State; deliverWebhooks: () => Promise<unknown>; deliverEmails: () => Promise<number>; routes: { method: string; url: string }[] }
 
 export async function buildApp(opt: AppOptions): Promise<FccApp> {
   const db = await Database.open(opt.dbUrl, opt.dbSchema)
@@ -110,8 +113,8 @@ export async function buildApp(opt: AppOptions): Promise<FccApp> {
         if (!st.orgs.length) return
         const draft: State = { ...st }
         // tác nhân hệ thống; nhật ký ghi "Hệ thống"
-        const ctx: Ctx = { s: draft, now: core.clock(), listedDir: opt.listedDir, autoApprove: !!opt.devAutologin, actor: { ...st.orgs[0], id: 'system', shortName: 'Hệ thống' }, role: 'system', authMethod: 'system', events: [] }
-        if (runSweep(ctx) > 0) await core.commitWithEvents(draft, ctx.events ?? [])
+        const ctx: Ctx = { s: draft, now: core.clock(), listedDir: opt.listedDir, autoApprove: !!opt.devAutologin, actor: { ...st.orgs[0], id: 'system', shortName: 'Hệ thống' }, role: 'system', authMethod: 'system', events: [], notices: [] }
+        if (runSweep(ctx) > 0) await core.commitWithEvents(draft, ctx.events ?? [], ctx.notices ?? [])
       } catch (e) {
         app.log.error(e, 'sweep failed')
       }
@@ -120,14 +123,29 @@ export async function buildApp(opt: AppOptions): Promise<FccApp> {
   timer.unref()
   // gửi webhook tới đối tác (có thử lại); kiểm thử gọi trực tiếp app.deliverWebhooks()
   const deliver = () => deliverWebhooks(db, core.clock).catch((e) => app.log.error(e, 'webhook delivery failed'))
+  // thông báo nghiệp vụ → email cho thành viên của tổ chức nhận, theo tùy chọn; dedupe_key chống gửi trùng
+  core.onNotices(async (notices) => {
+    for (const n of notices) {
+      const kind = emailKind(n.title)
+      for (const m of (await db.membersOf(n.orgId)).filter((x) => x.status === 'active')) {
+        if ((await db.emailPrefs(m.userId))[kind] === false) continue
+        await db.queueEmail({ to: m.email, kind, subject: `FCC — ${n.title}`, body: `${n.body}\n\nMở FCC: ${core.opt.appUrl}${n.link ?? ''}\n\nBạn có thể tắt loại thông báo này ở Bảo mật tài khoản.`, dedupeKey: `${n.id}:${m.email}` })
+      }
+    }
+  })
+  const mailer = opt.mailer ?? createMailer(undefined, undefined, (m) => app.log.info(m))
+  const deliverMail = () => deliverEmails(db, mailer, core.clock).catch((e) => { app.log.error(e, 'email delivery failed'); return 0 })
+  const mailTimer = process.env.NODE_ENV === 'test' ? undefined : setInterval(() => void deliverMail(), 10_000)
+  mailTimer?.unref()
   const hookTimer = process.env.NODE_ENV === 'test' ? undefined : setInterval(() => void deliver(), 5_000)
   hookTimer?.unref()
   app.addHook('onClose', async () => {
     clearInterval(timer)
     if (hookTimer) clearInterval(hookTimer)
+    if (mailTimer) clearInterval(mailTimer)
     await core.serial(async () => undefined)
     await db.close()
   })
 
-  return Object.assign(app, { db, core, sweep, getState: () => core.getState(), deliverWebhooks: deliver, routes }) as FccApp
+  return Object.assign(app, { db, core, sweep, getState: () => core.getState(), deliverWebhooks: deliver, deliverEmails: deliverMail, routes }) as FccApp
 }
