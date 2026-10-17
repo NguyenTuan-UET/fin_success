@@ -6,7 +6,7 @@ import { resolve } from 'node:path'
 import { Database, KEYS, type State } from '../src/state'
 
 const src = resolve(process.argv[2] ?? 'data/fcc.db')
-const url = process.argv[3] ?? process.env.DATABASE_URL ?? `postgres://fcc@/fcc?host=${resolve('data/pg-run')}&port=5433`
+const url = process.argv[3] ?? process.env.DATABASE_URL ?? `postgres://fcc@/fcc_prod?host=${resolve('data/pg-run')}&port=5433`
 
 const lite = new DatabaseSync(src, { readOnly: true })
 const pg = await Database.open(url)

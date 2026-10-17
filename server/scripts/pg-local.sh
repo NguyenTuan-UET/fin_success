@@ -12,7 +12,7 @@ DATA="$PWD/data/pg"
 RUN="$PWD/data/pg-run"
 LOG="$PWD/data/pg.log"
 PORT=5433
-URL="postgres://fcc@/fcc?host=$RUN&port=$PORT"
+URL="postgres://fcc@/fcc_prod?host=$RUN&port=$PORT"
 
 case "${1:-start}" in
   start)
@@ -28,8 +28,8 @@ EOF
     if ! "$BIN/pg_ctl" -D "$DATA" status >/dev/null 2>&1; then
       "$BIN/pg_ctl" -D "$DATA" -l "$LOG" -w start >/dev/null
     fi
-    "$BIN/psql" -h "$RUN" -p $PORT -U fcc -d postgres -Atc "select 1 from pg_database where datname='fcc'" | grep -q 1 \
-      || "$BIN/createdb" -h "$RUN" -p $PORT -U fcc fcc
+    "$BIN/psql" -h "$RUN" -p $PORT -U fcc -d postgres -Atc "select 1 from pg_database where datname='fcc_prod'" | grep -q 1 \
+      || "$BIN/createdb" -h "$RUN" -p $PORT -U fcc fcc_prod
     "$BIN/psql" -h "$RUN" -p $PORT -U fcc -d postgres -Atc "select 1 from pg_database where datname='fcc_test'" | grep -q 1 \
       || "$BIN/createdb" -h "$RUN" -p $PORT -U fcc fcc_test
     echo "DATABASE_URL=$URL"

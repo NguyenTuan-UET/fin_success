@@ -15,7 +15,7 @@ const arg = (k: string, d: string) => {
 const endpoint = arg('--endpoint', 'http://127.0.0.1:8790')
 const outPath = resolve(arg('--out', '../sim-bank/config.local.json'))
 const dev = (process.env.FCC_ENV ?? 'dev') === 'dev'
-const url = process.env.DATABASE_URL ?? `postgres://fcc@/fcc?host=${resolve('data/pg-run')}&port=5433`
+const url = process.env.DATABASE_URL ?? `postgres://fcc@/fcc_prod?host=${resolve('data/pg-run')}&port=5433`
 const dataKey = ObjectStore.keyFor(dev, resolve('data'))
 
 const db = await Database.open(url)

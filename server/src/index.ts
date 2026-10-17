@@ -16,7 +16,7 @@ const password = process.env.ADMIN_PASSWORD
 if (!dev && password && password.length < 12) throw new Error('ADMIN_PASSWORD tối thiểu 12 ký tự')
 
 // dev mặc định dùng cụm PostgreSQL cục bộ do scripts/pg-local.sh dựng; staging/production bắt buộc đặt DATABASE_URL.
-const dbUrl = process.env.DATABASE_URL ?? (dev ? `postgres://fcc@/fcc?host=${resolve('data/pg-run')}&port=5433` : undefined)
+const dbUrl = process.env.DATABASE_URL ?? (dev ? `postgres://fcc@/fcc_prod?host=${resolve('data/pg-run')}&port=5433` : undefined)
 if (!dbUrl) throw new Error('Thiếu DATABASE_URL')
 
 const app = await buildApp({

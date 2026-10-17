@@ -5,7 +5,7 @@
 # Lưu ý: khóa FCC_DATA_KEY (hoặc data/data.key ở dev) phải được cất RIÊNG khỏi bản sao lưu — mất khóa là mất tệp.
 set -euo pipefail
 cd "$(dirname "$0")/.."
-URL="${DATABASE_URL:-postgres://fcc@/fcc?host=$PWD/data/pg-run&port=5433}"
+URL="${DATABASE_URL:-postgres://fcc@/fcc_prod?host=$PWD/data/pg-run&port=5433}"
 OUT="${BACKUP_DIR:-$PWD/backups}"
 ANY=$(ls -d /usr/lib/postgresql/*/bin 2>/dev/null | sort -V | tail -1)
 # dùng pg_dump/pg_restore cùng phiên bản chính với máy chủ (công cụ mới hơn có thể sinh lệnh mà máy chủ cũ không hiểu)

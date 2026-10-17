@@ -3,7 +3,7 @@
 import { resolve } from 'node:path'
 import { Database } from '../src/state'
 
-const url = process.argv[2] ?? process.env.DATABASE_URL ?? `postgres://fcc@/fcc?host=${resolve('data/pg-run')}&port=5433`
+const url = process.argv[2] ?? process.env.DATABASE_URL ?? `postgres://fcc@/fcc_prod?host=${resolve('data/pg-run')}&port=5433`
 const db = await Database.open(url)
 const s = await db.load()
 const counts = Object.fromEntries(Object.entries(s).filter(([k, v]) => k !== 'sources' && Array.isArray(v) && v.length).map(([k, v]) => [k, (v as unknown[]).length]))
