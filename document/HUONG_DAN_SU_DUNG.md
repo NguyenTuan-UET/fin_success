@@ -29,7 +29,7 @@ Phase này **không kết nối ngân hàng thật**. Phía ngân hàng và tổ
 - **Phí và doanh thu:** biểu phí có phiên bản, 6 nguồn thu, hóa đơn phí in được, xuất CSV, chạy tính phí hằng tháng.
 - **Thông báo:** trong ứng dụng và email (hàng đợi có thử lại), tùy chọn theo loại thông báo.
 - **Dữ liệu công khai:** đọc tự động website do doanh nghiệp tự khai (khi FCC duyệt nguồn); FCC tra cứu thủ công nguồn nhà nước kèm đường dẫn; bản chụp có băm; doanh nghiệp khiếu nại được. Dữ liệu này chỉ để tham khảo, không đưa vào điểm.
-- **Bên mua niêm yết (vnstock):** FCC xác minh ánh xạ MST ↔ mã chứng khoán trước khi nạp; ý kiến kiểm toán và diện cảnh báo do FCC nhập tay có nguồn.
+- **Bên mua niêm yết (vnstock):** FCC xác minh ánh xạ MST ↔ mã chứng khoán trước khi nạp; dữ liệu tự làm mới định kỳ; ý kiến kiểm toán và diện cảnh báo do FCC đối chiếu và xác nhận có nguồn (chưa xác nhận thì không được chấm).
 - **Trợ lý AI:** chỉ diễn giải số liệu do máy chủ trả về, từ chối câu hỏi ngoài phạm vi.
 - **Quản trị (`/admin`):** chỉ số vận hành thật, duyệt tổ chức tài chính và sản phẩm, KYC, ESG, điểm tín dụng, nguồn dữ liệu, biểu phí; tài khoản kiểm toán viên chỉ đọc, mọi lần truy cập được ghi lại.
 
@@ -48,7 +48,7 @@ Phase này **không kết nối ngân hàng thật**. Phía ngân hàng và tổ
 - Giấy phép vnstock cho mục đích thương mại; pháp chế duyệt từng nguồn crawl.
 
 **Chưa có trong mã**
-- Job nạp vnstock định kỳ (đang chạy script tay `scripts/fetch_listed.py`).
+- vnstock chỉ cho dữ liệu gần thời gian thực (làm mới 15 phút trong giờ giao dịch), không phải giá khớp lệnh tức thời.
 - Tác vụ xóa bản chụp crawl quá 24 tháng.
 - Sản phẩm bảo lãnh, LC, bảo hiểm tín dụng, tài trợ thương mại quốc tế.
 - Client TypeScript sinh từ OpenAPI; bộ câu hỏi mẫu tự động cho trợ lý AI.
@@ -111,7 +111,7 @@ Vai trò: nhà cung cấp và bên mua có *Chủ tổ chức*, *Người phê d
 - **Xác nhận hoặc tranh chấp** hóa đơn nhà cung cấp gửi (MFA).
 - **Ghi nhận đã thanh toán:** nhập số tiền, ngày, mã giao dịch. Việc này chỉ là bên mua tự báo; hồ sơ chỉ tất toán khi tổ chức tài chính xác nhận tiền về.
 - **Chương trình thanh toán sớm:** tạo đề nghị cho nhà cung cấp, ghi nhận khi đã trả.
-- Bên mua niêm yết khai mã chứng khoán ở Cài đặt; sau khi FCC xác minh, vào mục chấm điểm để **nạp dữ liệu từ vnstock**.
+- Bên mua niêm yết khai mã chứng khoán ở Cài đặt; sau khi FCC xác minh, máy chủ tự lấy dữ liệu từ vnstock định kỳ; bấm **Làm mới ngay** ở Cài đặt để lấy ngay.
 
 ### 3.5. Tổ chức tài chính
 1. Đăng ký tổ chức rồi **chờ FCC xác minh** (chưa xác minh thì chưa đăng sản phẩm hoặc báo giá được).

@@ -83,6 +83,19 @@ export function SettingsPanel() {
           {org.type === "buyer" && <label className="field"><span>Mã chứng khoán (nếu niêm yết)</span><input className="input" disabled={!isOwner} value={val("listedSymbol")} onChange={(e) => upd("listedSymbol", e.target.value.toUpperCase())} /></label>}
         </div>
         {isOwner && org.type !== "fcc" && <button className="btn bp" style={{ alignSelf: "flex-start" }} disabled={busy || !Object.keys(profile).length} onClick={() => run(async () => { await act("POST", "/v1/organizations/me", profile); setProfile({}); }, "Đã cập nhật hồ sơ")}>Lưu hồ sơ</button>}
+        {org.type === "buyer" && org.listedSymbol && (() => {
+          const l = data.listed.find((x) => x.orgId === org.id);
+          const verified = org.listedVerified?.symbol === org.listedSymbol;
+          return (
+            <div className="between soft">
+              <span className="muted">
+                Dữ liệu niêm yết {org.listedSymbol} (vnstock): {!verified ? "chờ FCC xác minh mã chứng khoán" : l ? `cập nhật ${dateTime(l.fetchedAt)}, tự làm mới định kỳ` : "chưa nạp"}
+                {l && !l.flagsReviewed && " · ý kiến kiểm toán / diện giao dịch chờ FCC đối chiếu"}
+              </span>
+              {verified && <button className="btn bs sm" disabled={busy} onClick={() => run(() => act("POST", `/v1/listed/${org.listedSymbol}/refresh`, {}), "Đã lấy dữ liệu mới từ vnstock")}>Làm mới ngay</button>}
+            </div>
+          );
+        })()}
       </section>
 
       {org.type !== "fcc" && (

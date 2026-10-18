@@ -27,6 +27,13 @@ const app = await buildApp({
   filesDir: resolve(process.env.FILES_DIR ?? 'data/objects'),
   appUrl: process.env.APP_URL ?? 'http://localhost:3000',
   listedDir: resolve(process.env.LISTED_DIR ?? 'seed/listed'),
+  // VNSTOCK_AUTO=0 để tắt; cần venv có vnstock (VNSTOCK_PYTHON, mặc định ../.venv/bin/python) và khóa trong scripts/.env
+  listedFetch: process.env.VNSTOCK_AUTO === '0' ? undefined : {
+    python: resolve(process.env.VNSTOCK_PYTHON ?? '../.venv/bin/python'),
+    script: resolve(process.env.VNSTOCK_SCRIPT ?? '../scripts/fetch_listed.py'),
+    freshMinOpen: Number(process.env.VNSTOCK_FRESH_MIN_OPEN ?? 15),
+    freshMinClosed: Number(process.env.VNSTOCK_FRESH_MIN_CLOSED ?? 360),
+  },
   admin: !dev && email && password ? { email, password } : undefined,
   ollamaKey: process.env.OLLAMA_API_KEY || undefined,
   ollamaBase: process.env.OLLAMA_BASE_URL || undefined,

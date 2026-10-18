@@ -11,7 +11,7 @@ Biến môi trường đọc từ scripts/.env (gitignored) nếu chưa có tron
     VNSTOCK_DISABLE_AGENT_SETUP=1  không cho vnai ghi file hướng dẫn trợ lý AI
 
 Kết quả: <out>/<MÃ>.json gồm `snapshot` (ListedSnapshot) và `financials` (FinancialYear, mới nhất trước).
-Trang "Chấm điểm DN" → nhập mã → "Làm mới từ vnstock" sẽ nạp file này.
+Máy chủ tự chạy script này (server/src/listed-sync.ts) theo chu kỳ và khi bấm làm mới, rồi nạp file vào hệ thống.
 
 Ghi chú dữ liệu (kiểm tra 12/10/2026 với vnstock 4.0.9):
 - Nguồn mặc định KBS trả BCTC năm với NHÃN NĂM BỊ ĐẢO (cột "2025" chứa số liệu 2022 của HPG).
@@ -159,6 +159,25 @@ def main() -> None:
     if not financials:
         die("Không ánh xạ được chỉ tiêu nào — kiểm tra item_id của nguồn VCI.")
 
+    # Kiểm tra chất lượng: số liệu sai cấu trúc thì dừng (giữ nguyên file cũ), lệch nhỏ thì ghi cảnh báo kèm dữ liệu
+    warnings: list[str] = []
+    for f in financials:
+        y, ta, eqt = f["year"], f["totalAssets"], f["equity"]
+        if ta <= 0 or f["revenue"] <= 0:
+            die(f"BCTC {y}: tổng tài sản hoặc doanh thu không dương — nguồn trả dữ liệu bất thường.")
+        if eqt == 0 or f["currentLiabilities"] == 0:
+            die(f"BCTC {y}: thiếu vốn chủ sở hữu hoặc nợ ngắn hạn — không tính được hệ số, không ghi dữ liệu.")
+        gap = abs(ta - (f["totalLiabilities"] + eqt)) / ta
+        if gap > 0.02:
+            warnings.append(f"BCTC {y}: tổng tài sản lệch nợ phải trả + vốn chủ {gap:.1%}")
+        if f["currentAssets"] > ta * 1.001:
+            warnings.append(f"BCTC {y}: tài sản ngắn hạn lớn hơn tổng tài sản")
+        if eqt < 0:
+            warnings.append(f"BCTC {y}: vốn chủ sở hữu âm")
+    if financials[0]["year"] < date.today().year - 2:
+        warnings.append(f"BCTC mới nhất là năm {financials[0]['year']} — có thể nguồn chưa cập nhật")
+    warnings.append("Nghĩa vụ trả nợ (debtService) là ước tính: lãi vay + 20% vay dài hạn")
+
     # Quý gần nhất (doanh thu, LNST, LCTT HĐKD)
     quarters = []
     try:
@@ -187,6 +206,10 @@ def main() -> None:
     prices = [{"date": str(t)[:10], "close": round(c * mult)} for t, c in zip(px["time"], closes)]
     rets = [math.log(closes[i] / closes[i - 1]) for i in range(max(1, len(closes) - 90), len(closes)) if closes[i - 1] > 0 and closes[i] > 0]
     vol = 0.3
+    if len(rets) <= 5:
+        warnings.append("Thiếu dữ liệu giá: biến động 90 phiên dùng giá trị mặc định 30%")
+    if prices and (end - date.fromisoformat(prices[-1]["date"])).days > 7:
+        warnings.append(f"Giá gần nhất là ngày {prices[-1]['date']} — cổ phiếu có thể bị tạm ngừng giao dịch")
     if len(rets) > 5:
         m = sum(rets) / len(rets)
         vol = math.sqrt(sum((r - m) ** 2 for r in rets) / (len(rets) - 1)) * math.sqrt(252)
@@ -195,6 +218,7 @@ def main() -> None:
         f.pop("_charter", None)
     shares = charter / 10_000 if charter else 0
     market_cap = round(shares * prices[-1]["close"]) if shares and prices else 0
+    warnings.append("Vốn hóa là ước tính: vốn điều lệ / 10.000 × giá đóng cửa gần nhất" if market_cap else "Không ước tính được vốn hóa (thiếu vốn điều lệ hoặc giá)")
 
     snapshot = {
         "symbol": symbol,
@@ -203,22 +227,28 @@ def main() -> None:
         "fetchedAt": datetime.now(timezone.utc).isoformat(),
         "marketCap": market_cap,
         "volatility90d": round(vol, 4),
-        "auditOpinion": "unqualified",  # vnstock không cung cấp — cần đối chiếu báo cáo kiểm toán
+        "auditOpinion": "unqualified",  # vnstock không cung cấp; M1/M2 chỉ được chấm sau khi FCC đối chiếu (flagsReviewed)
         "tradingStatus": "normal",  # cần đối chiếu danh sách cảnh báo/kiểm soát của Sở GDCK
         "quarters": quarters,
         "priceHistory": prices,
         "events": [],
+        "warnings": warnings,
         "isMock": False,
         "taxCode": a.tax_code,
     }
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
     path = out / f"{symbol}.json"
-    path.write_text(json.dumps({"snapshot": snapshot, "financials": financials}, ensure_ascii=False, indent=1), encoding="utf-8")
+    # ghi ra file tạm rồi đổi tên: máy chủ không bao giờ đọc phải file ghi dở
+    tmp = path.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps({"snapshot": snapshot, "financials": financials}, ensure_ascii=False, indent=1), encoding="utf-8")
+    os.replace(tmp, path)
     f0 = financials[0]
     print(f"Đã ghi {path}")
     print(f"  {len(financials)} năm BCTC (mới nhất {f0['year']}: doanh thu {f0['revenue']/1e12:,.1f} nghìn tỷ, LNST {f0['netProfit']/1e12:,.2f} nghìn tỷ)")
     print(f"  {len(quarters)} quý · {len(prices)} phiên giá · biến động 90 phiên {vol:.0%} · vốn hóa ~{market_cap/1e12:,.0f} nghìn tỷ")
+    for w in warnings:
+        print(f"  Cảnh báo: {w}")
 
 
 if __name__ == "__main__":

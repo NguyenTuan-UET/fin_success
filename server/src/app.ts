@@ -16,6 +16,7 @@ import { chargeFromEvents, ensureFeeSchedule } from './billing'
 import { enqueueForOrg, processQueue, type CrawlOptions } from './crawl/engine'
 import './crawl/company-website'
 import { deliverWebhooks } from './integrations/partner'
+import { syncListed, type ListedFetcher } from './listed-sync'
 import { createMailer, deliverEmails, emailKind, type Mailer } from './integrations/mailer'
 
 export interface AppOptions {
@@ -24,6 +25,8 @@ export interface AppOptions {
   /** Schema dùng cho ứng dụng (mặc định public); kiểm thử dùng schema riêng cho mỗi lần chạy */
   dbSchema?: string
   listedDir: string
+  /** Tự động lấy dữ liệu niêm yết từ vnstock (định kỳ và khi bấm làm mới); bỏ trống thì chỉ đọc file có sẵn */
+  listedFetch?: ListedFetcher
   /** Thư mục kho tệp (đã mã hóa) */
   filesDir?: string
   /** Khóa dữ liệu 64 ký tự hex: mã hóa tệp và secret MFA */
@@ -54,7 +57,7 @@ export async function buildApp(opt: AppOptions): Promise<FccApp> {
   const dataKey = Buffer.from(opt.dataKey, 'hex')
   const files = new ObjectStore(opt.filesDir ?? 'data/objects', opt.dataKey)
   const core = createCore(db, files, dataKey, await db.load(), {
-    listedDir: opt.listedDir, devAutologin: opt.devAutologin, now: opt.now, appUrl: opt.appUrl ?? 'http://localhost:3000',
+    listedDir: opt.listedDir, listedFetch: opt.listedFetch, devAutologin: opt.devAutologin, now: opt.now, appUrl: opt.appUrl ?? 'http://localhost:3000',
   })
 
   const app = Fastify({
@@ -167,8 +170,12 @@ export async function buildApp(opt: AppOptions): Promise<FccApp> {
   mailTimer?.unref()
   const hookTimer = process.env.NODE_ENV === 'test' ? undefined : setInterval(() => void deliver(), 5_000)
   hookTimer?.unref()
+  // dữ liệu niêm yết từ vnstock: mỗi 5 phút xem mã nào đã cũ (15 phút trong giờ giao dịch, 6 giờ ngoài giờ) thì chạy lại script rồi nạp
+  const listedTimer = opt.listedFetch && process.env.NODE_ENV !== 'test' ? setInterval(() => void syncListed(core, opt.listedFetch!, { log: (m) => app.log.warn(m) }), 5 * 60_000) : undefined
+  listedTimer?.unref()
   app.addHook('onClose', async () => {
     clearInterval(timer)
+    if (listedTimer) clearInterval(listedTimer)
     if (hookTimer) clearInterval(hookTimer)
     if (mailTimer) clearInterval(mailTimer)
     if (crawlTimer) clearInterval(crawlTimer)

@@ -7,6 +7,7 @@ import { matchProduct, rankMatches } from '@fcc/domain/marketplace'
 import { ewsAlerts } from '@fcc/domain/ews'
 import { applicationScoreOf, buyerScoreOf, esgOf, supplierScoreOf } from '@fcc/domain/engine'
 import type { Authed, Core } from '../core'
+import { fetchListedFile, syncListed, syncStatus } from '../listed-sync'
 import { actions, fundApplication, matchContextFor, reconciliationOf } from '../service'
 import { balanceAt } from '@fcc/domain/settlement'
 import { viewFor } from '../views'
@@ -389,6 +390,17 @@ export const ENDPOINTS: Endpoint[] = [
       return v.external.filter((e) => e.orgId === id).map((e) => ({ ...e, source: core.getState().sources.find((x) => x.id === e.sourceId)?.name, label: 'Nguồn công khai – tham khảo', status: e.disputed ? 'Đang được xem xét' : e.resolution ? `Đã xử lý khiếu nại: ${e.resolution.outcome === 'upheld' ? 'chấp nhận' : 'giữ nguyên'}` : undefined }))
     } },
   { method: 'POST', path: '/v1/organizations/{id}/listed-verification', tag: 'Dữ liệu công khai', summary: 'FCC xác minh ánh xạ MST ↔ mã chứng khoán của bên mua (điều kiện để nạp dữ liệu niêm yết)', auth: 'user', action: 'verifyListed', args: (s) => [P(s, 'id'), B(s).note], body: { note: 'string' } },
+  { method: 'GET', path: '/v1/operations/listed-sync', tag: 'Dữ liệu công khai', summary: 'Trạng thái tự động lấy dữ liệu niêm yết từ vnstock theo mã: lần chạy gần nhất, lỗi (FCC)', auth: 'user',
+    run: (s, core) => {
+      if (orgOf(core, s.a!.activeOrgId)?.type !== 'fcc') throw forbidden('Chỉ nhân sự FCC')
+      return { enabled: !!core.opt.listedFetch, symbols: Object.fromEntries(syncStatus) }
+    } },
+  { method: 'POST', path: '/v1/operations/listed-sync', tag: 'Dữ liệu công khai', summary: 'Chạy ngay việc lấy dữ liệu vnstock cho mọi bên mua niêm yết đã xác minh (vận hành FCC)', auth: 'user',
+    run: async (s, core) => {
+      if (orgOf(core, s.a!.activeOrgId)?.type !== 'fcc' || !['fcc_admin', 'fcc_operations'].includes(s.a!.role)) throw forbidden('Chỉ vận hành FCC')
+      if (!core.opt.listedFetch) throw bad('Chưa bật tự động lấy dữ liệu vnstock trên máy chủ (VNSTOCK_AUTO)')
+      return syncListed(core, core.opt.listedFetch, { force: true })
+    } },
   { method: 'POST', path: '/v1/organizations/{id}/listed-flags', tag: 'Dữ liệu công khai', summary: 'FCC nhập ý kiến kiểm toán / diện giao dịch từ công bố thông tin (không có trong vnstock)', auth: 'user', action: 'setListedFlags', args: (s) => [P(s, 'id'), B(s)], body: { auditOpinion: 'string', tradingStatus: 'string', note: 'string' } },
   { method: 'POST', path: '/v1/external-records/{id}/disputes', tag: 'Dữ liệu công khai', summary: 'Doanh nghiệp khiếu nại sai lệch dữ liệu công khai về mình', auth: 'user', action: 'disputeExternal', args: (s) => [P(s, 'id'), B(s).reason], body: { reason: 'string' } },
   { method: 'POST', path: '/v1/external-records/{id}/resolution', tag: 'Dữ liệu công khai', summary: 'FCC xử lý khiếu nại (upheld gỡ bản ghi; rejected giữ nguyên)', auth: 'user', action: 'resolveExternal', args: (s) => [P(s, 'id'), B(s).outcome, B(s).note], body: { outcome: 'upheld|rejected', note: 'string' } },
@@ -676,6 +688,21 @@ export function v1Routes(app: FastifyInstance, core: Core) {
             if (ep.check === 'receivableFiles') {
               const files = (B(s).files ?? []) as { key?: unknown }[]
               for (const f of Array.isArray(files) ? files : []) if (typeof f?.key !== 'string' || !(await core.db.fileOf(f.key, s.a.activeOrgId))) throw bad('Chứng từ chưa được tải lên bởi tổ chức này')
+            }
+            if (ep.action === 'refreshListed' && core.opt.listedFetch) {
+              // lấy dữ liệu mới từ vnstock trước khi nạp (cùng điều kiện với refreshListed: đúng mã, đã được FCC xác minh)
+              const org = core.getState().orgs.find((o) => o.id === s.a!.activeOrgId)
+              const sym = String(args[0] ?? '').toUpperCase()
+              if (org?.type === 'buyer' && org.listedSymbol?.toUpperCase() === sym && org.listedVerified?.symbol === org.listedSymbol) {
+                try {
+                  await fetchListedFile(core.opt.listedFetch, org, core.opt.listedDir)
+                  syncStatus.set(sym, { at: core.clock().toISOString(), ok: true })
+                } catch (e) {
+                  const error = e instanceof Error ? e.message : String(e)
+                  syncStatus.set(sym, { at: core.clock().toISOString(), ok: false, error })
+                  throw bad(`Không lấy được dữ liệu mới từ vnstock: ${error}`)
+                }
+              }
             }
             const result = await core.mutate({ kind: 'user', user: s.a, correlationId: req.id }, (c) => fn(c, ...args))
             out = { result: result ?? null, version: core.version() }

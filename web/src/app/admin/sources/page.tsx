@@ -9,8 +9,11 @@ import { useData } from "@/lib/session";
 import { PageHeader } from "@/components/ui/basic";
 import { useToast } from "@/components/providers/Toast";
 
+type SyncState = { enabled: boolean; symbols: Record<string, { at: string; ok: boolean; error?: string }> };
 type Job = { id: string; sourceId: string; orgId: string; status: string; attempts: number; reason?: string; error?: string; createdAt: string };
 const CLASS_LABEL = { A: "A — crawl tự động", B: "B — tra cứu thủ công", C: "C — bỏ" } as const;
+const AUDIT_LABEL = { unqualified: "chấp nhận toàn phần", qualified: "ngoại trừ", adverse: "trái ngược", disclaimer: "từ chối" } as const;
+const TRADING_LABEL = { normal: "bình thường", warning: "cảnh báo", controlled: "kiểm soát", restricted: "hạn chế" } as const;
 const STATUS_LABEL = { approved: ["Đã phê duyệt", "c-ok"], pending: ["Chờ phê duyệt", "c-warn"], blocked: ["Bị chặn", "c-bad"] } as const;
 
 export default function SourcesPage() {
@@ -24,10 +27,12 @@ export default function SourcesPage() {
   const [resolve, setResolve] = useState<Record<string, string>>({});
   const [flags, setFlags] = useState({ orgId: "", auditOpinion: "", tradingStatus: "", note: "" });
   const [verifyNote, setVerifyNote] = useState<Record<string, string>>({});
+  const [sync, setSync] = useState<SyncState | null>(null);
 
   const load = useCallback(async () => {
     setSources(await api<DataSource[]>("GET", "/v1/operations/data-sources").catch(() => []));
     setJobs(await api<Job[]>("GET", "/v1/operations/crawl-jobs").catch(() => []));
+    setSync(await api<SyncState>("GET", "/v1/operations/listed-sync").catch(() => null));
   }, []);
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => { void load(); }, [load]);
@@ -120,8 +125,11 @@ export default function SourcesPage() {
       </section>
 
       <section className="card stack">
-        <h2 className="ct">Bên mua niêm yết (vnstock)</h2>
-        <div className="muted">Chỉ nạp dữ liệu niêm yết sau khi FCC xác minh ánh xạ MST ↔ mã chứng khoán. Ý kiến kiểm toán và diện cảnh báo không có trong vnstock — FCC nhập từ công bố thông tin của sở giao dịch.</div>
+        <div className="between">
+          <h2 className="ct">Bên mua niêm yết (vnstock)</h2>
+          {sync?.enabled && <button className="btn bs sm" onClick={() => run(() => api("POST", "/v1/operations/listed-sync", {}), "Đã lấy dữ liệu mới từ vnstock")}>Lấy dữ liệu ngay</button>}
+        </div>
+        <div className="muted">Chỉ nạp dữ liệu niêm yết sau khi FCC xác minh ánh xạ MST ↔ mã chứng khoán. {sync?.enabled ? "Máy chủ tự lấy lại dữ liệu mỗi 15 phút trong giờ giao dịch, 6 giờ ngoài giờ." : "Máy chủ chưa bật tự động lấy dữ liệu (VNSTOCK_AUTO)."} Ý kiến kiểm toán và diện cảnh báo không có trong vnstock: FCC đối chiếu công bố thông tin của sở giao dịch rồi xác nhận bên dưới, trước đó hai chỉ tiêu này không được chấm.</div>
         {!listedBuyers.length ? <div className="muted">Chưa có bên mua nào khai mã chứng khoán.</div> : (
           <div className="tw" tabIndex={0} role="region" aria-label="Bảng dữ liệu, cuộn ngang để xem thêm"><table>
             <thead><tr><th>Bên mua</th><th>Mã</th><th>Xác minh</th><th>Dữ liệu</th></tr></thead>
@@ -133,19 +141,22 @@ export default function SourcesPage() {
                   <td>{ok ? <span className="chip c-ok">Đã xác minh {o.listedVerified?.at.slice(0, 10)}</span> : (
                     <div className="stack-sm"><input className="input" placeholder="Căn cứ đối chiếu MST ↔ mã" value={verifyNote[o.id] ?? ""} onChange={(e) => setVerifyNote({ ...verifyNote, [o.id]: e.target.value })} />
                       <button className="btn bp sm" onClick={() => run(() => api("POST", `/v1/organizations/${o.id}/listed-verification`, { note: verifyNote[o.id] ?? "" }), "Đã xác minh mã chứng khoán")}>Xác minh</button></div>)}</td>
-                  <td>{l ? <>Nạp {dateTime(l.fetchedAt)} · kiểm toán: {l.auditOpinion} · giao dịch: {l.tradingStatus}{nowMs - new Date(l.fetchedAt).getTime() > 7 * 86_400_000 && <span className="chip c-warn" style={{ marginLeft: 6 }}>Dữ liệu cũ</span>}</> : <span className="muted">Chưa nạp</span>}</td></tr>);
+                  <td className="wrap">{l ? <>Nạp {dateTime(l.fetchedAt)}{nowMs - new Date(l.fetchedAt).getTime() > 7 * 86_400_000 && <span className="chip c-warn" style={{ marginLeft: 6 }}>Dữ liệu cũ</span>}
+                    <div>{l.flagsReviewed ? <>Kiểm toán: {AUDIT_LABEL[l.auditOpinion]} · giao dịch: {TRADING_LABEL[l.tradingStatus]} <span className="chip c-ok">Đã đối chiếu {l.flagsReviewed.at.slice(0, 10)}</span></> : <span className="chip c-warn">Chưa đối chiếu kiểm toán / diện giao dịch</span>}</div>
+                    {(l.warnings ?? []).map((w) => <div key={w} className="muted">⚠ {w}</div>)}</> : <span className="muted">Chưa nạp</span>}
+                    {sync?.symbols[o.listedSymbol!.toUpperCase()]?.ok === false && <div className="chip c-bad">Lần lấy gần nhất lỗi: {sync.symbols[o.listedSymbol!.toUpperCase()].error}</div>}</td></tr>);
             })}</tbody></table></div>)}
         {data.listed.length > 0 && (
           <div className="stack-sm">
             <b>Nhập ý kiến kiểm toán / diện giao dịch</b>
             <div className="grid-fields">
               <label className="field"><span>Bên mua</span><select className="select" value={flags.orgId} onChange={(e) => setFlags({ ...flags, orgId: e.target.value })}><option value="">—</option>{data.listed.map((l) => <option key={l.orgId} value={l.orgId}>{l.symbol} · {orgName(data.orgs, l.orgId)}</option>)}</select></label>
-              <label className="field"><span>Ý kiến kiểm toán</span><select className="select" value={flags.auditOpinion} onChange={(e) => setFlags({ ...flags, auditOpinion: e.target.value })}><option value="">Giữ nguyên</option><option value="unqualified">Chấp nhận toàn phần</option><option value="qualified">Ngoại trừ</option><option value="adverse">Trái ngược</option><option value="disclaimer">Từ chối đưa ý kiến</option></select></label>
-              <label className="field"><span>Diện giao dịch</span><select className="select" value={flags.tradingStatus} onChange={(e) => setFlags({ ...flags, tradingStatus: e.target.value })}><option value="">Giữ nguyên</option><option value="normal">Bình thường</option><option value="warning">Cảnh báo</option><option value="controlled">Kiểm soát</option><option value="restricted">Hạn chế giao dịch</option></select></label>
+              <label className="field"><span>Ý kiến kiểm toán</span><select className="select" value={flags.auditOpinion} onChange={(e) => setFlags({ ...flags, auditOpinion: e.target.value })}><option value="">Giữ nguyên (xác nhận đúng)</option><option value="unqualified">Chấp nhận toàn phần</option><option value="qualified">Ngoại trừ</option><option value="adverse">Trái ngược</option><option value="disclaimer">Từ chối đưa ý kiến</option></select></label>
+              <label className="field"><span>Diện giao dịch</span><select className="select" value={flags.tradingStatus} onChange={(e) => setFlags({ ...flags, tradingStatus: e.target.value })}><option value="">Giữ nguyên (xác nhận đúng)</option><option value="normal">Bình thường</option><option value="warning">Cảnh báo</option><option value="controlled">Kiểm soát</option><option value="restricted">Hạn chế giao dịch</option></select></label>
               <label className="field"><span>Nguồn công bố</span><input className="input" value={flags.note} onChange={(e) => setFlags({ ...flags, note: e.target.value })} /></label>
             </div>
-            <button className="btn bp" style={{ alignSelf: "flex-start" }} disabled={!flags.orgId || (!flags.auditOpinion && !flags.tradingStatus)}
-              onClick={() => run(() => api("POST", `/v1/organizations/${flags.orgId}/listed-flags`, { ...(flags.auditOpinion ? { auditOpinion: flags.auditOpinion } : {}), ...(flags.tradingStatus ? { tradingStatus: flags.tradingStatus } : {}), note: flags.note }), "Đã cập nhật")}>Lưu</button>
+            <button className="btn bp" style={{ alignSelf: "flex-start" }} disabled={!flags.orgId || flags.note.trim().length < 10}
+              onClick={() => run(() => api("POST", `/v1/organizations/${flags.orgId}/listed-flags`, { ...(flags.auditOpinion ? { auditOpinion: flags.auditOpinion } : {}), ...(flags.tradingStatus ? { tradingStatus: flags.tradingStatus } : {}), note: flags.note }), "Đã ghi nhận đối chiếu")}>Xác nhận đã đối chiếu</button>
           </div>)}
       </section>
     </div>

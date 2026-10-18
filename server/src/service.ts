@@ -810,7 +810,9 @@ export const actions: Record<string, Action> = {
     } catch {
       throw notFound(`Chưa có dữ liệu ${sym}. Chạy: python scripts/fetch_listed.py ${sym} --tax-code <MST> (cần vnstock).`)
     }
-    const snap: ListedSnapshot = { ...j.snapshot, orgId: c.actor.id }
+    // ý kiến kiểm toán và diện giao dịch do FCC nhập tay (vnstock không có): giữ nguyên khi nạp lại, không ghi đè bằng giá trị mặc định của script
+    const prev = c.s.listed.find((l) => l.orgId === c.actor.id)
+    const snap: ListedSnapshot = { ...j.snapshot, orgId: c.actor.id, ...(prev ? { auditOpinion: prev.auditOpinion, tradingStatus: prev.tradingStatus, flagsReviewed: prev.flagsReviewed } : {}) }
     const financials = j.financials.map((f) => ({ ...f, status: 'public_reference' as const }))
     c.s.listed = [snap, ...c.s.listed.filter((l) => l.orgId !== snap.orgId)]
     if (financials.length) {
@@ -839,7 +841,9 @@ export const actions: Record<string, Action> = {
     if (flags.auditOpinion && !['unqualified', 'qualified', 'adverse', 'disclaimer'].includes(flags.auditOpinion)) throw bad('Ý kiến kiểm toán không hợp lệ')
     if (flags.tradingStatus && !['normal', 'warning', 'controlled', 'restricted'].includes(flags.tradingStatus)) throw bad('Diện giao dịch không hợp lệ')
     if (String(flags.note ?? '').trim().length < 10) throw bad('Cần ghi nguồn công bố (≥ 10 ký tự)')
-    c.s.listed = c.s.listed.map((x) => (x.orgId === orgId ? { ...x, auditOpinion: flags.auditOpinion ?? x.auditOpinion, tradingStatus: flags.tradingStatus ?? x.tradingStatus } : x))
+    // lưu cả khi giữ nguyên hai giá trị: FCC xác nhận đã đối chiếu, M1/M2 mới được chấm
+    const reviewed = { by: c.userId ?? c.actor.shortName, at: c.now.toISOString(), note: flags.note.trim() }
+    c.s.listed = c.s.listed.map((x) => (x.orgId === orgId ? { ...x, auditOpinion: flags.auditOpinion ?? x.auditOpinion, tradingStatus: flags.tradingStatus ?? x.tradingStatus, flagsReviewed: reviewed } : x))
     log(c, 'Cập nhật ý kiến kiểm toán/diện giao dịch', orgId, `${flags.auditOpinion ?? ''} ${flags.tradingStatus ?? ''} — ${flags.note.trim()}`)
   },
   upsertFinancialYear(c, orgId: string, fy: FinancialYear) {

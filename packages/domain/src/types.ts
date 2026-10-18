@@ -136,6 +136,10 @@ export interface ListedSnapshot {
   quarters: { period: string; revenue: number; netProfit: number; operatingCashFlow: number }[]
   priceHistory: { date: string; close: number }[]
   events: { date: string; title: string }[]
+  /** FCC đã đối chiếu ý kiến kiểm toán / diện giao dịch với công bố thông tin; chưa có thì M1, M2 không được chấm */
+  flagsReviewed?: { by: string; at: string; note: string }
+  /** Cảnh báo chất lượng dữ liệu do script lấy dữ liệu ghi lại (số liệu ước tính, lệch cân đối…) */
+  warnings?: string[]
 }
 
 // ---------------- Hóa đơn / khoản phải thu ----------------

@@ -371,10 +371,16 @@ export function scoreBuyer(ctx: BuyerContext): ScoreResult {
 
   if (ctx.listed) {
     const L = ctx.listed
+    // vnstock không có ý kiến kiểm toán / diện giao dịch: khi FCC chưa đối chiếu thì để trống (điểm tạm tính), không mặc định là tốt
+    const reviewed = !!L.flagsReviewed
+    if (!reviewed) {
+      add({ code: 'M1', name: 'Ý kiến kiểm toán', component: 'market', raw: 'Chưa đối chiếu', points: null, flag: 'FCC chưa đối chiếu ý kiến kiểm toán', source: '—', reason: 'Chờ FCC đối chiếu công bố thông tin' })
+      add({ code: 'M2', name: 'Diện cảnh báo/kiểm soát', component: 'market', raw: 'Chưa đối chiếu', points: null, flag: 'FCC chưa đối chiếu diện giao dịch', source: '—', reason: 'Chờ FCC đối chiếu danh sách của sở giao dịch' })
+    }
     const ao = { unqualified: 100, qualified: 30, adverse: 0, disclaimer: 0 }[L.auditOpinion]
-    add({ code: 'M1', name: 'Ý kiến kiểm toán', component: 'market', raw: { unqualified: 'Chấp nhận toàn phần', qualified: 'Ngoại trừ', adverse: 'Trái ngược', disclaimer: 'Từ chối' }[L.auditOpinion], points: ao, flag: ao < 100 ? 'Ý kiến kiểm toán không phải chấp nhận toàn phần' : undefined, source: src, reason: ao === 100 ? 'BCTC kiểm toán chấp nhận toàn phần' : 'Kiểm toán có ý kiến ngoại trừ' })
+    if (reviewed) add({ code: 'M1', name: 'Ý kiến kiểm toán', component: 'market', raw: { unqualified: 'Chấp nhận toàn phần', qualified: 'Ngoại trừ', adverse: 'Trái ngược', disclaimer: 'Từ chối' }[L.auditOpinion], points: ao, flag: ao < 100 ? 'Ý kiến kiểm toán không phải chấp nhận toàn phần' : undefined, source: src, reason: ao === 100 ? 'BCTC kiểm toán chấp nhận toàn phần' : 'Kiểm toán có ý kiến ngoại trừ' })
     const ts = { normal: 100, warning: 30, controlled: 10, restricted: 0 }[L.tradingStatus]
-    add({ code: 'M2', name: 'Diện cảnh báo/kiểm soát', component: 'market', raw: { normal: 'Bình thường', warning: 'Bị cảnh báo', controlled: 'Bị kiểm soát', restricted: 'Hạn chế giao dịch' }[L.tradingStatus], points: ts, flag: ts < 100 ? 'Cổ phiếu thuộc diện cảnh báo/kiểm soát' : undefined, source: src, reason: ts === 100 ? 'Không thuộc diện cảnh báo' : 'Thuộc diện cảnh báo' })
+    if (reviewed) add({ code: 'M2', name: 'Diện cảnh báo/kiểm soát', component: 'market', raw: { normal: 'Bình thường', warning: 'Bị cảnh báo', controlled: 'Bị kiểm soát', restricted: 'Hạn chế giao dịch' }[L.tradingStatus], points: ts, flag: ts < 100 ? 'Cổ phiếu thuộc diện cảnh báo/kiểm soát' : undefined, source: src, reason: ts === 100 ? 'Không thuộc diện cảnh báo' : 'Thuộc diện cảnh báo' })
     add({ code: 'M3', name: 'Biến động giá 90 ngày (năm hóa)', component: 'market', raw: pct(L.volatility90d), points: band(-L.volatility90d, [[-0.25, 100], [-0.4, 70], [-0.6, 40]], 20), source: src, reason: L.volatility90d <= 0.4 ? 'Biến động giá vừa phải' : 'Biến động giá cao' })
   }
 

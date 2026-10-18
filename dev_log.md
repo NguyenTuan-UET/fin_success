@@ -1,6 +1,6 @@
 # Dev log — 19/10/2026
 
-Tóm tắt công việc trong ngày: (A) xử lý báo cáo đánh giá `document/Bao_cao_danh_gia_FCC_Fin_Success.docx`, (B) bổ sung kiểm thử theo mục 16 của báo cáo, (C) khắc phục phản hồi của người dùng thử trong `document/test/`.
+Tóm tắt công việc trong ngày: (A) xử lý báo cáo đánh giá `document/Bao_cao_danh_gia_FCC_Fin_Success.docx`, (B) bổ sung kiểm thử theo mục 16 của báo cáo, (C) khắc phục phản hồi của người dùng thử trong `document/test/`, (D) tự động lấy dữ liệu vnstock và khắc phục các vấn đề dữ liệu niêm yết.
 
 ## Trạng thái commit
 
@@ -9,9 +9,10 @@ Tóm tắt công việc trong ngày: (A) xử lý báo cáo đánh giá `documen
 | `3a2f52c` | Hoàn thiện demo theo báo cáo đánh giá (điểm thiếu dữ liệu, landing, MFA, nhật ký, quản trị) |
 | `8505537` | Cập nhật README_SU_DUNG theo menu quản trị mới |
 | `133bd68` | Kiểm thử T02/T06/T09/T11/T12 và sửa lỗi phát hiện |
-| (commit này) | Phần C: khắc phục phản hồi người dùng thử |
+| `789fe32` | Phần C: khắc phục phản hồi người dùng thử |
+| (commit này) | Phần D: vnstock tự động, kiểm tra dữ liệu niêm yết |
 
-Chưa push. Các thay đổi có từ trước, không thuộc phần việc này: `server/.env.production`, `document/SPEC_FCC_MVP.md` (đang bị xóa), `document/test/`, tệp báo cáo `.docx`.
+Chưa push. Các thay đổi có từ trước, không thuộc phần việc này: `server/.env.production`, `document/SPEC_FCC_MVP.md` (đang bị xóa), `document/test/`, tệp báo cáo `.docx`. (`server/src/{app,core,index}.ts` và `server/src/listed-sync.ts` thuộc phần D.)
 
 ---
 
@@ -43,7 +44,7 @@ Lỗi thật đã sửa:
 
 Test mới: `server/tests/concurrency.test.ts`, `web/e2e/a11y.spec.ts`, bổ sung `identity.test.ts`, `e2e.test.ts`.
 
-## C. Khắc phục phản hồi người dùng thử (`document/test/`) — chưa commit
+## C. Khắc phục phản hồi người dùng thử (`document/test/`) (commit `789fe32`)
 
 ### Lỗi nghiệp vụ
 - **F01:** thêm hỏi lại định kỳ 5 giây làm dự phòng SSE; bên mua thấy phiên bản và thời điểm cập nhật; server trả 409 nếu xác nhận phiên bản đã bị thay thế (`buyerDecision` nhận `version`).
@@ -74,6 +75,36 @@ Test mới: `server/tests/concurrency.test.ts`, `web/e2e/a11y.spec.ts`, bổ sun
 - Mới: `server/tests/feedback.test.ts`, `packages/domain/tests/taxcode.test.ts`, `web/e2e/feedback.spec.ts`; sửa `flow.spec.ts` (nút "Xác nhận v1"), `a11y.spec.ts`.
 - Kết quả: server 92, domain 42, sim-bank 5, e2e 2 + 5 + 4 đều qua; `tsc` và `eslint` web sạch.
 - Chạy trên CSDL tạm `fcc_review` (đã xóa), cổng 8797/3010; server cổng 8787 của người dùng không bị đụng tới.
+
+## D. Dữ liệu niêm yết từ vnstock
+
+Trước đây phải chạy tay `scripts/fetch_listed.py`; máy chủ chỉ đọc file JSON có sẵn, web không có nút làm mới, và ý kiến kiểm toán / diện giao dịch mặc định là tốt nếu FCC quên nhập.
+
+### Tự động lấy dữ liệu
+- **`server/src/listed-sync.ts` (mới):** máy chủ chạy script bằng `.venv` (`execFile`, đối số dạng mảng, timeout 180 giây) rồi nạp bằng `refreshListed` với tác nhân "Hệ thống". Chỉ áp dụng cho bên mua đã được FCC xác minh MST ↔ mã.
+- **Chu kỳ (`app.ts`):** mỗi 5 phút kiểm tra; lấy lại khi file cũ hơn 15 phút trong giờ giao dịch (T2–T6, 9–15h giờ Việt Nam) hoặc 6 giờ ngoài giờ. Giãn 15 giây giữa các mã (hạn mức Cộng đồng 60 lượt/phút, ~7 lượt/mã); chỉ một lượt đồng bộ tại một thời điểm; lỗi thì giữ dữ liệu cũ.
+- **Làm mới theo yêu cầu:** `POST /v1/listed/{symbol}/refresh` lấy dữ liệu mới trước khi nạp, lỗi trả 422 kèm lý do. Mới: `GET/POST /v1/operations/listed-sync` (FCC xem trạng thái theo mã; vận hành FCC chạy ngay).
+- **Cấu hình (`index.ts`):** `VNSTOCK_AUTO=0` để tắt; `VNSTOCK_PYTHON`, `VNSTOCK_SCRIPT`, `VNSTOCK_FRESH_MIN_OPEN`, `VNSTOCK_FRESH_MIN_CLOSED`.
+
+### Chất lượng dữ liệu và chấm điểm
+- **M1/M2:** thêm `ListedSnapshot.flagsReviewed`; khi FCC chưa đối chiếu, ý kiến kiểm toán và diện giao dịch để trống (điểm tạm tính, có cờ) thay vì mặc định tối đa. `setListedFlags` ghi nhận đối chiếu kể cả khi giữ nguyên giá trị; `refreshListed` giữ cờ và đối chiếu khi nạp lại.
+- **Script:** dừng (giữ file cũ) khi tổng tài sản/doanh thu không dương hoặc thiếu vốn chủ/nợ ngắn hạn; cảnh báo (`ListedSnapshot.warnings`) khi lệch cân đối > 2%, BCTC quá cũ, thiếu giá, giá đứng > 7 ngày; vốn hóa và `debtService` gắn nhãn ước tính. Ghi file tạm rồi `os.replace`.
+- Đã thử `ratio()` của vnstock để lấy số cổ phiếu lưu hành: dữ liệu đứng ở 2018 (HPG ~2,1 tỷ, thực tế ~6,4 tỷ) nên không dùng, giữ ước tính từ vốn điều lệ.
+
+### Giao diện
+- **Cài đặt (bên mua):** trạng thái dữ liệu niêm yết và nút "Làm mới ngay".
+- **`/admin/sources`:** nút "Lấy dữ liệu ngay", trạng thái đối chiếu, cảnh báo dữ liệu, lỗi lần lấy gần nhất theo mã; nút "Xác nhận đã đối chiếu" (yêu cầu ghi nguồn ≥ 10 ký tự).
+
+### Kiểm thử
+- Mới: `server/tests/listed-sync.test.ts` (bản giả thay script): mã chưa xác minh không chạy, giữ đối chiếu khi nạp lại, M1/M2 trống khi chưa đối chiếu, bỏ qua khi còn mới, lỗi giữ dữ liệu cũ và trả 422, chỉ vận hành FCC chạy ngay.
+- Kết quả: server 94, domain 42 đều qua; `tsc` và `eslint` web sạch. Script chạy với dữ liệu thật HPG, CTD: qua kiểm tra cân đối, chỉ có hai cảnh báo ước tính.
+- Chưa thử trên trình duyệt với server đang chạy.
+- `tsc` server còn một lỗi có từ trước, không thuộc phần D: `service.ts(546)` — `expired` không có trong bảng nhãn trạng thái sản phẩm.
+
+### Giới hạn còn lại
+- Không có realtime thật: vnstock không đẩy dữ liệu, nhanh nhất ~15 phút trong giờ giao dịch; giá theo ngày.
+- Vốn hóa, `debtService` vẫn là ước tính; phụ thuộc Python + vnstock trên máy chạy backend; hạn mức bản Cộng đồng.
+- Bên mua niêm yết đã có dữ liệu sẽ về điểm tạm tính cho tới khi FCC xác nhận đối chiếu (có chủ đích).
 
 ## Chưa làm
 

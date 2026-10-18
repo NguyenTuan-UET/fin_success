@@ -9,8 +9,12 @@ import { hashToken } from './auth/password'
 import { HttpError, forbidden } from './errors'
 import { viewFor } from './views'
 
+import type { ListedFetcher } from './listed-sync'
+
 export interface CoreOptions {
   listedDir: string
+  /** Tự chạy vnstock (scripts/fetch_listed.py) trước khi nạp dữ liệu niêm yết; không đặt thì chỉ đọc file có sẵn */
+  listedFetch?: ListedFetcher
   devAutologin?: boolean
   now?: () => Date
   /** Địa chỉ gốc của giao diện, dùng trong liên kết email (mời thành viên, đặt lại mật khẩu) */
