@@ -45,6 +45,7 @@ let adminToken = ''
 describe('thành viên, vai trò, phân quyền theo hành động', () => {
   it('chủ tổ chức mời người lập hồ sơ; người lập hồ sơ không chia sẻ dữ liệu hay chấp thuận được', async () => {
     const S = await register('supplier', 'sup1')
+    await enableMfa(S.token) // mời / đổi vai trò cần MFA
     expect(S.userId).toBeTruthy()
     const inv = await post('/api/org/invitations', { email: 'opr@example.test', role: 'operator' }, S.token)
     expect(inv.status, JSON.stringify(inv.body)).toBe(200)
@@ -70,11 +71,15 @@ describe('thành viên, vai trò, phân quyền theo hành động', () => {
     // không bỏ được chủ tổ chức cuối cùng
     expect((await post(`/api/org/members/${S.userId}/role`, { role: 'operator' }, S.token)).status).toBe(409)
     expect((await post(`/api/org/members/${S.userId}/revoke`, {}, S.token)).status).toBe(409)
+    // MFA quá hạn: không đổi quyền được
+    await app.db.rawQuery(`UPDATE sessions SET mfa_at = $2 WHERE token_hash = encode(sha256($1::bytea), 'hex')`, [S.token, new Date(now().getTime() - 11 * 60_000)])
+    expect((await post('/api/org/invitations', { email: 'z@example.test', role: 'operator' }, S.token)).status).toBe(401)
   })
 
   it('một người thuộc nhiều tổ chức, chuyển tổ chức đang hoạt động; không chuyển sang tổ chức khác', async () => {
     const A = await register('supplier', 'multiA')
     const B = await register('buyer', 'multiB')
+    await enableMfa(B.token)
     const inv = await post('/api/org/invitations', { email: A.email, role: 'approver' }, B.token)
     const t = inviteToken(inv.body.inviteUrl)
     expect((await post(`/api/invitations/${t}/accept`, { password: 'sai-mat-khau-1' })).status).toBe(401)
@@ -137,6 +142,7 @@ describe('xác minh người đại diện (KYC) với giấy tờ trong kho t�
     expect(adminSecret.startsWith('v1.')).toBe(true) // secret MFA được mã hóa khi lưu
     expect((await post('/api/auth/login', ADMIN)).body.mfaRequired).toBe(true)
     const L = await register('lender', 'audit-owner')
+    await enableMfa(L.token)
     expect((await post('/api/org/invitations', { email: 'auditor@example.test', role: 'fcc_auditor' }, L.token)).status).toBe(400) // vai trò chỉ có ở FCC
     const inv = await post('/api/org/invitations', { email: 'auditor@example.test', role: 'fcc_auditor' }, adminToken)
     expect(inv.status, JSON.stringify(inv.body)).toBe(200)

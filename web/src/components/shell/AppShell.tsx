@@ -277,9 +277,12 @@ function Shell({ role, children }: { role: Role; children: ReactNode }) {
               Hỏi trợ lý
             </button>
           </div>
+          <span className="side-sec" title="Giai đoạn thử nghiệm: phía ngân hàng/tổ chức tài chính do hệ thống giả lập">
+            Ngân hàng giả lập · không có giao dịch tiền thật
+          </span>
           <span className="side-sec">
             <ShieldCheck size={16} aria-hidden="true" />
-            {me?.mfaEnabled ? "AES-256 · MFA đang bật" : "AES-256 · MFA chưa bật"}
+            {me?.mfaEnabled ? "MFA đang bật" : "MFA chưa bật"}
           </span>
         </aside>
 

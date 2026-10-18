@@ -39,6 +39,8 @@ export default function SourcesPage() {
   const customers = data.orgs.filter((o) => o.type === "supplier" || o.type === "buyer");
   const disputed = data.external.filter((e: ExternalRecord) => e.disputed);
   const manualJobs = jobs.filter((j) => j.status === "manual_needed" || j.status === "failed");
+  const manualSources = sources.filter((s) => s.sourceClass === "B" && s.status !== "blocked");
+  const manualReady = manualSources.length > 0 && customers.length > 0;
   const listedBuyers = data.orgs.filter((o) => o.type === "buyer" && o.listedSymbol);
 
   return (
@@ -51,6 +53,7 @@ export default function SourcesPage() {
         <div className="tw"><table>
           <thead><tr><th>Nguồn</th><th>Loại</th><th>Trạng thái</th><th>Khảo sát / căn cứ</th><th style={{ minWidth: 340 }}>Thao tác</th></tr></thead>
           <tbody>
+            {sources.length === 0 && <tr><td colSpan={5} className="empty">Chưa cấu hình nguồn dữ liệu. Bước tiếp theo: khai báo nguồn trong danh mục máy chủ (kèm điều khoản sử dụng), sau đó phê duyệt tại đây với căn cứ pháp lý. Các bước tra cứu bên dưới tạm khóa cho tới khi có nguồn.</td></tr>}
             {sources.map((s) => (
               <tr key={s.id}>
                 <td className="wrap">{s.name}<div className="muted">{s.owner}</div></td>
@@ -86,9 +89,11 @@ export default function SourcesPage() {
 
       <section className="card stack">
         <h2 className="ct">Ghi kết quả tra cứu thủ công</h2>
+        {!manualReady && <div className="muted">{!manualSources.length ? "Chưa có nguồn tra cứu thủ công (loại B) khả dụng — cấu hình nguồn ở danh mục trên trước khi ghi kết quả." : "Chưa có doanh nghiệp nào đăng ký để tra cứu."}</div>}
+        <fieldset disabled={!manualReady} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }} className="stack">
         <div className="grid-fields">
           <label className="field"><span>Doanh nghiệp</span><select className="select" value={manual.orgId} onChange={(e) => setManual({ ...manual, orgId: e.target.value })}><option value="">—</option>{customers.map((o) => <option key={o.id} value={o.id}>{o.shortName} · MST {o.taxCode}</option>)}</select></label>
-          <label className="field"><span>Nguồn</span><select className="select" value={manual.sourceId} onChange={(e) => setManual({ ...manual, sourceId: e.target.value })}><option value="">—</option>{sources.filter((s) => s.sourceClass === "B").map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
+          <label className="field"><span>Nguồn</span><select className="select" value={manual.sourceId} onChange={(e) => setManual({ ...manual, sourceId: e.target.value })}><option value="">—</option>{manualSources.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
           <label className="field"><span>Thông tin</span><input className="input" value={manual.field} onChange={(e) => setManual({ ...manual, field: e.target.value })} /></label>
           <label className="field"><span>Giá trị</span><input className="input" value={manual.value} onChange={(e) => setManual({ ...manual, value: e.target.value })} /></label>
           <label className="field"><span>Đường dẫn nguồn (URL)</span><input className="input" value={manual.url} onChange={(e) => setManual({ ...manual, url: e.target.value })} /></label>
@@ -96,6 +101,7 @@ export default function SourcesPage() {
         </div>
         <button className="btn bp" style={{ alignSelf: "flex-start" }} disabled={!manual.orgId || !manual.sourceId || !manual.field || !manual.value || !manual.url}
           onClick={() => run(async () => { await act("POST", `/v1/organizations/${manual.orgId}/external-records`, { sourceId: manual.sourceId, field: manual.field, value: manual.value, url: manual.url, note: manual.note }); setManual({ ...manual, field: "", value: "", url: "", note: "" }); }, "Đã ghi kết quả tra cứu")}>Ghi kết quả</button>
+        </fieldset>
       </section>
 
       <section className="card stack">

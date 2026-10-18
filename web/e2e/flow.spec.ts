@@ -109,7 +109,20 @@ test("hóa đơn → xác nhận → RFQ → báo giá → thẩm định → đ
   // FCC: bảng điều khiển có chỉ số thật và trang nguồn dữ liệu công khai
   const admin = await as(browser, "admin");
   admin.on("pageerror", (e) => errors.push(e.message));
-  await expect(admin.getByText("Giá trị đã tài trợ")).toBeVisible({ timeout: 15_000 });
+  await expect(admin.getByText("Giá trị bên tài trợ đã giải ngân")).toBeVisible({ timeout: 15_000 });
+  // một hồ sơ: chưa đủ mẫu để tính tỷ lệ, vẫn hiện tử số/mẫu số
+  await expect(admin.getByText("Không đủ dữ liệu").first()).toBeVisible();
+  await expect(admin.getByText("1/1 hồ sơ đã quyết định không bị từ chối", { exact: false })).toBeVisible();
+  await admin.goto("/admin/members");
+  await expect(admin.getByRole("heading", { name: "Ma trận quyền" })).toBeVisible({ timeout: 15_000 });
+  await admin.goto("/admin/orgs");
+  await expect(admin.getByRole("heading", { name: "Tổ chức", exact: true })).toBeVisible({ timeout: 15_000 });
+  await admin.goto("/admin/audit");
+  await expect(admin.getByText("Ghi nhận giải ngân").first()).toBeVisible({ timeout: 15_000 });
+  await expect(admin.getByText("[số tiền]").first()).toBeVisible(); // số tiền của tổ chức khác được ẩn với FCC
+  // ESG chưa có chỉ tiêu nào xác minh: không gán điểm/mức
+  await supplier.goto("/supplier/esg");
+  await expect(supplier.getByText("Chưa xếp loại", { exact: false })).toBeVisible({ timeout: 15_000 });
   await admin.goto("/admin/sources");
   await expect(admin.getByRole("heading", { name: "Danh mục nguồn" })).toBeVisible();
   await expect(admin.getByText("Báo chí (tin bất lợi)")).toBeVisible();

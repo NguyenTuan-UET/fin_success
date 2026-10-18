@@ -126,7 +126,7 @@ export function InvoiceManager() {
                         <div className="num">{date(r.dueDate)}</div>
                         <div className={cx("muted", r.state === "OVERDUE" && "t-bad strong")}>{d === null ? "đã thanh toán" : d < 0 ? `quá hạn ${-d} ngày` : `còn ${d} ngày`}</div>
                       </td>
-                      <td className="num">{scores.buyer(r.buyerId).rating}</td>
+                      <td className="num">{(() => { const b = scores.buyer(r.buyerId); return !b.official && b.coverage < 0.5 ? "Chưa đủ dữ liệu" : b.rating; })()}</td>
                       <td><span className={`chip ${RECEIVABLE_STAGE[r.state].chip}`}>{RECEIVABLE_STAGE[r.state].short}</span></td>
                     </tr>
                   );
@@ -157,7 +157,7 @@ export function InvoiceManager() {
                 <div><div className="muted">Người mua</div><div className="strong wrap">{orgName(data.orgs, s.buyerId)}</div></div>
                 <div><div className="muted">Số tiền</div><div className="num strong">{vnd(s.amount)} đ</div></div>
                 <div><div className="muted">Hạn thanh toán</div><div className="num">{date(s.dueDate)}{dl !== null && ` (${dl < 0 ? `quá ${-dl}` : `còn ${dl}`} ngày)`}</div></div>
-                <div><div className="muted">Xếp hạng người mua (tham khảo)</div><div className="num">{buyer.rating}{buyer.official ? "" : " · tạm tính"}</div></div>
+                <div><div className="muted">Xếp hạng người mua (tham khảo)</div><div className="num">{!buyer.official && buyer.coverage < 0.5 ? "Chưa đủ dữ liệu" : buyer.rating}{buyer.official ? "" : ` · tạm tính (bao phủ ${Math.round(buyer.coverage * 100)}%)`}</div></div>
                 <div><div className="muted">Hóa đơn</div><div className="num">{s.invoiceSeries}-{s.invoiceNumber}</div></div>
                 <div><div className="muted">Nguồn</div><div>{{ xml: "XML hóa đơn điện tử", ocr: "OCR/AI", manual: "Nhập tay", accounting: "Phần mềm kế toán" }[s.source]}</div></div>
               </div>

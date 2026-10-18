@@ -103,6 +103,7 @@ function Compare() {
                 <Send size={16} aria-hidden="true" /> Gửi yêu cầu báo giá ({picked.length}/3)
               </button>
             </div>
+            {eligible[0] && <div className="muted" style={{ padding: "0 16px 8px" }}>Cơ sở tính: {eligible[0].cost.tenorDays} ngày theo năm 365 ngày, lãi thu cuối kỳ, phí trả trước được trừ vào thực nhận; chưa gồm thuế và phí dịch vụ FCC. Thứ tự chỉ theo tiêu chí “Sắp xếp” bạn chọn — FCC không xếp hạng theo hoa hồng hay quan hệ với tổ chức tài chính.</div>}
             {hasRfq && <div className="muted" style={{ padding: "0 16px 8px" }}>Hóa đơn này đã có RFQ đang mở. Hủy hoặc chờ phản hồi ở bên dưới.</div>}
             <div className="tw">
               <table>
@@ -115,7 +116,7 @@ function Compare() {
                       <td className="r num">{p.pricing.advancePct}%<div className="muted">{vnd(c.advance)} đ</div></td>
                       <td className="r num strong">{vnd(c.netReceived)} đ</td>
                       <td className="r num">{dec(c.rateMin)}{c.rateMax !== c.rateMin ? `–${dec(c.rateMax)}` : ""}%</td>
-                      <td className="r num">{vnd(c.totalMin)}{c.totalMax !== c.totalMin ? `–${vnd(c.totalMax)}` : ""} đ</td>
+                      <td className="r num">{vnd(c.totalMin)}{c.totalMax !== c.totalMin ? `–${vnd(c.totalMax)}` : ""} đ<div className="muted">lãi {vnd(c.interestMin)}{c.interestMax !== c.interestMin ? `–${vnd(c.interestMax)}` : ""} + phí {vnd(c.fees)}</div></td>
                       <td className="r num">{dec(c.effAprMin * 100)}{c.effAprMax !== c.effAprMin ? `–${dec(c.effAprMax * 100)}` : ""}%</td>
                       <td>{p.sla.reviewHours ? `${p.sla.reviewHours} giờ` : "—"}</td>
                       <td>{c.greenApplied ? <span className="chip c-ok">−{dec(c.greenDiscount)}%</span> : p.greenRule ? <span className="chip c-neu">Cần ESG ≥ {p.greenRule.minEsg}</span> : "—"}</td>

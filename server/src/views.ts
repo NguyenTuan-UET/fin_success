@@ -23,7 +23,7 @@ export function viewFor(s: State, actorId: string, now = new Date()): State {
       receivables: s.receivables.filter((r) => (r.flags?.length ?? 0) > 0 || r.taxCheck).map((r) => ({ ...r, description: '', files: undefined, fingerprint: '', docs: { xml: false, contract: false, delivery: false }, disputeReason: undefined })),
       rfqs: [], applications: [], earlyOffers: [], consents: [],
       notifications: s.notifications.filter((n) => n.orgId === actorId).slice(0, 200),
-      audit: s.audit.slice(0, 300),
+      audit: s.audit.slice(0, 300).map((e) => (e.actorOrgId === actorId ? e : { ...e, detail: redactAuditDetail(e.action, e.detail) })),
     }
   }
 
@@ -73,4 +73,16 @@ export function viewFor(s: State, actorId: string, now = new Date()): State {
     notifications: s.notifications.filter((n) => n.orgId === actorId).slice(0, 200),
     audit: s.audit.filter((e) => e.actorOrgId === actorId || visibleEntities.has(e.entity)).slice(0, 300),
   }
+}
+
+/**
+ * Tối thiểu hóa dữ liệu trong nhật ký hiển thị cho nhân sự FCC: sự kiện do tổ chức khác thực hiện được ẩn số tiền,
+ * lãi suất và kết quả chấm điểm. Bản ghi gốc (và chuỗi băm) không đổi; kiểm toán viên tra cứu qua /v1/audit-events (có ghi vết).
+ */
+export function redactAuditDetail(action: string, detail: string): string {
+  if (/^Chấm điểm/.test(action)) return '[kết quả chấm điểm đã ẩn]'
+  return detail
+    .replace(/\d[\d.]*(,\d+)?\s*₫/g, '[số tiền]')
+    .replace(/\d{1,3}(\.\d{3})+(,\d+)?/g, '[số tiền]') // số có phân cách hàng nghìn, kể cả khi không ghi ₫
+    .replace(/\d+(,\d+)?%\/năm/g, '[lãi suất]')
 }

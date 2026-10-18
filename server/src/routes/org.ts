@@ -39,6 +39,7 @@ export function orgRoutes(app: FastifyInstance, core: Core, openSession: (userId
   app.post('/api/org/invitations', async (req) => {
     const a = await core.auth(req)
     requireOwner(a.role)
+    core.requireStepUp(a) // thay quyền: cần MFA gần đây
     const b = (req.body ?? {}) as { email?: string; role?: string }
     const email = str(b.email, 'email', 120).toLowerCase()
     if (!EMAIL.test(email)) throw bad('Email không hợp lệ')
@@ -89,6 +90,7 @@ export function orgRoutes(app: FastifyInstance, core: Core, openSession: (userId
   app.post('/api/org/members/:userId/role', async (req) => {
     const a = await core.auth(req)
     requireOwner(a.role)
+    core.requireStepUp(a) // thay quyền: cần MFA gần đây
     const userId = (req.params as { userId: string }).userId
     const role = (req.body as { role?: string } | undefined)?.role as MemberRole
     const org = orgOf(a.activeOrgId)!

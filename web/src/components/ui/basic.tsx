@@ -10,12 +10,18 @@ import {
   Users,
   Activity,
   Info,
+  Building2,
+  Receipt,
+  ScrollText,
 } from "lucide-react";
 import type { IconKey } from "@/lib/roles";
 import { cx } from "@/lib/format";
 
 const ICONS = {
   overview: LayoutGrid,
+  org: Building2,
+  revenue: Receipt,
+  log: ScrollText,
   invoice: FileText,
   market: Store,
   esg: Leaf,

@@ -21,7 +21,7 @@ export function BuyerProgram() {
   return (
     <>
       <section className="grid-kpi">
-        <Kpi label="Xếp hạng của bạn (tham khảo)" value={rating.rating} note={rating.official ? "Điểm chính thức" : `Tạm tính · độ bao phủ dữ liệu ${Math.round(rating.coverage * 100)}%`} />
+        <Kpi label="Xếp hạng của bạn (tham khảo)" value={!rating.official && rating.coverage < 0.5 ? "Chưa đủ dữ liệu" : rating.rating} note={rating.official ? "Điểm chính thức" : `Tạm tính, chỉ để tham khảo · độ bao phủ dữ liệu ${Math.round(rating.coverage * 100)}% (cần ≥ 50% để hiển thị hạng)`} />
         <Kpi label="Nhà cung cấp đã gửi hóa đơn" value={String(suppliers.length)} note={`${mine.length} hóa đơn tới bạn`} />
         <Kpi label="Đang được tài trợ" value={money(fundedVnd)} note={`${funded.length} hồ sơ đã chấp thuận/giải ngân`} />
         <Kpi label="Lãi suất sàn thấp nhất đang công bố" value={rates.length ? `${dec(Math.min(...rates))}%` : "—"} note={`${products.length} gói đang công bố`} />

@@ -9,11 +9,10 @@ import { orgName } from "@/lib/model";
 import { useData } from "@/lib/session";
 import { PageHeader } from "@/components/ui/basic";
 import { PublicData } from "@/components/screens/PublicData";
+import { MembersSection } from "@/components/screens/Members";
 import { useToast } from "@/components/providers/Toast";
 import type { Role } from "@/lib/roles";
 
-type Member = { userId: string; email: string; name: string; title: string; role: string; roleLabel: string; status: string; mfaEnabled: boolean };
-type Members = { members: Member[]; invitations: { email: string; role: string; expiresAt: string }[]; roles: { role: string; label: string }[] };
 type Keys = { keys: { id: string; name: string; scopes: string[]; createdAt: string; lastUsedAt?: string; revokedAt?: string }[]; scopes: Record<string, { label: string }>; endpoint: string | null };
 const SCOPE_LABEL: Record<string, string> = { products: "sản phẩm", rfqs: "báo giá", applications: "hồ sơ", packages: "gói hồ sơ", events: "sự kiện tiền" };
 const KYC_LABEL = { pending: ["Chờ FCC xác minh", "c-warn"], verified: ["Đã xác minh", "c-ok"], rejected: ["Chưa đạt", "c-bad"] } as const;
@@ -22,9 +21,6 @@ export function SettingsPanel({ role }: { role: Role }) {
   const { data, org, me, act } = useData();
   const toast = useToast();
   const isOwner = ["owner", "fcc_admin"].includes(me.role);
-  const [members, setMembers] = useState<Members | null>(null);
-  const [invite, setInvite] = useState({ email: "", role: "" });
-  const [inviteUrl, setInviteUrl] = useState("");
   const [profile, setProfile] = useState<Partial<Org>>({});
   const [kycName, setKycName] = useState("");
   const [kycKeys, setKycKeys] = useState<string[]>([]);
@@ -34,7 +30,6 @@ export function SettingsPanel({ role }: { role: Role }) {
   const [hookEdit, setHookEdit] = useState<string | null>(null);
   const [deliveries, setDeliveries] = useState<{ eventId: string; type: string; attempts: number; lastStatus?: number; deliveredAt?: string; deadAt?: string; lastError?: string }[]>([]);
 
-  const loadMembers = useCallback(() => api<Members>("GET", "/api/org/members").then(setMembers, () => undefined), []);
   const loadKeys = useCallback(async () => {
     if (org.type !== "lender") return;
     setKeys(await api<Keys>("GET", "/v1/integration-keys").catch(() => null));
@@ -42,7 +37,7 @@ export function SettingsPanel({ role }: { role: Role }) {
   }, [org.type]);
   // tải danh sách khi mở màn hình (dữ liệu từ máy chủ, không nằm trong trạng thái chung)
   /* eslint-disable react-hooks/set-state-in-effect */
-  useEffect(() => { void loadMembers(); void loadKeys(); }, [loadMembers, loadKeys]);
+  useEffect(() => { void loadKeys(); }, [loadKeys]);
   /* eslint-enable react-hooks/set-state-in-effect */
   const hookUrl = hookEdit ?? keys?.endpoint ?? "";
   const setHookUrl = setHookEdit;
@@ -116,33 +111,9 @@ export function SettingsPanel({ role }: { role: Role }) {
         </section>
       )}
 
-      <section className="card stack">
-        <h2 className="ct">Thành viên & vai trò</h2>
-        <div className="tw"><table>
-          <thead><tr><th>Họ tên</th><th>Email</th><th>Vai trò</th><th>MFA</th><th></th></tr></thead>
-          <tbody>
-            {members?.members.filter((m) => m.status === "active").map((m) => (
-              <tr key={m.userId}>
-                <td>{m.name}<div className="muted">{m.title}</div></td><td>{m.email}</td>
-                <td>{isOwner && m.userId !== me.id ? (
-                  <select className="select" value={m.role} onChange={(e) => void run(async () => { await api("POST", `/api/org/members/${m.userId}/role`, { role: e.target.value }); await loadMembers(); }, "Đã đổi vai trò")}>
-                    {members.roles.map((r) => <option key={r.role} value={r.role}>{r.label}</option>)}
-                  </select>) : m.roleLabel}</td>
-                <td><span className={`chip ${m.mfaEnabled ? "c-ok" : "c-warn"}`}>{m.mfaEnabled ? "Đã bật" : "Chưa bật"}</span></td>
-                <td>{isOwner && m.userId !== me.id && <button className="btn bs sm" onClick={() => run(async () => { await api("POST", `/api/org/members/${m.userId}/revoke`, {}); await loadMembers(); }, "Đã thu hồi quyền — hiệu lực ngay")}>Thu hồi</button>}</td>
-              </tr>
-            ))}
-          </tbody></table></div>
-        {members?.invitations.map((i) => <div key={i.email} className="muted">Đã mời {i.email} ({i.role}) — hết hạn {date(i.expiresAt)}</div>)}
-        {isOwner && members && (
-          <div className="row" style={{ gap: 8, alignItems: "flex-end", flexWrap: "wrap" }}>
-            <label className="field"><span>Email người được mời</span><input className="input" type="email" value={invite.email} onChange={(e) => setInvite({ ...invite, email: e.target.value })} /></label>
-            <label className="field"><span>Vai trò</span><select className="select" value={invite.role || members.roles[members.roles.length > 1 ? 1 : 0].role} onChange={(e) => setInvite({ ...invite, role: e.target.value })}>{members.roles.map((r) => <option key={r.role} value={r.role}>{r.label}</option>)}</select></label>
-            <button className="btn bp" disabled={busy || !invite.email} onClick={() => run(async () => { const r = await api<{ inviteUrl: string }>("POST", "/api/org/invitations", { email: invite.email, role: invite.role || members.roles[members.roles.length > 1 ? 1 : 0].role }); setInviteUrl(r.inviteUrl); setInvite({ email: "", role: "" }); await loadMembers(); }, "Đã gửi lời mời qua email")}>Mời thành viên</button>
-          </div>
-        )}
-        {inviteUrl && <div className="okmsg">Liên kết mời (cũng đã gửi email): <code style={{ wordBreak: "break-all" }}>{inviteUrl}</code></div>}
-      </section>
+      {org.type === "fcc"
+        ? <section className="card stack"><h2 className="ct">Thành viên & vai trò</h2><div className="muted">Thành viên FCC, vai trò và ma trận quyền được quản lý tại <Link href="/admin/members">Thành viên & quyền</Link>.</div></section>
+        : <MembersSection />}
 
       <section className="card stack">
         <h2 className="ct">Chia sẻ dữ liệu</h2>

@@ -16,14 +16,18 @@ import { useToast } from "@/components/providers/Toast";
 const LEVEL_CHIP = (s: number | null) => (s === null ? "c-neu" : s >= 80 ? "c-ok" : s >= 65 ? "c-info" : s >= 50 ? "c-warn" : "c-bad");
 const YEAR_MS = 365 * 86_400_000;
 
+/** Chưa có chỉ tiêu nào được xác minh: không hiển thị điểm hay mức để tránh bị hiểu là kết quả đánh giá. */
+const noData = (r: { verifiedCount: number }) => r.verifiedCount === 0;
+
 function Summary({ a }: { a: EsgAssessment }) {
   const r = computeEsg(a.indicators, a.industryGroup);
   const official = esgOfficialScore(a);
+  const empty = noData(r);
   return (
     <section className="grid-kpi">
-      <Kpi label={<Term k="esg">Điểm ESG</Term>} value={`${dec(r.score, 1)}/100`} note={official ? `Chính thức · ${ESG_BADGE[official.level]}` : `Tạm tính · khoảng ${dec(r.min, 0)}–${dec(r.max, 0)}`} />
+      <Kpi label={<Term k="esg">Điểm ESG</Term>} value={empty ? "—" : `${dec(r.score, 1)}/100`} note={empty ? "Chưa đủ dữ liệu: chưa có chỉ tiêu nào được xác minh — bổ sung bằng chứng để có điểm tạm tính" : official ? `Chính thức · ${ESG_BADGE[official.level]}` : `Tạm tính, có thể thay đổi · khoảng ${dec(r.min, 0)}–${dec(r.max, 0)}`} />
       <Kpi label={<Term k="coverage">Độ bao phủ</Term>} value={`${Math.round(r.coverage * 100)}%`} note={`${r.verifiedCount}/${r.applicableCount} chỉ tiêu đã xác minh · cần ≥ 80% để chính thức`} tone={r.coverage >= 0.8 ? "ok" : undefined} />
-      <Kpi label="Mức" value={r.level} note={ESG_LEVEL_ACTION[r.level]} />
+      <Kpi label="Mức" value={empty ? "—" : r.level} note={empty ? "Chưa xếp loại: cần ít nhất một chỉ tiêu được xác minh" : ESG_LEVEL_ACTION[r.level]} />
       <Kpi label="Cờ trọng yếu" value={String(r.flags.length)} note={r.flags.length ? r.flags.map((f) => f.code).join(", ") : "Không có"} tone={r.flags.length ? "bad" : "ok"} />
     </section>
   );
@@ -168,7 +172,7 @@ export function EsgReview() {
         {list.map((e) => { const x = computeEsg(e.indicators, e.industryGroup); return (
           <button key={e.id} onClick={() => setSel(e.id)} className="soft" style={{ display: "block", width: "100%", textAlign: "left", border: "none", borderTop: "1px solid var(--line-2)", cursor: "pointer", background: a?.id === e.id ? "var(--surface-3)" : undefined }}>
             <strong>{orgName(data.orgs, e.orgId)}</strong>
-            <div className="muted">{dec(x.score, 0)}/100 · bao phủ {Math.round(x.coverage * 100)}% · {{ draft: "Nháp", in_review: "Đang rà soát", official: "Chính thức", provisional: "Tạm tính" }[e.status]}</div>
+            <div className="muted">{noData(x) ? "Chưa đủ dữ liệu" : `${dec(x.score, 0)}/100`} · bao phủ {Math.round(x.coverage * 100)}% · {{ draft: "Nháp", in_review: "Đang rà soát", official: "Chính thức", provisional: "Tạm tính" }[e.status]}</div>
           </button>
         ); })}
       </div>
@@ -232,7 +236,7 @@ export function EsgPortfolio({ kind }: { kind: "buyer" | "lender" }) {
         <div className="tw"><table>
           <thead><tr><th>Doanh nghiệp</th><th className="r">Điểm</th><th>Mức</th><th className="r">Bao phủ</th><th>Cờ</th><th>Trạng thái</th></tr></thead>
           <tbody>
-            {rows.map(({ e, r, official }) => <tr key={e.id}><td>{orgName(data.orgs, e.orgId)}</td><td className="r num strong">{dec(r.score, 1)}</td><td><span className={`chip ${LEVEL_CHIP(r.score)}`}>{r.level}</span></td><td className="r num">{Math.round(r.coverage * 100)}%</td><td>{r.flags.map((f) => f.code).join(", ") || "—"}</td><td>{official ? <span className="chip c-ok">Chính thức</span> : <span className="chip c-neu">Tạm tính</span>}</td></tr>)}
+            {rows.map(({ e, r, official }) => <tr key={e.id}><td>{orgName(data.orgs, e.orgId)}</td><td className="r num strong">{noData(r) ? "—" : dec(r.score, 1)}</td><td>{noData(r) ? <span className="chip c-neu">Chưa đủ dữ liệu</span> : <span className={`chip ${LEVEL_CHIP(r.score)}`}>{r.level}</span>}</td><td className="r num">{Math.round(r.coverage * 100)}%</td><td>{r.flags.map((f) => f.code).join(", ") || "—"}</td><td>{official ? <span className="chip c-ok">Chính thức</span> : <span className="chip c-neu">Tạm tính</span>}</td></tr>)}
             {rows.length === 0 && <tr><td colSpan={6} className="empty">Chưa có doanh nghiệp nào chia sẻ ESG. Doanh nghiệp chia sẻ khi gửi yêu cầu báo giá hoặc hồ sơ tài trợ.</td></tr>}
           </tbody></table></div>
       </section>

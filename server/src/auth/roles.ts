@@ -57,7 +57,7 @@ PERMISSIONS.setEsgIndustry = [...PERMISSIONS.setEsgIndustry, 'fcc_reviewer']
 /** Hành động nhạy cảm: cần MFA trong STEP_UP_MS gần nhất (SPEC mục 2: chia sẻ dữ liệu, chọn báo giá, phát hành điểm…). */
 export const STEP_UP_ACTIONS = new Set([
   'buyerDecision', 'acceptOffer', 'selectQuote', 'createRfq', 'submitDirect', 'grantConsent', 'issueEsg', 'fundApp', 'markBuyerPaid', 'confirmPayment', 'confirmRefund',
-  'payEarlyOffer', 'decideKyc',
+  'payEarlyOffer', 'decideKyc', 'verifyOrg', 'approveProduct',
 ])
 export const STEP_UP_MS = 10 * 60_000
 

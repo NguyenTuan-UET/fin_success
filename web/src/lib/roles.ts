@@ -2,6 +2,9 @@ export type Role = "supplier" | "buyer" | "lender" | "admin";
 
 export type IconKey =
   | "overview"
+  | "org"
+  | "revenue"
+  | "log"
   | "invoice"
   | "market"
   | "esg"
@@ -120,11 +123,13 @@ export const ROLES: Record<Role, RoleMeta> = {
       greetingName: "bạn",
     },
     nav: [
-      { href: "/admin", label: "Bảng điều khiển", icon: "overview" },
-      { href: "/admin#users", label: "Người dùng & quyền", icon: "users" },
+      { href: "/admin", label: "Việc cần xử lý", icon: "overview" },
+      { href: "/admin/members", label: "Thành viên & quyền", icon: "users" },
+      { href: "/admin/orgs", label: "Tổ chức", icon: "org" },
       { href: "/admin/esg", label: "Thẩm định ESG", icon: "esg" },
       { href: "/admin/sources", label: "Nguồn dữ liệu công khai", icon: "shield" },
-      { href: "/admin#security", label: "Bảo mật & gian lận", icon: "shield" },
+      { href: "/admin/revenue", label: "Doanh thu & biểu phí", icon: "revenue" },
+      { href: "/admin/audit", label: "Nhật ký kiểm toán", icon: "log" },
       { href: "/admin/settings", label: "Cài đặt hệ thống", icon: "settings" },
     ],
   },

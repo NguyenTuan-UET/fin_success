@@ -98,6 +98,9 @@ describe('luồng tài trợ chuỗi cung ứng — không có dữ liệu mẫu
   it('tổ chức tài chính chỉ đăng sản phẩm sau khi FCC xác minh; sản phẩm phải được FCC duyệt mới hiện với doanh nghiệp', async () => {
     expect((await act(L1.token, 'upsertProduct', product('SP1'))).status).toBe(403) // chưa xác minh
     expect((await act(L1.token, 'verifyOrg', L1.orgId, true)).status).toBe(403) // không tự xác minh
+    await staleMfa(admin)
+    expect((await act(admin, 'verifyOrg', L1.orgId, true)).status).toBe(401) // MFA quá 10 phút: máy chủ từ chối duyệt tổ chức
+    await app.db.rawQuery(`UPDATE sessions SET mfa_at = $2 WHERE token_hash = encode(sha256($1::bytea), 'hex')`, [admin, now()])
     for (const l of [L1, L2]) expect((await act(admin, 'verifyOrg', l.orgId, true)).status).toBe(200)
     const a = await act(L1.token, 'upsertProduct', product('SP1'))
     const b = await act(L2.token, 'upsertProduct', product('SP2'))

@@ -21,6 +21,8 @@ export function operationsKpis(s: State, users: number) {
     receivables: { total: s.receivables.length, byState: byState(s.receivables), totalAmount: s.receivables.reduce((a, r) => a + r.amount, 0) },
     applications: { total: apps.length, byState: byState(apps) },
     financed: { count: funded.length, amount: funded.reduce((a, x) => a + (x.fundedAmount ?? 0), 0) },
+    approval: { approved: approved.length, decided: decided.length },
+    dispute: { disputed: everDisputed, sent: confirmable },
     approvalRate: decided.length ? Math.round((approved.length / decided.length) * 1000) / 10 : null, // % hồ sơ đã quyết định mà không bị từ chối
     disputeRate: confirmable ? Math.round((everDisputed / confirmable) * 1000) / 10 : null, // % khoản đã gửi bên mua từng bị tranh chấp
     stepTimes: {
