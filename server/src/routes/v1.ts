@@ -25,6 +25,7 @@ import { bankStatement, computeAndStoreForecast, forecastAccuracy, journalFor, p
 import { toCsv, type JournalEntry } from '@fcc/domain/journal'
 import { billingRun, chargeReport, chargeScoring, feeSourceLabel, scheduleAt } from '../billing'
 import { FEE_SOURCES, validateSchedule, type FeeSchedule } from '@fcc/domain/fees'
+import { iso, vnStartOfDay } from '@fcc/domain/util'
 
 type Json = Record<string, unknown>
 interface Src {
@@ -182,7 +183,7 @@ export const ENDPOINTS: Endpoint[] = [
       const o = view(core, s.a!.activeOrgId).orgs.find((x) => x.id === id)
       if (!o) throw notFound('Không tìm thấy tổ chức')
       const st = core.getState()
-      const canSee = id === s.a!.activeOrgId || orgOf(core, s.a!.activeOrgId)?.type === 'fcc' || st.consents.some((k) => k.ownerId === id && k.recipientId === s.a!.activeOrgId && !k.revokedAt && k.scopes.includes('credit_score') && k.expiresAt >= core.clock().toISOString().slice(0, 10))
+      const canSee = id === s.a!.activeOrgId || orgOf(core, s.a!.activeOrgId)?.type === 'fcc' || st.consents.some((k) => k.ownerId === id && k.recipientId === s.a!.activeOrgId && !k.revokedAt && k.scopes.includes('credit_score') && k.expiresAt >= iso(core.clock()))
       if (!canSee && o.type !== 'buyer') throw forbidden('Chưa được chia sẻ điểm của tổ chức này')
       const credit = o.type === 'buyer' ? buyerScoreOf(st, id) : o.type === 'supplier' ? supplierScoreOf(st, id) : undefined
       const e = esgOf(st, id)
@@ -408,7 +409,7 @@ export const ENDPOINTS: Endpoint[] = [
   // ---- ngân hàng giả lập, bút toán, dự báo ----
   { method: 'POST', path: '/v1/bank/link', tag: 'Kế toán & dòng tiền', summary: 'Liên kết tài khoản với ngân hàng GIẢ LẬP (phase này chưa kết nối ngân hàng thật); cần khai số dư trước', auth: 'user', action: 'linkBank', args: (s) => [s.a!.activeOrgId] },
   { method: 'GET', path: '/v1/bank/statement', tag: 'Kế toán & dòng tiền', summary: 'Sao kê (?from=&to=) dựng từ sự kiện tiền trên FCC, ghi rõ nguồn giả lập', auth: 'user',
-    run: (s, core) => bankStatement(core, s.a!.activeOrgId, s.query.from ?? '2000-01-01', s.query.to ?? core.clock().toISOString().slice(0, 10)) },
+    run: (s, core) => bankStatement(core, s.a!.activeOrgId, s.query.from ?? '2000-01-01', s.query.to ?? iso(core.clock())) },
   { method: 'GET', path: '/v1/journal-entries', tag: 'Kế toán & dòng tiền', summary: 'Bút toán đề xuất theo chế độ ?regime=TT133|TT200, kèm trạng thái duyệt', auth: 'user', run: (s, core) => journalFor(core, s.a!.activeOrgId, parseRegime(s.query.regime)) },
   { method: 'POST', path: '/v1/journal-entries/decision', tag: 'Kế toán & dòng tiền', summary: 'Kế toán duyệt hoặc từ chối một bút toán (có thể sửa dòng, phải cân Nợ/Có)', auth: 'user', body: { ref: 'string', status: 'approved|rejected', lines: 'JournalLine[] (tùy chọn)', note: 'string', regime: 'TT133|TT200' },
     run: async (s, core) => {
@@ -454,7 +455,7 @@ export const ENDPOINTS: Endpoint[] = [
     } },
   { method: 'GET', path: '/v1/fees/invoice-link', tag: 'Phí', summary: 'Liên kết ký (10 phút) tới hóa đơn phí tháng, mở/in thành PDF từ trình duyệt', auth: 'user',
     run: (s, core) => {
-      const period = s.query.period ?? new Date().toISOString().slice(0, 7)
+      const period = s.query.period ?? iso(core.clock()).slice(0, 7)
       if (!/^\d{4}-\d{2}$/.test(period)) throw bad('period phải có dạng YYYY-MM')
       const exp = Math.floor(core.clock().getTime() / 1000) + 600
       const v = `${s.a!.activeOrgId}|${period}`
@@ -479,8 +480,8 @@ export const ENDPOINTS: Endpoint[] = [
       const p = (B(s).params ?? {}) as Partial<FeeSchedule>
       const errs = validateSchedule(p)
       if (errs.length) throw bad(errs.join('; '))
-      const from = new Date(`${String(B(s).effectiveFrom)}T00:00:00Z`)
-      if (Number.isNaN(from.getTime()) || from.toISOString().slice(0, 10) < core.clock().toISOString().slice(0, 10)) throw bad('Ngày hiệu lực phải từ hôm nay trở đi')
+      const from = vnStartOfDay(String(B(s).effectiveFrom))
+      if (Number.isNaN(from.getTime()) || iso(from) < iso(core.clock())) throw bad('Ngày hiệu lực phải từ hôm nay trở đi')
       const id = uid('fee')
       await core.db.createFeeSchedule({ id, name: String(B(s).name ?? 'Biểu phí mới').slice(0, 120), params: p, effectiveFrom: from, createdBy: s.a!.id })
       await core.audit(s.a!.activeOrgId, s.a!.id, 'Tạo phiên bản biểu phí', id, String(B(s).name ?? ''), s.req.id)

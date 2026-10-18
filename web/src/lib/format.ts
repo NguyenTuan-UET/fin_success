@@ -1,3 +1,5 @@
+import { iso } from "@fcc/domain/util";
+
 /** Định dạng số theo kiểu Việt Nam: 1.234.567 */
 export const vnd = (v: number) => Math.round(v).toLocaleString("vi-VN");
 
@@ -28,12 +30,13 @@ export function dateTime(s?: string) {
   return new Date(s).toLocaleString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Ho_Chi_Minh" });
 }
 
-/** Số ngày từ hôm nay (theo ngày UTC) tới ngày s; âm nếu đã qua. */
+/** Số ngày từ hôm nay (theo giờ Việt Nam) tới ngày s; âm nếu đã qua. */
 export function daysFromNow(s: string) {
-  return Math.round((new Date(s).getTime() - new Date(new Date().toISOString().slice(0, 10)).getTime()) / 86_400_000);
+  return Math.round((new Date(s).getTime() - new Date(today()).getTime()) / 86_400_000);
 }
 
-export const today = () => new Date().toISOString().slice(0, 10);
+/** Ngày nghiệp vụ hôm nay theo giờ Việt Nam, khớp thanh tiêu đề và phía server. */
+export const today = () => iso(new Date());
 
 export async function sha256(text: string | ArrayBuffer) {
   const buf = typeof text === "string" ? new TextEncoder().encode(text) : new Uint8Array(text);

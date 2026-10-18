@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import type { Consent, Org } from "@fcc/domain/types";
 import { api, fileToBase64 } from "@/lib/api";
-import { date, dateTime } from "@/lib/format";
+import { date, dateTime, today as todayVN } from "@/lib/format";
 import { orgName } from "@/lib/model";
 import { useData } from "@/lib/session";
 import { PageHeader } from "@/components/ui/basic";
@@ -51,7 +51,7 @@ export function SettingsPanel() {
 
   const consentsOut = data.consents.filter((c) => c.ownerId === org.id);
   const consentsIn = data.consents.filter((c) => c.recipientId === org.id);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayVN();
   const live = (c: Consent) => !c.revokedAt && c.expiresAt >= today;
   const myAudit = data.audit.slice(0, 40);
 
@@ -185,7 +185,7 @@ type Charge = { id: string; sourceLabel: string; amount: number; description: st
 /** Phí dịch vụ của tổ chức: biểu phí đang áp dụng, phí đã phát sinh theo tháng, bảng kê in được. */
 function FeesSection() {
   const { org } = useData();
-  const [period, setPeriod] = useState(new Date().toISOString().slice(0, 7));
+  const [period, setPeriod] = useState(todayVN().slice(0, 7));
   const [data, setData] = useState<{ charges: Charge[]; total: number } | null>(null);
   const [sch, setSch] = useState<{ active: { name: string; transactionPct: number }; } | null>(null);
   useEffect(() => { api<typeof data>("GET", `/v1/fees?period=${period}`).then(setData, () => undefined); }, [period]);

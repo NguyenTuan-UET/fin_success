@@ -1,6 +1,7 @@
 // Bút toán đề xuất từ sự kiện tiền trên FCC (giải ngân, thu hồi, thanh toán của bên mua), theo chế độ kế toán doanh nghiệp.
 // Chỉ là ĐỀ XUẤT có độ tin cậy; kế toán duyệt/sửa từng dòng rồi xuất file nhập vào phần mềm kế toán. FCC không ghi vào sổ của doanh nghiệp.
 import type { AppData, Org, Receivable } from './types'
+import { dayOf } from './util'
 
 export type Regime = 'TT133' | 'TT200'
 
@@ -35,7 +36,7 @@ const A = (regime: Regime) => ({
 })
 
 const L = (a: { account: string; accountName: string }, debit: number, credit: number): JournalLine => ({ ...a, debit, credit })
-const day = (iso?: string) => (iso ?? '').slice(0, 10)
+const day = dayOf
 
 export const balanced = (e: JournalEntry) => e.lines.reduce((t, l) => t + l.debit, 0) === e.lines.reduce((t, l) => t + l.credit, 0)
 

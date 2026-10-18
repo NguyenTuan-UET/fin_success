@@ -3,6 +3,7 @@
 import { buyerScoreOf, paymentHistory } from './engine'
 import { RATING_ORDER } from './credit'
 import type { AppData, FundingApplication, Receivable } from './types'
+import { iso } from './util'
 
 export type EwsSeverity = 'high' | 'medium' | 'low'
 export type EwsCode = 'OVERDUE' | 'DUE_SOON' | 'BUYER_LATE_HISTORY' | 'BUYER_RATING_LOW' | 'CONCENTRATION' | 'DISPUTE_ON_FUNDED' | 'OFFER_EXPIRING'
@@ -26,7 +27,7 @@ type S = Pick<AppData, 'orgs' | 'profiles' | 'listed' | 'receivables' | 'esg' | 
 
 export const EWS_PARAMS = { dueSoonDays: 7, concentrationShare: 0.4, lateHistoryDays: 5, lowRating: 'BB' as const, offerExpiringDays: 2 }
 const DAY = 86_400_000
-const daysTo = (s: string, now: Date) => Math.round((new Date(s).getTime() - new Date(now.toISOString().slice(0, 10)).getTime()) / DAY)
+const daysTo = (s: string, now: Date) => Math.round((new Date(s).getTime() - new Date(iso(now)).getTime()) / DAY)
 
 /** Cảnh báo cho danh mục hồ sơ của một tổ chức tài chính (hoặc một tập hồ sơ bất kỳ). */
 export function ewsAlerts(s: S, apps: FundingApplication[], now = new Date()): EwsAlert[] {

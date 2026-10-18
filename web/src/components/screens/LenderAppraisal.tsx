@@ -13,8 +13,9 @@ import { Bar, Disclaimer } from "@/components/ui/basic";
 import { SettlementPanel } from "./SettlementPanel";
 import { Term } from "@/components/ui/Term";
 import { useToast } from "@/components/providers/Toast";
+import { iso } from "@fcc/domain/util";
 
-const addDays = (n: number) => new Date(Date.now() + n * 86_400_000).toISOString().slice(0, 10);
+const addDays = (n: number) => iso(new Date(Date.now() + n * 86_400_000));
 
 function ScoreBlock({ title, s, term }: { title: string; s: ScoreResult; term?: React.ReactNode }) {
   return (

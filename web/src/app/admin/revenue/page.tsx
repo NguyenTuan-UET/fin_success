@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import { date } from "@/lib/format";
+import { date, today } from "@/lib/format";
 import { useData } from "@/lib/session";
 import { PageHeader } from "@/components/ui/basic";
 import { useToast } from "@/components/providers/Toast";
@@ -36,8 +36,8 @@ export default function AdminRevenue() {
       <section className="card flush">
         <div className="ch"><h2 className="ct">Doanh thu theo nguồn</h2>
           <span className="row" style={{ gap: 8 }}>
-            <button className="btn bs sm" disabled={busy} onClick={() => run(async () => { const r = await act<{ created: number }>("POST", "/v1/operations/billing-run", { period: new Date().toISOString().slice(0, 7) }); await load(); toast(`Đã tính phí định kỳ: ${r.created} khoản mới`); }, "Hoàn tất")}>Chạy tính phí tháng này</button>
-            <button className="btn bs sm" onClick={() => setFeeForm({ name: "Biểu phí mới", transactionPct: "0.3", supplier: "0", buyer: "0", lender: "0", scoringFee: "0", apiMonthlyPerKey: "0", reportFee: "0", referralPctOfFees: "0", effectiveFrom: new Date().toISOString().slice(0, 10) })}>Tạo biểu phí mới</button>
+            <button className="btn bs sm" disabled={busy} onClick={() => run(async () => { const r = await act<{ created: number }>("POST", "/v1/operations/billing-run", { period: today().slice(0, 7) }); await load(); toast(`Đã tính phí định kỳ: ${r.created} khoản mới`); }, "Hoàn tất")}>Chạy tính phí tháng này</button>
+            <button className="btn bs sm" onClick={() => setFeeForm({ name: "Biểu phí mới", transactionPct: "0.3", supplier: "0", buyer: "0", lender: "0", scoringFee: "0", apiMonthlyPerKey: "0", reportFee: "0", referralPctOfFees: "0", effectiveFrom: today() })}>Tạo biểu phí mới</button>
           </span></div>
         <div className="tw" tabIndex={0} role="region" aria-label="Bảng dữ liệu, cuộn ngang để xem thêm"><table>
           <thead><tr><th>Nguồn thu</th><th className="r">Số khoản</th><th className="r">Phát sinh (đ)</th><th className="r">Đã thu (đ)</th></tr></thead>

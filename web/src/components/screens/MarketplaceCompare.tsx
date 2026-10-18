@@ -117,7 +117,7 @@ function Compare() {
                       <td className="r num strong">{vnd(c.netReceived)} đ</td>
                       <td className="r num">{dec(c.rateMin)}{c.rateMax !== c.rateMin ? `–${dec(c.rateMax)}` : ""}%</td>
                       <td className="r num">{vnd(c.totalMin)}{c.totalMax !== c.totalMin ? `–${vnd(c.totalMax)}` : ""} đ<div className="muted">lãi {vnd(c.interestMin)}{c.interestMax !== c.interestMin ? `–${vnd(c.interestMax)}` : ""} + phí {vnd(c.fees)}</div></td>
-                      <td className="r num">{dec(c.effAprMin * 100)}{c.effAprMax !== c.effAprMin ? `–${dec(c.effAprMax * 100)}` : ""}%</td>
+                      <td className="r num">{dec(c.effAprMin)}{c.effAprMax !== c.effAprMin ? `–${dec(c.effAprMax)}` : ""}%</td>
                       <td>{p.sla.reviewHours ? `${p.sla.reviewHours} giờ` : "—"}</td>
                       <td>{c.greenApplied ? <span className="chip c-ok">−{dec(c.greenDiscount)}%</span> : p.greenRule ? <span className="chip c-neu">Cần ESG ≥ {p.greenRule.minEsg}</span> : "—"}</td>
                     </tr>

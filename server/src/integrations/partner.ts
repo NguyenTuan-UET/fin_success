@@ -5,6 +5,7 @@ import type { Database } from '../state'
 import type { MemberRole } from '../auth/roles'
 import type { DomainEvent } from '../service'
 import { HttpError } from '../errors'
+import { iso } from '@fcc/domain/util'
 
 /** Phạm vi quyền của khóa tích hợp → vai trò tương đương khi chạy hành động nghiệp vụ. */
 export const SCOPES = {
@@ -38,7 +39,7 @@ export async function partnerAuth(db: Database, req: FastifyRequest, need: Scope
   if (!ok) throw new HttpError(401, 'Khóa tích hợp không hợp lệ hoặc đã bị thu hồi')
   if (!k.scopes.includes(need)) throw new HttpError(403, `Khóa tích hợp thiếu phạm vi ${need}`)
   await db.touchIntegrationKey(k.id)
-  await db.countApiCall(k.orgId, new Date().toISOString().slice(0, 7)) // số lượt gọi theo tháng (cơ sở báo cáo sử dụng API)
+  await db.countApiCall(k.orgId, iso(new Date()).slice(0, 7)) // số lượt gọi theo tháng (cơ sở báo cáo sử dụng API)
   return { keyId: k.id, orgId: k.orgId, scopes: k.scopes as Scope[] }
 }
 

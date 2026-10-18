@@ -6,7 +6,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import { Send, Sparkles, X } from "lucide-react";
 import type { Role } from "@/lib/roles";
 import { glossaryHit, greeting, norm, SUGGESTIONS, type Reply } from "./answers";
-import { allowedLinks, buildFacts, fundingAdvice, isFundingQuestion } from "./facts";
+import { adminPending, allowedLinks, buildFacts, fundingAdvice, isFundingQuestion, isPendingQuestion } from "./facts";
 import { chat, parseJson } from "@/lib/ai";
 import { TEXT_MODEL } from "@/lib/ai";
 import { useFcc } from "@/lib/session";
@@ -46,6 +46,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
         if (g) reply = g; // thuật ngữ: trả lời từ từ điển, không cần AI
         else if (!data || !org) reply = { text: "Bạn cần đăng nhập để mình xem dữ liệu của bạn." };
         else if (role === "supplier" && isFundingQuestion(norm(text))) reply = fundingAdvice(data, org); // điều kiện nghiệp vụ: trả lời bằng quy tắc
+        else if (role === "admin" && isPendingQuestion(norm(text))) reply = adminPending(data); // hàng đợi FCC: đếm như dashboard
         else reply = await askAi(role, text, buildFacts(role, data, org));
         setTyping(false);
         setLog((l) => ({ ...l, [role]: [...l[role], { from: "bot", reply }] }));

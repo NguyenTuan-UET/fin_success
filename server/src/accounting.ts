@@ -8,6 +8,7 @@ import { uid } from './core'
 import { canonical } from './state'
 import { viewFor } from './views'
 import { bad, conflict, notFound } from './errors'
+import { dayOf, iso } from '@fcc/domain/util'
 
 export const FORECAST_MODEL = 'cashflow-v1 (lịch phải thu/phải trả + độ trễ lịch sử)'
 export const parseRegime = (v?: string): Regime => (v === 'TT200' ? 'TT200' : 'TT133')
@@ -41,7 +42,7 @@ export function currentBalance(core: Core, orgId: string) {
   const conn = st.connections.find((c) => c.orgId === orgId)
   if (!conn) return undefined
   if (!conn.bankLinkedAt) return conn.openingCash
-  return statementFor(st, org, conn, conn.bankLinkedAt.slice(0, 10), core.clock().toISOString().slice(0, 10)).closing
+  return statementFor(st, org, conn, conn.bankLinkedAt.slice(0, 10), iso(core.clock())).closing
 }
 
 /** Dự báo 90 ngày ba kịch bản, lưu lại; cùng đầu vào cùng ngày thì không lưu trùng. Kèm danh sách phải thu FCC dự kiến để đo sai số về sau. */
@@ -54,7 +55,7 @@ export async function computeAndStoreForecast(core: Core, orgId: string) {
   const now = core.clock()
   const opening = currentBalance(core, orgId)!
   const f = orgForecast(st, org, now, 90, opening)!
-  const inputsHash = createHash('sha256').update(canonical({ opening, conn, ledger: st.ledger.filter((l) => l.orgId === orgId), recv: st.receivables.filter((r) => r.sellerId === orgId || r.buyerId === orgId).map((r) => [r.id, r.amount, r.dueDate, r.state]), apps: st.applications.map((a) => [a.id, a.state]), asOf: now.toISOString().slice(0, 10) })).digest('hex')
+  const inputsHash = createHash('sha256').update(canonical({ opening, conn, ledger: st.ledger.filter((l) => l.orgId === orgId), recv: st.receivables.filter((r) => r.sellerId === orgId || r.buyerId === orgId).map((r) => [r.id, r.amount, r.dueDate, r.state]), apps: st.applications.map((a) => [a.id, a.state]), asOf: iso(now) })).digest('hex')
   const delays = f ? ((await import('@fcc/domain/cashflow')).paymentDelays(st.receivables, st.orgs, orgId)) : {}
   const expectedAr = st.receivables
     .filter((r) => r.sellerId === orgId && ['BUYER_CONFIRMED', 'SUBMITTED', 'UNDER_REVIEW', 'OFFERED', 'ACCEPTED', 'FUNDED', 'OVERDUE'].includes(r.state))
@@ -65,14 +66,14 @@ export async function computeAndStoreForecast(core: Core, orgId: string) {
     })
   const summary = { minBase: f.minBase, shortfall: f.shortfall ?? null, inflow: f.inflow, outflow: f.outflow, minConservative: Math.min(...f.points.map((p) => p.conservative)), minOptimistic: Math.min(...f.points.map((p) => p.optimistic)) }
   const id = uid('CF')
-  const created = await core.db.saveForecast({ id, orgId, asOf: now.toISOString().slice(0, 10), horizon: 90, inputsHash, modelVersion: FORECAST_MODEL, opening, series: f.points, summary, expectedAr })
+  const created = await core.db.saveForecast({ id, orgId, asOf: iso(now), horizon: 90, inputsHash, modelVersion: FORECAST_MODEL, opening, series: f.points, summary, expectedAr })
   return { stored: created, forecast: { ...f, asOf: f.asOf }, opening, modelVersion: FORECAST_MODEL, inputsHash, expectedAr }
 }
 
 /** Sai số dự báo thu: so ngày thu dự kiến của mỗi khoản phải thu (lúc dự báo, đã qua ≥ 7 ngày) với ngày thực tế thanh toán. */
 export async function forecastAccuracy(core: Core, orgId: string) {
   const st = viewFor(core.getState(), orgId, core.clock())
-  const today = core.clock().toISOString().slice(0, 10)
+  const today = iso(core.clock())
   const rows = await core.db.forecastsOf(orgId)
   const seen = new Set<string>()
   const errs: { code: string; expected: string; actual: string; errorDays: number; asOf: string }[] = []
@@ -82,7 +83,7 @@ export async function forecastAccuracy(core: Core, orgId: string) {
       const r = st.receivables.find((x) => x.id === e.receivableId)
       if (!r?.paidAt) continue
       seen.add(e.receivableId)
-      const actual = r.paidAt.slice(0, 10)
+      const actual = dayOf(r.paidAt)
       if (actual > today) continue
       errs.push({ code: e.code, expected: e.expectedDate, actual, errorDays: Math.round((new Date(actual).getTime() - new Date(e.expectedDate).getTime()) / 86_400_000), asOf: String(f.asOf) })
     }

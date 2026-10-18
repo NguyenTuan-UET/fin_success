@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Plus } from "lucide-react";
 import type { FinancingProduct, ProductType, Rating } from "@fcc/domain/types";
 import { api } from "@/lib/api";
-import { date, dec, vnd } from "@/lib/format";
+import { date, dec, today, vnd } from "@/lib/format";
 import { PRODUCT_TYPE_LABEL } from "@/lib/model";
 import { useData } from "@/lib/session";
 import { Kpi } from "@/components/ui/basic";
@@ -20,7 +20,7 @@ type Overview = { type: string; products: number; rateMin: number; rateMax: numb
 const blank = () => ({
   id: "", name: "", type: "factoring_recourse" as ProductType, description: "", minAmount: "100000000", maxAmount: "5000000000", maxTenorDays: "120",
   minApplicationRating: "" as Rating | "", advancePct: "80", rateMin: "8", rateMax: "12", feePct: "0.3", latePenaltyPct: "150",
-  greenMinEsg: "", greenMinCoverage: "0.8", greenDiscount: "", reviewHours: "24", effectiveFrom: new Date().toISOString().slice(0, 10), effectiveTo: `${new Date().getFullYear() + 1}-12-31`,
+  greenMinEsg: "", greenMinCoverage: "0.8", greenDiscount: "", reviewHours: "24", effectiveFrom: today(), effectiveTo: `${new Date().getFullYear() + 1}-12-31`,
 });
 
 type Form = ReturnType<typeof blank>;

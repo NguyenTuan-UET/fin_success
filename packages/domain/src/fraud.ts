@@ -1,6 +1,7 @@
 // Phát hiện bất thường hóa đơn theo luật xác định (hồ sơ dự án mục 3.3.a). Chỉ gắn cờ và đưa vào hàng đợi người xem xét;
 // không tự từ chối hồ sơ. Trùng lặp được chặn riêng ở luật tạo khoản phải thu và ở ràng buộc CSDL.
 import type { InvoiceFlag, Receivable } from './types'
+import { iso } from './util'
 
 export const FRAUD_PARAMS = { anomalyMultiple: 3, minHistory: 3, newBuyerLarge: 2_000_000_000, burstCount: 5, roundLarge: 1_000_000_000, futureDays: 1 }
 const DAY = 86_400_000
@@ -29,7 +30,7 @@ export function invoiceFlags(r: Draft, existing: Receivable[], now = new Date())
   if (new Date(r.issueDate).getTime() > now.getTime() + FRAUD_PARAMS.futureDays * DAY) {
     out.push({ code: 'FUTURE_ISSUE_DATE', severity: 'high', detail: `Ngày lập ${r.issueDate} ở tương lai.` })
   }
-  const sameDay = existing.filter((x) => x.sellerId === r.sellerId && x.buyerId === r.buyerId && x.createdAt.slice(0, 10) === now.toISOString().slice(0, 10) && x.state !== 'CANCELLED').length
+  const sameDay = existing.filter((x) => x.sellerId === r.sellerId && x.buyerId === r.buyerId && x.createdAt.slice(0, 10) === iso(now) && x.state !== 'CANCELLED').length
   if (sameDay + 1 >= FRAUD_PARAMS.burstCount) {
     out.push({ code: 'BURST_SAME_BUYER', severity: 'low', detail: `${sameDay + 1} hóa đơn cho cùng bên mua trong một ngày.` })
   }

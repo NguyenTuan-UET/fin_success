@@ -2,6 +2,7 @@
 // Lãi tính theo ngày trên dư nợ gốc: lãi suất đề nghị đến hạn thanh toán của hóa đơn, sau đó lãi quá hạn = lãi suất × latePenaltyPct%.
 // Hàm thuần, xác định: cùng chuỗi sự kiện → cùng kết quả. Số tiền do tổ chức tài chính xác nhận là nguồn sự thật.
 import type { FundingApplication } from './types'
+import { VN_OFFSET_MS } from './util'
 
 export interface SettlementEvent {
   id: string
@@ -30,7 +31,8 @@ export interface Balance {
 }
 
 const DAY = 86_400_000
-const day = (iso: string) => Math.floor(new Date(iso).getTime() / DAY)
+// số ngày theo lịch Việt Nam: "YYYY-MM-DD" (0h UTC) và mốc giờ cùng ngày VN cho cùng một số
+const day = (iso: string) => Math.floor((new Date(iso).getTime() + VN_OFFSET_MS) / DAY)
 const r0 = (n: number) => Math.round(n)
 
 type Offer = NonNullable<FundingApplication['offer']>

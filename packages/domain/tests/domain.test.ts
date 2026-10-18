@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { computeEsg } from '../src/esg'
 import { estimateCost } from '../src/marketplace'
 import { toRating } from '../src/credit'
+import { iso } from '../src/util'
 import type { EsgIndicatorResult, FinancingProduct, IndicatorLevel } from '../src/types'
 
 const lv = (m: Record<string, number>): EsgIndicatorResult[] => Object.entries(m).map(([code, l]) => ({ code, finalLevel: l as IndicatorLevel }))
@@ -58,6 +59,23 @@ describe('Marketplace — chi phí ước tính', () => {
     expect(estimateCost(p, 2e9, 90, { score: 70, coverage: 0.9, official: true, flags: 0 }).rateMin).toBeCloseTo(7.3)
     expect(estimateCost(p, 2e9, 90, { score: 70, coverage: 0.9, official: false, flags: 0 }).greenApplied).toBe(false)
     expect(estimateCost(p, 2e9, 90, { score: 70, coverage: 0.9, official: true, flags: 1 }).greenApplied).toBe(false)
+  })
+  it('chi phí hiệu dụng/năm đã ở đơn vị % (QA production 19/10: 9,89–13,90%, không phải 988,6–1.389,8%)', () => {
+    const qa: FinancingProduct = { ...p, pricing: { ...p.pricing, rateMin: 8, rateMax: 12, fees: [{ name: 'Phí xử lý', kind: 'pct', value: 0.3, upfront: true }] }, greenRule: undefined }
+    const c = estimateCost(qa, 20_000_000, 59)
+    expect(c.netReceived).toBe(15_952_000)
+    expect(c.totalMin).toBe(254_904)
+    expect(c.totalMax).toBe(358_356)
+    expect(c.effAprMin).toBeCloseTo(9.89, 2)
+    expect(c.effAprMax).toBeCloseTo(13.90, 2)
+  })
+})
+
+describe('ngày nghiệp vụ theo giờ Việt Nam', () => {
+  it('0h–7h sáng giờ VN vẫn là ngày VN, không lùi về ngày UTC', () => {
+    expect(iso(new Date('2026-10-18T17:00:00Z'))).toBe('2026-10-19') // 00:00 ngày 19/10 giờ VN
+    expect(iso(new Date('2026-10-18T23:59:00Z'))).toBe('2026-10-19')
+    expect(iso(new Date('2026-10-18T16:59:00Z'))).toBe('2026-10-18')
   })
 })
 

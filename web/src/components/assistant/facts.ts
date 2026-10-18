@@ -5,7 +5,7 @@ import { forecastCash } from "@fcc/domain/cashflow";
 import { applicationScoreOf, buyerScoreOf, supplierScoreOf } from "@fcc/domain/engine";
 import type { Org, Receivable } from "@fcc/domain/types";
 import { APP_STATE_LABEL, RECEIVABLE_STAGE } from "@/lib/model";
-import { date, vnd } from "@/lib/format";
+import { date, today, vnd } from "@/lib/format";
 import type { FccState } from "@/lib/session";
 import { ROLES, type Role } from "@/lib/roles";
 
@@ -52,7 +52,7 @@ export function fundingAdvice(d: FccState, org: Org) {
 export const isFundingQuestion = (q: string) => /tai tro/.test(q) && /(nen|hoa don nao|cai nao|chon|uu tien|kha dung)/.test(q);
 
 export function buildFacts(role: Role, d: FccState, org: Org) {
-  const base = { vai_tro: role, to_chuc: org.name, hom_nay: new Date().toISOString().slice(0, 10) };
+  const base = { vai_tro: role, to_chuc: org.name, hom_nay: today() };
   if (role === "supplier") {
     const mine = d.receivables.filter((r) => r.sellerId === org.id);
     const conn = d.connections.find((c) => c.orgId === org.id);
@@ -92,12 +92,45 @@ export function buildFacts(role: Role, d: FccState, org: Org) {
       san_pham_cua_ban: d.products.filter((p) => p.lenderId === org.id).map((p) => ({ ten: p.name, trang_thai: p.status })),
     };
   }
+  const q = adminQueues(d);
   return {
     ...base,
-    to_chuc_cho_xac_minh: d.orgs.filter((o) => o.type === "lender" && !o.verified).map((o) => o.name),
-    kyc_cho_duyet: d.orgs.filter((o) => o.kyc?.status === "pending").map((o) => o.name),
-    san_pham_cho_duyet: d.products.filter((p) => p.status === "pending_review").map((p) => p.name),
-    esg_chua_phat_hanh: d.esg.filter((e) => e.source === "assessed" && e.status !== "official").length,
+    to_chuc_tai_chinh_cho_xac_minh: q.lenders.map((o) => o.name),
+    kyc_nguoi_dai_dien_cho_duyet: q.kyc.map((o) => o.name),
+    san_pham_cho_duyet: q.products.map((p) => p.name),
+    hoa_don_co_co_bat_thuong: q.flagged.map((r) => ({ ma: r.code, nha_cung_cap: name(d, r.sellerId), so_co_chua_xu_ly: (r.flags ?? []).filter((f) => !f.resolvedAt).length })),
+    ho_so_esg_chua_phat_hanh: q.esg.map((e) => name(d, e.orgId)),
+  };
+}
+
+/** Hàng đợi của FCC — cùng bộ lọc với dashboard "Việc cần xử lý" để trợ lý và bộ đếm luôn khớp. */
+export function adminQueues(d: FccState) {
+  return {
+    lenders: d.orgs.filter((o) => o.type === "lender" && !o.verified),
+    kyc: d.orgs.filter((o) => o.kyc?.status === "pending"),
+    products: d.products.filter((p) => p.status === "pending_review"),
+    flagged: d.receivables.filter((r) => (r.flags ?? []).some((f) => !f.resolvedAt)),
+    esg: d.esg.filter((e) => e.source === "assessed" && e.status !== "official"),
+  };
+}
+
+export const isPendingQuestion = (q: string) => /cho xu ly|can xu ly|dang cho|hang doi|viec (nao|gi)/.test(q);
+
+/** Trả lời "việc nào đang chờ" bằng quy tắc, không qua mô hình — mô hình từng bỏ sót hàng đợi so với dashboard. */
+export function adminPending(d: FccState) {
+  const q = adminQueues(d);
+  const list = (xs: string[]) => (xs.length > 3 ? `${xs.slice(0, 3).join(", ")} và ${xs.length - 3} mục khác` : xs.join(", "));
+  const lines = [
+    q.lenders.length && `• ${q.lenders.length} tổ chức tài chính chờ xác minh: ${list(q.lenders.map((o) => o.name))}.`,
+    q.kyc.length && `• ${q.kyc.length} hồ sơ KYC người đại diện chờ duyệt: ${list(q.kyc.map((o) => o.name))}.`,
+    q.products.length && `• ${q.products.length} sản phẩm tài trợ chờ duyệt: ${list(q.products.map((p) => p.name))}.`,
+    q.flagged.length && `• ${q.flagged.length} hóa đơn có cờ bất thường cần xem xét: ${list(q.flagged.map((r) => `${r.code} (${name(d, r.sellerId)})`))}.`,
+    q.esg.length && `• ${q.esg.length} hồ sơ ESG chưa phát hành: ${list(q.esg.map((e) => name(d, e.orgId)))}.`,
+  ].filter((x): x is string => !!x);
+  if (!lines.length) return { text: "Hiện không có việc nào đang chờ: không có tổ chức chờ xác minh, KYC, sản phẩm chờ duyệt, hóa đơn có cờ hay hồ sơ ESG chưa phát hành." };
+  return {
+    text: [`Có ${lines.length} nhóm việc đang chờ xử lý:`, ...lines].join("\n"),
+    links: [{ href: "/admin", label: "Việc cần xử lý" }, ...(q.esg.length ? [{ href: "/admin/esg", label: "Thẩm định ESG" }] : [])],
   };
 }
 

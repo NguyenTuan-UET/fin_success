@@ -7,6 +7,7 @@ import type { Core } from './core'
 import { uid } from './core'
 import { canonical, type Database, type State } from './state'
 import { HttpError, forbidden, notFound } from './errors'
+import { iso } from '@fcc/domain/util'
 
 export const DEFAULT_SCORECARD_ID = 'sc-v1.0'
 export const OFFICIAL_VALID_DAYS = 180
@@ -58,7 +59,7 @@ export function canSeeAssessment(core: Core, viewerOrgId: string, row: { org_id:
   if (row.org_id === viewerOrgId) return true
   const viewer = s.orgs.find((o) => o.id === viewerOrgId)
   if (viewer?.type === 'fcc') return true
-  const today = now.toISOString().slice(0, 10)
+  const today = iso(now)
   return s.consents.some((k) => k.ownerId === row.org_id && k.recipientId === viewerOrgId && !k.revokedAt && k.expiresAt >= today && k.scopes.includes('credit_score'))
 }
 

@@ -3,6 +3,7 @@ import { createHmac } from 'node:crypto'
 import { dropSchema, newSchema, startApp } from './helpers'
 import { totp } from '../src/auth/totp'
 import type { FinancingProduct, FundingApplication, Receivable, Rfq } from '@fcc/domain/types'
+import { iso } from '@fcc/domain/util' // ngày VN, như giao diện gửi lên
 
 const schema = newSchema()
 const ADMIN = { email: 'ops@example.test', password: 'ops-password-123' }
@@ -15,7 +16,6 @@ const code = (secret: string) => {
   return totp(secret, now().getTime())
 }
 let app = await startApp(schema, { admin: ADMIN, now })
-const iso = (d: Date) => d.toISOString().slice(0, 10)
 const due = iso(new Date(Date.now() + 40 * 86_400_000))
 
 type Json = any // eslint-disable-line @typescript-eslint/no-explicit-any

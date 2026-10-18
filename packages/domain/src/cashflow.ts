@@ -1,5 +1,6 @@
 // Dự báo dòng tiền v1 theo lịch, giải thích được — SPEC mục 7.3.
 import type { AccountingConnection, AppData, FundingApplication, LedgerItem, Org } from './types'
+import { iso } from './util'
 
 export interface ForecastPoint {
   day: number
@@ -26,7 +27,6 @@ export interface Forecast {
 }
 
 const DAY = 86_400_000
-const iso = (d: Date) => d.toISOString().slice(0, 10)
 
 export function forecastCash(conn: AccountingConnection, items: LedgerItem[], apps: FundingApplication[], horizon = 90, now = new Date(), threshold = 0): Forecast {
   const start = new Date(iso(now))

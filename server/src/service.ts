@@ -7,7 +7,7 @@ import type {
   ReceivableRevision, AccountingConnection, Consent, CreditProfile, SignatureEvidence, EarlyPaymentOffer, EsgAssessment, EsgDocument, EsgIndicatorResult, FinancialYear,
   ExternalRecord, FinancingProduct, FundingApplication, LedgerItem, ListedSnapshot, Org, Receivable, ReceivableState, Rfq, RfqResponse,
 } from '@fcc/domain/types'
-import { iso } from '@fcc/domain/util'
+import { dayOf, iso, vnStartOfDay } from '@fcc/domain/util'
 import { applicationScoreOf, buyerScoreOf, esgOf, supplierScoreOf } from '@fcc/domain/engine'
 import { matchProduct } from '@fcc/domain/marketplace'
 import { computeEsg } from '@fcc/domain/esg'
@@ -320,7 +320,7 @@ export const actions: Record<string, Action> = {
     }
     const amount = input?.amount === undefined ? r.amount - (a.settlements ?? []).filter((e) => e.type === 'buyer_reported').reduce((t, e) => t + e.amount, 0) : input.amount
     positiveInt(amount, 'Số tiền thanh toán')
-    const at = input?.paidAt && isDate(input.paidAt) ? `${input.paidAt}T00:00:00.000Z` : c.now.toISOString()
+    const at = input?.paidAt && isDate(input.paidAt) ? vnStartOfDay(input.paidAt).toISOString() : c.now.toISOString()
     const ev: SettlementEvent = { id: uid('SE'), type: 'buyer_reported', amount, at, source: 'buyer', reference: input?.reference?.slice(0, 100) }
     const settlements = [...(a.settlements ?? []), ev]
     patchApp(c, a.id, { settlements })
@@ -338,8 +338,8 @@ export const actions: Record<string, Action> = {
     if (!a.offer || !a.fundedAt) throw conflict('Hồ sơ chưa có thông tin giải ngân')
     positiveInt(input?.amount, 'Số tiền')
     if (input.externalEventId && (a.settlements ?? []).some((e) => e.externalEventId === input.externalEventId)) return { duplicate: true }
-    const at = input.paidAt && isDate(input.paidAt) ? `${input.paidAt}T00:00:00.000Z` : c.now.toISOString()
-    if (at < a.fundedAt) throw bad('Ngày thu tiền không được trước ngày giải ngân')
+    const at = input.paidAt && isDate(input.paidAt) ? vnStartOfDay(input.paidAt).toISOString() : c.now.toISOString()
+    if (dayOf(at) < dayOf(a.fundedAt)) throw bad('Ngày thu tiền không được trước ngày giải ngân')
     const prior = a.settlements ?? []
     const ev: SettlementEvent = { id: uid('SE'), type: input.kind === 'collateral' ? 'collateral_liquidated' : 'payment_received', amount: input.amount, at, source: 'lender', externalEventId: input.externalEventId, reference: input.reference?.slice(0, 100) }
     ev.allocation = allocationOf(a.offer, a.fundedAt, r.dueDate, prior, ev, product?.pricing.latePenaltyPct)

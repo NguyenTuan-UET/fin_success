@@ -1,6 +1,7 @@
 // Sao kê tài khoản từ ngân hàng GIẢ LẬP: dựng từ các sự kiện tiền đã ghi nhận trên FCC (giải ngân, thu hồi, hoàn phần dư, thanh toán của
 // bên mua) cộng chi định kỳ doanh nghiệp tự khai. Không có giao dịch ngẫu nhiên. Mọi dòng ghi nguồn để tách khỏi dữ liệu ngân hàng thật về sau.
 import type { AccountingConnection, AppData, Org } from './types'
+import { dayOf } from './util'
 
 export const STATEMENT_SOURCE = 'Ngân hàng giả lập (dựng từ sự kiện tiền trên FCC)'
 
@@ -15,7 +16,7 @@ export interface StatementLine {
 }
 
 type S = Pick<AppData, 'receivables' | 'applications' | 'earlyOffers'>
-const day = (iso?: string) => (iso ?? '').slice(0, 10)
+const day = dayOf
 
 export function statementFor(s: S, org: Org, conn: Pick<AccountingConnection, 'openingCash' | 'recurringMonthlyOut' | 'lastSyncedAt'> & { bankLinkedAt?: string }, from: string, to: string): { lines: StatementLine[]; opening: number; closing: number; source: string } {
   const since = day(conn.bankLinkedAt ?? conn.lastSyncedAt)

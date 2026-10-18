@@ -60,3 +60,11 @@ describe('thu hồi và tất toán', () => {
     expect(reconcile([rep(100), ev('p', 'payment_received', 90, '2027-01-14T00:00:00Z')])).toBe('mismatch')
   })
 })
+
+describe('đếm ngày theo lịch Việt Nam', () => {
+  it('giải ngân ngày 19/10 (giờ VN) và thu lúc 06:00 sáng 20/10 giờ VN tính đủ 1 ngày lãi', () => {
+    const o = { ...offer, advanceVnd: 16_000_000, ratePct: 8, feesVnd: 0 }
+    const b = balanceAt(o, '2026-10-19', '2026-12-17', [], '2026-10-19T23:00:00Z')
+    expect(b.interest).toBe(Math.round((16_000_000 * 8) / 36500))
+  })
+})

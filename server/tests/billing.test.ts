@@ -1,5 +1,6 @@
 import { afterAll, describe, expect, it } from 'vitest'
 import { dropSchema, newSchema, startApp } from './helpers'
+import { iso } from '@fcc/domain/util' // ngày VN, như giao diện gửi lên
 
 type Json = any // eslint-disable-line @typescript-eslint/no-explicit-any
 const schema = newSchema()
@@ -18,8 +19,7 @@ async function call(method: 'GET' | 'POST', url: string, body?: unknown, token?:
 const post = (u: string, b: unknown, t?: string) => call('POST', u, b, t)
 const act = (t: string, n: string, ...args: unknown[]) => post(`/api/actions/${n}`, { args }, t)
 const session = async (role: string) => (await post('/api/dev/session', { role })).body.token as string
-const iso = (d: Date) => d.toISOString().slice(0, 10)
-const period = new Date().toISOString().slice(0, 7)
+const period = iso(new Date()).slice(0, 7)
 
 async function fundOne(n: string) {
   const [S, B, L] = await Promise.all([session('supplier'), session('buyer'), session('lender')])

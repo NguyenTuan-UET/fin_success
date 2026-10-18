@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Download, FileInput, Plus, Trash2 } from "lucide-react";
 import type { LedgerItem } from "@fcc/domain/types";
 import { api } from "@/lib/api";
-import { date, daysFromNow, money, vnd } from "@/lib/format";
+import { date, daysFromNow, money, vnd, today as todayVN } from "@/lib/format";
 import { useData } from "@/lib/session";
 import { useCashForecast } from "@/lib/cash";
 import { CashForecast } from "@/components/charts/CashForecast";
@@ -308,7 +308,7 @@ export function Accounting({ role }: { role: Role }) {
 /** Tổ chức tài chính: dữ liệu kế toán doanh nghiệp đã chia sẻ (theo quyền còn hiệu lực), dẫn tới hồ sơ thẩm định liên quan. */
 function LenderSharedAccounting() {
   const { data, org } = useData();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayVN();
   const owners = [...new Set(data.consents.filter((c) => c.recipientId === org.id && !c.revokedAt && c.expiresAt >= today && c.scopes.includes("accounting")).map((c) => c.ownerId))];
   return (
     <>

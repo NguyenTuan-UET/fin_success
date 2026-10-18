@@ -10,6 +10,7 @@ import { useData } from "@/lib/session";
 import { Kpi, PageHeader } from "@/components/ui/basic";
 import { useToast } from "@/components/providers/Toast";
 import { useAsk } from "@/components/providers/Dialog";
+import { adminQueues } from "@/components/assistant/facts";
 
 /** Dưới ngưỡng này tỷ lệ dễ gây hiểu nhầm: hiển thị "Không đủ dữ liệu" kèm tử số/mẫu số. */
 const MIN_SAMPLES = 5;
@@ -50,11 +51,7 @@ export default function AdminPage() {
   }, []);
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { void loadScoring(); }, [loadScoring]);
-  const lendersPending = data.orgs.filter((o) => o.type === "lender" && !o.verified);
-  const kycPending = data.orgs.filter((o) => o.kyc?.status === "pending");
-  const productsPending = data.products.filter((p) => p.status === "pending_review");
-  const flagged = data.receivables.filter((r) => (r.flags ?? []).some((f) => !f.resolvedAt));
-  const esgPending = data.esg.filter((e) => e.source === "assessed" && e.status !== "official");
+  const { lenders: lendersPending, kyc: kycPending, products: productsPending, flagged, esg: esgPending } = adminQueues(data);
 
   return (
     <>

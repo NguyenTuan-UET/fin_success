@@ -32,7 +32,7 @@ export interface CostEstimate {
   totalMin: number
   totalMax: number
   netReceived: number
-  effAprMin: number
+  effAprMin: number // %/năm (đã nhân 100)
   effAprMax: number
   greenApplied: boolean
   greenDiscount: number
