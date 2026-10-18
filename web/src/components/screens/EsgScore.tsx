@@ -233,7 +233,7 @@ export function EsgPortfolio({ kind }: { kind: "buyer" | "lender" }) {
       </section>
       <section className="card flush">
         <div className="ch"><h2 className="ct">ESG theo doanh nghiệp</h2></div>
-        <div className="tw"><table>
+        <div className="tw" tabIndex={0} role="region" aria-label="Bảng dữ liệu, cuộn ngang để xem thêm"><table>
           <thead><tr><th>Doanh nghiệp</th><th className="r">Điểm</th><th>Mức</th><th className="r">Bao phủ</th><th>Cờ</th><th>Trạng thái</th></tr></thead>
           <tbody>
             {rows.map(({ e, r, official }) => <tr key={e.id}><td>{orgName(data.orgs, e.orgId)}</td><td className="r num strong">{noData(r) ? "—" : dec(r.score, 1)}</td><td>{noData(r) ? <span className="chip c-neu">Chưa đủ dữ liệu</span> : <span className={`chip ${LEVEL_CHIP(r.score)}`}>{r.level}</span>}</td><td className="r num">{Math.round(r.coverage * 100)}%</td><td>{r.flags.map((f) => f.code).join(", ") || "—"}</td><td>{official ? <span className="chip c-ok">Chính thức</span> : <span className="chip c-neu">Tạm tính</span>}</td></tr>)}

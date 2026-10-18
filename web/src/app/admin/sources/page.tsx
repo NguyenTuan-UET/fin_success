@@ -50,7 +50,7 @@ export default function SourcesPage() {
       <section className="card stack">
         <h2 className="ct">Danh mục nguồn</h2>
         <div className="muted">Nguồn chưa phê duyệt thì không chạy. Loại B chỉ tra cứu thủ công kèm đường dẫn; loại C không dùng (kết quả khảo sát bên dưới). Phê duyệt cần MFA và ghi căn cứ pháp lý/điều khoản.</div>
-        <div className="tw"><table>
+        <div className="tw" tabIndex={0} role="region" aria-label="Bảng dữ liệu, cuộn ngang để xem thêm"><table>
           <thead><tr><th>Nguồn</th><th>Loại</th><th>Trạng thái</th><th>Khảo sát / căn cứ</th><th style={{ minWidth: 340 }}>Thao tác</th></tr></thead>
           <tbody>
             {sources.length === 0 && <tr><td colSpan={5} className="empty">Chưa cấu hình nguồn dữ liệu. Bước tiếp theo: khai báo nguồn trong danh mục máy chủ (kèm điều khoản sử dụng), sau đó phê duyệt tại đây với căn cứ pháp lý. Các bước tra cứu bên dưới tạm khóa cho tới khi có nguồn.</td></tr>}
@@ -77,7 +77,7 @@ export default function SourcesPage() {
         <div className="between"><h2 className="ct">Hàng đợi crawl và việc tra cứu thủ công</h2>
           <button className="btn bs sm" onClick={() => void load()}>Làm mới</button></div>
         {!jobs.length ? <div className="muted">Chưa có việc nào.</div> : (
-          <div className="tw"><table>
+          <div className="tw" tabIndex={0} role="region" aria-label="Bảng dữ liệu, cuộn ngang để xem thêm"><table>
             <thead><tr><th>Thời điểm</th><th>Tổ chức</th><th>Nguồn</th><th>Trạng thái</th><th>Ghi chú</th></tr></thead>
             <tbody>{jobs.map((j) => (
               <tr key={j.id}><td>{dateTime(j.createdAt)}</td><td>{orgName(data.orgs, j.orgId)}</td><td>{sources.find((s) => s.id === j.sourceId)?.name ?? j.sourceId}</td>
@@ -123,7 +123,7 @@ export default function SourcesPage() {
         <h2 className="ct">Bên mua niêm yết (vnstock)</h2>
         <div className="muted">Chỉ nạp dữ liệu niêm yết sau khi FCC xác minh ánh xạ MST ↔ mã chứng khoán. Ý kiến kiểm toán và diện cảnh báo không có trong vnstock — FCC nhập từ công bố thông tin của sở giao dịch.</div>
         {!listedBuyers.length ? <div className="muted">Chưa có bên mua nào khai mã chứng khoán.</div> : (
-          <div className="tw"><table>
+          <div className="tw" tabIndex={0} role="region" aria-label="Bảng dữ liệu, cuộn ngang để xem thêm"><table>
             <thead><tr><th>Bên mua</th><th>Mã</th><th>Xác minh</th><th>Dữ liệu</th></tr></thead>
             <tbody>{listedBuyers.map((o) => {
               const l = data.listed.find((x) => x.orgId === o.id);

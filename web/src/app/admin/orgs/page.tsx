@@ -27,7 +27,7 @@ export default function AdminOrgs() {
           <label className="field" style={{ flex: "1 1 240px" }}><span>Tìm kiếm</span><input className="input" placeholder="Tên hoặc MST" value={q} onChange={(e) => filter(() => setQ(e.target.value))} /></label>
           <label className="field"><span>Loại</span><select className="select" value={type} onChange={(e) => filter(() => setType(e.target.value))}><option value="">Tất cả ({all.length})</option>{(["supplier", "buyer", "lender"] as const).map((t) => <option key={t} value={t}>{TYPE_LABEL[t]} ({all.filter((o) => o.type === t).length})</option>)}</select></label>
         </div>
-        <div className="tw"><table>
+        <div className="tw" tabIndex={0} role="region" aria-label="Bảng dữ liệu, cuộn ngang để xem thêm"><table>
           <thead><tr><th>Tên</th><th>Loại</th><th>MST</th><th>Tạo</th><th>Xác minh</th><th>KYC</th></tr></thead>
           <tbody>
             {shown.map((o) => <tr key={o.id}><td className="wrap">{o.name}{o.simulated && <span className="chip c-neu" style={{ marginLeft: 6 }}>Giả lập</span>}</td><td>{TYPE_LABEL[o.type]}</td><td className="num">{o.taxCode}</td><td>{date(o.createdAt)}</td><td>{o.type === "lender" ? (o.verified ? <span className="chip c-ok">Đã xác minh</span> : <span className="chip c-warn">Chờ</span>) : "—"}</td><td>{o.kyc ? <span className={`chip ${o.kyc.status === "verified" ? "c-ok" : o.kyc.status === "pending" ? "c-warn" : "c-bad"}`}>{{ verified: "Đã xác minh", pending: "Chờ", rejected: "Chưa đạt" }[o.kyc.status]}</span> : "—"}</td></tr>)}

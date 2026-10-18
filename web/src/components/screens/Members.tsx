@@ -52,7 +52,7 @@ export function MembersSection({ history = false }: { history?: boolean }) {
           <label className="field"><span>Vai trò</span><select className="select" value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)}><option value="">Tất cả</option>{members?.roles.map((r) => <option key={r.role} value={r.role}>{r.label}</option>)}</select></label>
           <label className="field"><span>MFA</span><select className="select" value={mfaFilter} onChange={(e) => setMfaFilter(e.target.value as typeof mfaFilter)}><option value="">Tất cả</option><option value="on">Đã bật</option><option value="off">Chưa bật</option></select></label>
         </div>
-        <div className="tw"><table>
+        <div className="tw" tabIndex={0} role="region" aria-label="Bảng dữ liệu, cuộn ngang để xem thêm"><table>
           <thead><tr><th>Họ tên</th><th>Email</th><th>Vai trò</th><th>Trạng thái</th><th>MFA</th><th></th></tr></thead>
           <tbody>
             {rows.map((m) => (
@@ -83,7 +83,7 @@ export function MembersSection({ history = false }: { history?: boolean }) {
       {history && (
         <section className="card flush">
           <div className="ch"><h2 className="ct">Lịch sử thay đổi thành viên</h2><span className="muted">Từ nhật ký kiểm toán</span></div>
-          <div className="tw"><table>
+          <div className="tw" tabIndex={0} role="region" aria-label="Bảng dữ liệu, cuộn ngang để xem thêm"><table>
             <thead><tr><th>Thời gian</th><th>Hành động</th><th>Đối tượng</th><th>Chi tiết</th></tr></thead>
             <tbody>
               {log.map((e) => <tr key={e.id}><td className="num">{dateTime(e.at)}</td><td>{e.action}</td><td className="num">{e.entity}</td><td className="wrap">{e.detail}</td></tr>)}

@@ -56,7 +56,7 @@ export default function AdminMembers() {
       <MembersSection history />
       <section className="card flush">
         <div className="ch"><h2 className="ct">Ma trận quyền</h2><span className="muted">Quyền = loại tổ chức + vai trò + đối tượng/trạng thái + phạm vi được chia sẻ</span></div>
-        <div className="tw"><table>
+        <div className="tw" tabIndex={0} role="region" aria-label="Bảng dữ liệu, cuộn ngang để xem thêm"><table>
           <thead><tr><th>Chức năng</th><th>Vai trò được làm</th><th>MFA</th><th>Giới hạn bắt buộc</th></tr></thead>
           <tbody>
             {MATRIX.flatMap(({ org, perms }) => [

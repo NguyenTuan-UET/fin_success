@@ -96,7 +96,7 @@ export function FundingRequest() {
         <div className="between"><h2 className="ct">Kết quả chấm điểm đã lưu</h2>
           <button className="btn bp" disabled={busy} onClick={() => run(async () => { await api("POST", `/v1/organizations/${org.id}/credit-assessments`, {}); await loadSaved(); }, "Đã chấm điểm và lưu (bất biến)")}>Chấm điểm & lưu</button></div>
         <div className="muted">Mỗi kết quả lưu kèm phiên bản bộ chấm điểm và mã băm đầu vào; cùng dữ liệu thì cho cùng kết quả. Điểm chính thức do thẩm định viên FCC phát hành khi độ bao phủ đủ.</div>
-        <div className="tw"><table>
+        <div className="tw" tabIndex={0} role="region" aria-label="Bảng dữ liệu, cuộn ngang để xem thêm"><table>
           <thead><tr><th>Ngày</th><th>Hạng</th><th className="r">Điểm</th><th className="r">Bao phủ</th><th>Phiên bản</th><th>Mã băm đầu vào</th><th>Trạng thái</th><th></th></tr></thead>
           <tbody>
             {saved.map((a) => <tr key={a.id}><td className="num">{date(a.createdAt)}</td><td><span className={`chip ${ratingTone(a.rating)}`}>{a.rating}</span></td><td className="r num">{dec(a.score, 0)}</td><td className="r num">{Math.round(a.coverage * 100)}%</td><td className="num">{a.scorecardVersionId}</td><td className="num muted">{a.inputHash.slice(0, 10)}…</td>
@@ -114,7 +114,7 @@ export function FundingRequest() {
 
       <section className="card stack">
         <div className="between"><h2 className="ct"><Term k="tsbd">Tài sản bảo đảm</Term> (không bắt buộc)</h2><span className="muted">Cơ sở bảo đảm tham khảo: <strong className="num">{vnd(totalPreliminaryValue(collateral))} đ</strong></span></div>
-        <div className="tw"><table>
+        <div className="tw" tabIndex={0} role="region" aria-label="Bảng dữ liệu, cuộn ngang để xem thêm"><table>
           <thead><tr><th>Loại</th><th>Mô tả</th><th className="r">Giá trị khai báo (đ)</th><th className="r">Định giá sơ bộ (đ)</th><th></th></tr></thead>
           <tbody>
             {collateral.map((c) => <tr key={c.id}><td>{COLLATERAL_HAIRCUT[c.kind].label}<div className="muted">{COLLATERAL_HAIRCUT[c.kind].note}</div></td><td className="wrap">{c.description}</td><td className="r num">{vnd(c.declaredValue)}</td><td className="r num strong">{vnd(preliminaryValue(c))}</td>
@@ -132,7 +132,7 @@ export function FundingRequest() {
 
       <section className="card stack">
         <h2 className="ct">Báo cáo tài chính (VND)</h2>
-        <div className="tw"><table>
+        <div className="tw" tabIndex={0} role="region" aria-label="Bảng dữ liệu, cuộn ngang để xem thêm"><table>
           <thead><tr><th>Năm</th><th className="r">Doanh thu</th><th className="r">Lợi nhuận</th><th className="r">Tổng tài sản</th><th className="r">Vốn chủ</th><th>Nguồn</th><th>Trạng thái</th></tr></thead>
           <tbody>
             {(profile?.financials ?? []).map((f) => <tr key={f.year}><td className="num strong">{f.year}</td><td className="r num">{vnd(f.revenue)}</td><td className="r num">{vnd(f.netProfit)}</td><td className="r num">{vnd(f.totalAssets)}</td><td className="r num">{vnd(f.equity)}</td><td>{f.source}</td><td><span className="chip c-neu">{{ self_declared: "Tự khai", extracted: "AI trích xuất", verified: "Đã xác minh", public_reference: "Công bố tham khảo" }[f.status] ?? f.status}</span></td></tr>)}

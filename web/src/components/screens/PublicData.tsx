@@ -19,7 +19,7 @@ export function PublicData({ orgId, canDispute = false, empty }: { orgId: string
   if (!rows.length) return <div className="muted">{empty ?? "Chưa có dữ liệu công khai. Khai báo website ở hồ sơ tổ chức để FCC đọc các chứng nhận công bố; một số nguồn nhà nước do FCC tra cứu thủ công."}</div>;
   return (
     <div className="stack-sm">
-      <div className="tw"><table>
+      <div className="tw" tabIndex={0} role="region" aria-label="Bảng dữ liệu, cuộn ngang để xem thêm"><table>
         <thead><tr><th>Thông tin</th><th>Giá trị</th><th>Nguồn</th><th>Ngày lấy</th><th></th></tr></thead>
         <tbody>
           {rows.map((r) => (

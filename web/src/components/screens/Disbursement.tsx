@@ -44,7 +44,7 @@ export function Disbursement() {
     <>
       <section className="card flush">
         <div className="ch"><h2 className="ct">Hồ sơ của bạn</h2></div>
-        <div className="tw">
+        <div className="tw" tabIndex={0} role="region" aria-label="Bảng dữ liệu, cuộn ngang để xem thêm">
           <table>
             <thead><tr><th>Hồ sơ</th><th>Hóa đơn</th><th>Tổ chức tài chính</th><th className="r">Đề nghị (đ)</th><th>Trạng thái</th></tr></thead>
             <tbody>

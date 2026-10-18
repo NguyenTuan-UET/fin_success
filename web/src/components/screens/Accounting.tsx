@@ -173,7 +173,7 @@ export function Accounting({ role }: { role: Role }) {
             <button className="btn bs sm" disabled={busy || !hasSetup} onClick={() => run(async () => { const r = await api<{ stored: boolean }>("POST", "/v1/cashflow-forecasts", {}); toast(r.stored ? "Đã lưu dự báo hôm nay" : "Dự báo hôm nay đã được lưu với cùng dữ liệu"); loadAcc(); }, "Hoàn tất")}>Lưu dự báo</button>
           </span></div>
         <div className="muted">{bankLinked ? "Số dư lấy từ sao kê của ngân hàng GIẢ LẬP (dựng từ sự kiện tiền trên FCC) cộng chi định kỳ bạn khai." : "Chưa liên kết ngân hàng: số dư là số bạn khai. Phase này chưa kết nối ngân hàng thật."}</div>
-        {statement && <div className="tw"><table>
+        {statement && <div className="tw" tabIndex={0} role="region" aria-label="Bảng dữ liệu, cuộn ngang để xem thêm"><table>
           <thead><tr><th>Ngày</th><th>Nội dung</th><th className="r">Biến động (đ)</th><th className="r">Số dư (đ)</th></tr></thead>
           <tbody>{statement.lines.slice(-12).reverse().map((l, i) => <tr key={i}><td className="num">{date(l.date)}</td><td className="wrap">{l.description}</td><td className={`r num ${l.amount < 0 ? "t-warn" : "t-ok"}`}>{l.amount < 0 ? "−" : "+"}{vnd(Math.abs(l.amount))}</td><td className="r num">{vnd(l.balance)}</td></tr>)}</tbody></table>
           <div className="muted" style={{ padding: "6px 0" }}>Nguồn: {statement.source}</div></div>}
@@ -216,7 +216,7 @@ export function Accounting({ role }: { role: Role }) {
       <section className="card flush">
         <div className="ch"><h2 className="ct">Sổ công nợ đã nhập</h2>
           <button className="btn bs sm" disabled={!ledger.length} onClick={() => download("cong-no.csv", "loai,doi_tac,mst_doi_tac,so_chung_tu,so_tien,da_thanh_toan,han_thanh_toan\n" + ledger.map((l) => [l.kind, `"${l.counterpartyName}"`, l.counterpartyTaxCode ?? "", l.docNo, l.amount, l.paid, l.dueDate].join(",")).join("\n") + "\n")}><Download size={14} aria-hidden="true" /> Xuất CSV</button></div>
-        <div className="tw"><table>
+        <div className="tw" tabIndex={0} role="region" aria-label="Bảng dữ liệu, cuộn ngang để xem thêm"><table>
           <thead><tr><th>Loại</th><th>Đối tác</th><th>Chứng từ</th><th className="r">Số tiền (đ)</th><th className="r">Đã thanh toán (đ)</th><th>Hạn</th></tr></thead>
           <tbody>
             {ledger.map((l) => <tr key={l.id}><td><span className={`chip ${l.kind === "AR" ? "c-ok" : "c-warn"}`}>{l.kind === "AR" ? "Phải thu" : "Phải trả"}</span></td><td className="wrap">{l.counterpartyName}</td><td className="num">{l.docNo}</td><td className="r num">{vnd(l.amount)}</td><td className="r num">{vnd(l.paid)}</td><td className="num">{date(l.dueDate)}</td></tr>)}

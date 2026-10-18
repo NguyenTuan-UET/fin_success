@@ -28,7 +28,7 @@ export function BuyerProgram() {
       </section>
       <section className="card flush">
         <div className="ch"><h2 className="ct">Gói đang công bố trên Marketplace</h2></div>
-        <div className="tw">
+        <div className="tw" tabIndex={0} role="region" aria-label="Bảng dữ liệu, cuộn ngang để xem thêm">
           <table>
             <thead><tr><th>Tổ chức</th><th>Gói</th><th>Loại</th><th className="r">Ứng trước</th><th className="r">Lãi/năm</th><th className="r">Hạn mức/hồ sơ</th></tr></thead>
             <tbody>

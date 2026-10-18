@@ -60,7 +60,7 @@ export default function BuyerOverview() {
         </div>
         <div className="card flush grow-2">
           <div className="ch"><h2 className="ct">Sắp đến hạn</h2><Link className="btn bs sm" href="/buyer/invoices">Tất cả</Link></div>
-          <div className="tw"><table>
+          <div className="tw" tabIndex={0} role="region" aria-label="Bảng dữ liệu, cuộn ngang để xem thêm"><table>
             <thead><tr><th>Mã</th><th>Nhà cung cấp</th><th className="r">Số tiền (đ)</th><th>Hạn</th><th>Trạng thái</th></tr></thead>
             <tbody>
               {payable.slice(0, 6).map((r) => <tr key={r.id}><td className="num strong">{r.code}</td><td>{orgName(data.orgs, r.sellerId)}</td><td className="r num">{vnd(r.amount)}</td><td className="num">{date(r.dueDate)}</td><td><span className={`chip ${RECEIVABLE_STAGE[r.state].chip}`}>{RECEIVABLE_STAGE[r.state].short}</span></td></tr>)}

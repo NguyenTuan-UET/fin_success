@@ -129,7 +129,7 @@ export function LenderAppraisal() {
     <section className="row top">
       <div className="card flush grow-2" style={{ flexBasis: 360 }}>
         <div className="ch"><h2 className="ct">Hàng đợi hồ sơ</h2><span className="muted">{apps.filter((x) => ["SUBMITTED", "UNDER_REVIEW"].includes(x.state)).length} cần xử lý</span></div>
-        <div className="tw">
+        <div className="tw" tabIndex={0} role="region" aria-label="Bảng dữ liệu, cuộn ngang để xem thêm">
           <table>
             <thead><tr><th>Hồ sơ</th><th>Doanh nghiệp</th><th className="r">Giá trị (đ)</th><th>Trạng thái</th></tr></thead>
             <tbody>

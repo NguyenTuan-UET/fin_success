@@ -32,7 +32,7 @@ export default function AdminAudit() {
           <label className="field" style={{ flex: "1 1 240px" }}><span>Tìm kiếm</span><input className="input" placeholder="Hành động, đối tượng, chi tiết" value={q} onChange={(e) => { setQ(e.target.value); setPage(0); }} /></label>
           <label className="field"><span>Tổ chức thực hiện</span><select className="select" value={orgId} onChange={(e) => { setOrgId(e.target.value); setPage(0); }}><option value="">Tất cả</option>{actors.map((id) => <option key={id} value={id}>{short(id)}</option>)}</select></label>
         </div>
-        <div className="tw"><table>
+        <div className="tw" tabIndex={0} role="region" aria-label="Bảng dữ liệu, cuộn ngang để xem thêm"><table>
           <thead><tr><th>Thời gian</th><th>Tổ chức</th><th>Hành động</th><th>Đối tượng</th><th>Chi tiết</th></tr></thead>
           <tbody>
             {shown.map((e) => <tr key={e.id}><td className="num">{dateTime(e.at)}</td><td>{short(e.actorOrgId)}</td><td>{e.action}</td><td className="num">{e.entity}</td><td className="wrap">{e.detail}</td></tr>)}

@@ -143,7 +143,7 @@ export function SettingsPanel({ role }: { role: Role }) {
             <button className="btn bp" disabled={busy} onClick={() => run(async () => { const r = await act<{ token: string }>("POST", "/v1/integration-keys", { name: "Hệ thống nội bộ", scopes: Object.keys(keys.scopes) }); setNewKey({ token: r.token }); await loadKeys(); }, "Đã tạo khóa tích hợp")}>Tạo khóa tích hợp (cần MFA)</button>
           </div>
           {newKey && <div className="okmsg">Lưu ngay — chỉ hiển thị một lần:{newKey.token && <div><code style={{ wordBreak: "break-all" }}>{newKey.token}</code></div>}{newKey.secret && <div>Khóa ký: <code style={{ wordBreak: "break-all" }}>{newKey.secret}</code></div>}</div>}
-          <div className="tw"><table>
+          <div className="tw" tabIndex={0} role="region" aria-label="Bảng dữ liệu, cuộn ngang để xem thêm"><table>
             <thead><tr><th>Khóa</th><th>Phạm vi</th><th>Tạo</th><th>Dùng lần cuối</th><th></th></tr></thead>
             <tbody>
               {keys.keys.map((k) => <tr key={k.id}><td className="num">{k.id}<div className="muted">{k.name}</div></td><td>{k.scopes.map((s) => SCOPE_LABEL[s.split(":")[0]] ?? s).join(", ")}</td><td>{date(k.createdAt)}</td><td>{k.lastUsedAt ? dateTime(k.lastUsedAt) : "—"}</td><td>{k.revokedAt ? <span className="chip c-neu">Đã thu hồi</span> : <button className="btn bs sm" onClick={() => run(async () => { await api("POST", `/v1/integration-keys/${k.id}/revoke`, {}); await loadKeys(); }, "Đã thu hồi khóa")}>Thu hồi</button>}</td></tr>)}
@@ -157,7 +157,7 @@ export function SettingsPanel({ role }: { role: Role }) {
 
       <section className="card flush">
         <div className="ch"><h2 className="ct">Nhật ký hoạt động</h2><span className="muted">Chỉ thêm, không sửa; nối chuỗi băm kiểm tra toàn vẹn</span></div>
-        <div className="tw"><table>
+        <div className="tw" tabIndex={0} role="region" aria-label="Bảng dữ liệu, cuộn ngang để xem thêm"><table>
           <thead><tr><th>Thời gian</th><th>Hành động</th><th>Đối tượng</th><th>Chi tiết</th></tr></thead>
           <tbody>
             {myAudit.map((e) => <tr key={e.id}><td className="num">{dateTime(e.at)}</td><td>{e.action}</td><td className="num">{e.entity}</td><td className="wrap">{e.detail}</td></tr>)}
@@ -183,9 +183,9 @@ function FeesSection() {
   return (
     <section className="card flush">
       <div className="ch"><h2 className="ct">Phí dịch vụ</h2>
-        <span className="row" style={{ gap: 8 }}><input className="input num" style={{ maxWidth: 130 }} type="month" value={period} onChange={(e) => setPeriod(e.target.value)} /><button className="btn bs sm" onClick={open}>Bảng kê (in PDF)</button></span></div>
+        <span className="row" style={{ gap: 8 }}><input className="input num" style={{ maxWidth: 130 }} type="month" aria-label="Tháng phát sinh phí" value={period} onChange={(e) => setPeriod(e.target.value)} /><button className="btn bs sm" onClick={open}>Bảng kê (in PDF)</button></span></div>
       <div className="muted" style={{ padding: "0 16px 8px" }}>Biểu phí đang áp dụng: {sch?.active.name ?? "—"}. Phí được công bố trước khi phát sinh; FCC không giữ tiền của bạn.</div>
-      <div className="tw"><table>
+      <div className="tw" tabIndex={0} role="region" aria-label="Bảng dữ liệu, cuộn ngang để xem thêm"><table>
         <thead><tr><th>Nội dung</th><th>Nguồn</th><th className="r">Số tiền (đ)</th><th>Thanh toán</th></tr></thead>
         <tbody>
           {data?.charges.map((c) => <tr key={c.id}><td className="wrap">{c.description}</td><td>{c.sourceLabel}</td><td className="r num">{c.amount.toLocaleString("vi-VN")}</td><td>{c.paidAt ? <span className="chip c-ok">Đã thanh toán</span> : <span className="chip c-neu">Chưa</span>}</td></tr>)}

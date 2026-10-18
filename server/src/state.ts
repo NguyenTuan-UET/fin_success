@@ -470,6 +470,10 @@ export class Database {
   async fileOf(key: string, orgId: string) {
     return (await this.pool.query<{ key: string; name: string; mime: string; size: string; kind: string }>('SELECT key, name, mime, size, kind FROM files WHERE key = $1 AND org_id = $2', [key, orgId])).rows[0]
   }
+  /** Tệp có thuộc loại hồ sơ FCC được thẩm định (KYC người đại diện, bằng chứng ESG) — không gồm chứng từ hóa đơn/hợp đồng. */
+  async fccReviewableFile(key: string) {
+    return (await this.pool.query('SELECT 1 FROM files WHERE key = $1 AND kind = ANY($2) LIMIT 1', [key, ['kyc', 'esg']])).rowCount === 1
+  }
   async anyFile(key: string) {
     return (await this.pool.query<{ name: string; mime: string }>('SELECT name, mime FROM files WHERE key = $1 LIMIT 1', [key])).rows[0]
   }

@@ -93,7 +93,7 @@ export default function SupplierOverview() {
       <section className="row top">
         <div className="card flush grow-2">
           <div className="ch"><h2 className="ct">Hóa đơn gần đây</h2><Link className="btn bs sm" href="/supplier/invoices">Xem tất cả</Link></div>
-          <div className="tw">
+          <div className="tw" tabIndex={0} role="region" aria-label="Bảng dữ liệu, cuộn ngang để xem thêm">
             <table>
               <thead><tr><th>Mã</th><th>Người mua</th><th className="r">Số tiền (đ)</th><th>Hạn</th><th>Trạng thái</th></tr></thead>
               <tbody>

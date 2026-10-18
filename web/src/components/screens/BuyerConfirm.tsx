@@ -56,7 +56,7 @@ export function BuyerConfirm() {
             <h2 className="ct">Chờ xác nhận</h2>
             <span className="muted">{pending.length ? `${pending.length} hóa đơn · ${vnd(pending.reduce((a, p) => a + p.amount, 0))} đ` : "Không có hóa đơn nào chờ xác nhận"}</span>
           </div>
-          <div className="tw">
+          <div className="tw" tabIndex={0} role="region" aria-label="Bảng dữ liệu, cuộn ngang để xem thêm">
             <table>
               <thead>
                 <tr><th>Hóa đơn</th><th>Nhà cung cấp</th><th className="r">Số tiền (đ)</th><th>Hạn thanh toán</th><th><Term k="threeWay">Đối chiếu chứng từ</Term></th><th>Quyết định</th></tr>
@@ -109,7 +109,7 @@ export function BuyerConfirm() {
 
       <section className="card flush">
         <div className="ch"><h2 className="ct">Hóa đơn đã xác nhận</h2><span className="muted">Ghi nhận thanh toán khi bạn đã chuyển tiền</span></div>
-        <div className="tw">
+        <div className="tw" tabIndex={0} role="region" aria-label="Bảng dữ liệu, cuộn ngang để xem thêm">
           <table>
             <thead><tr><th>Hóa đơn</th><th>Nhà cung cấp</th><th className="r">Số tiền (đ)</th><th>Hạn</th><th>Trạng thái</th><th></th></tr></thead>
             <tbody>
@@ -140,7 +140,7 @@ export function BuyerConfirm() {
 
       <section className="card flush">
         <div className="ch"><div><h2 className="ct"><Term k="earlyPay">Chiết khấu thanh toán sớm</Term></h2><p className="muted">Bạn đề nghị trả trước hạn để được chiết khấu; nhà cung cấp đồng ý rồi bạn tự chuyển tiền, FCC chỉ ghi nhận.</p></div></div>
-        <div className="tw">
+        <div className="tw" tabIndex={0} role="region" aria-label="Bảng dữ liệu, cuộn ngang để xem thêm">
           <table>
             <thead><tr><th>Hóa đơn</th><th>Nhà cung cấp</th><th className="r">Số tiền (đ)</th><th className="r">Chiết khấu</th><th>Trả trước</th><th className="r"><Term k="annualYield">Lợi suất quy năm</Term></th><th>Trạng thái</th><th></th></tr></thead>
             <tbody>

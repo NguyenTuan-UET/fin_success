@@ -39,7 +39,7 @@ export default function AdminRevenue() {
             <button className="btn bs sm" disabled={busy} onClick={() => run(async () => { const r = await act<{ created: number }>("POST", "/v1/operations/billing-run", { period: new Date().toISOString().slice(0, 7) }); await load(); toast(`Đã tính phí định kỳ: ${r.created} khoản mới`); }, "Hoàn tất")}>Chạy tính phí tháng này</button>
             <button className="btn bs sm" onClick={() => setFeeForm({ name: "Biểu phí mới", transactionPct: "0.3", supplier: "0", buyer: "0", lender: "0", scoringFee: "0", apiMonthlyPerKey: "0", reportFee: "0", referralPctOfFees: "0", effectiveFrom: new Date().toISOString().slice(0, 10) })}>Tạo biểu phí mới</button>
           </span></div>
-        <div className="tw"><table>
+        <div className="tw" tabIndex={0} role="region" aria-label="Bảng dữ liệu, cuộn ngang để xem thêm"><table>
           <thead><tr><th>Nguồn thu</th><th className="r">Số khoản</th><th className="r">Phát sinh (đ)</th><th className="r">Đã thu (đ)</th></tr></thead>
           <tbody>
             {rev?.bySource.map((x) => <tr key={x.source}><td>{x.label}</td><td className="r num">{x.count}</td><td className="r num">{x.total.toLocaleString("vi-VN")}</td><td className="r num">{x.paid.toLocaleString("vi-VN")}</td></tr>)}
@@ -49,7 +49,7 @@ export default function AdminRevenue() {
 
       <section className="card flush">
         <div className="ch"><h2 className="ct">Phiên bản biểu phí</h2><span className="muted">Phiên bản cũ không đổi phí đã phát sinh</span></div>
-        <div className="tw"><table>
+        <div className="tw" tabIndex={0} role="region" aria-label="Bảng dữ liệu, cuộn ngang để xem thêm"><table>
           <thead><tr><th>Tên</th><th>Hiệu lực từ</th><th className="r">Phí giao dịch</th></tr></thead>
           <tbody>
             {schedules.map((s, i) => <tr key={s.id}><td>{s.name}{i === 0 && <span className="chip c-ok" style={{ marginLeft: 6 }}>Đang dùng</span>}</td><td>{date(s.effectiveFrom)}</td><td className="r num">{String(s.params.transactionPct ?? "—")}%</td></tr>)}

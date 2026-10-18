@@ -474,6 +474,18 @@ a.card:hover {
   font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
+  max-width: 100%;
+}
+/* chip dài (cảnh báo, ghi chú) xuống dòng thay vì tràn ngang trên màn hình hẹp */
+@media (max-width: 640px) {
+  .chip {
+    height: auto;
+    min-height: 24px;
+    white-space: normal;
+    padding-top: 3px;
+    padding-bottom: 3px;
+    border-radius: 10px;
+  }
 }
 .chip.lg {
   height: 30px;
@@ -550,6 +562,10 @@ a.card:hover {
 .tw {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
+}
+.tw:focus-visible {
+  outline: 2px solid var(--brand-fill);
+  outline-offset: -2px;
 }
 table {
   width: 100%;
@@ -1537,6 +1553,10 @@ input[type="range"] {
     gap: 8px;
   }
   .brand-name span {
+    display: none;
+  }
+  /* màn hình hẹp: "Bảo mật" vẫn mở được từ Cài đặt → Bảo mật tài khoản */
+  .tb .tb-sec {
     display: none;
   }
   .h1 {

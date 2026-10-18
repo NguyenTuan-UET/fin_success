@@ -100,7 +100,7 @@ export function InvoiceManager() {
             <h2 className="ct">Danh sách hóa đơn</h2>
             <input className="input" style={{ maxWidth: 260 }} placeholder="Tìm mã, số hóa đơn, người mua…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Tìm hóa đơn" />
           </div>
-          <div className="tw">
+          <div className="tw" tabIndex={0} role="region" aria-label="Bảng dữ liệu, cuộn ngang để xem thêm">
             <table>
               <thead>
                 <tr>

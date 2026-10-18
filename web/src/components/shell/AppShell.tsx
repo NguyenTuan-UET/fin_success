@@ -208,7 +208,7 @@ function Shell({ role, children }: { role: Role; children: ReactNode }) {
             </span>
           </span>
         </div>
-        <Link href="/security" className="btn bs sm" onNavigate={closeAll}>
+        <Link href="/security" className="btn bs sm tb-sec" onNavigate={closeAll}>
           Bảo mật
         </Link>
         <button className="btn bs sm" onClick={() => void logout().then(() => router.push("/"))}>

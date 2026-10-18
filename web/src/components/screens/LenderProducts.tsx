@@ -80,7 +80,7 @@ export function LenderProducts() {
           <button className="btn bp" disabled={!org.verified} title={org.verified ? undefined : "Cần FCC xác minh tổ chức trước"} onClick={() => setForm(blank())}><Plus size={16} aria-hidden="true" /> Tạo gói tài trợ</button>
         </div>
         {!org.verified && <div className="err" style={{ margin: "0 16px 12px" }}>Tổ chức chưa được FCC xác minh pháp nhân và giấy phép nên chưa đăng được sản phẩm.</div>}
-        <div className="tw"><table>
+        <div className="tw" tabIndex={0} role="region" aria-label="Bảng dữ liệu, cuộn ngang để xem thêm"><table>
           <thead><tr><th>Gói</th><th>Loại</th><th className="r">Ứng trước</th><th className="r">Lãi/năm</th><th className="r">Giá trị tài trợ (đ)</th><th>Hiệu lực</th><th>Phiên bản</th><th>Trạng thái</th><th></th></tr></thead>
           <tbody>
             {mine.map((p) => (
@@ -104,7 +104,7 @@ export function LenderProducts() {
 
       <section className="card flush">
         <div className="ch"><h2 className="ct">Mặt bằng thị trường</h2><span className="muted">Từ các gói đang công bố</span></div>
-        <div className="tw"><table>
+        <div className="tw" tabIndex={0} role="region" aria-label="Bảng dữ liệu, cuộn ngang để xem thêm"><table>
           <thead><tr><th>Loại</th><th className="r">Số gói</th><th className="r">Lãi/năm</th><th className="r">Ứng trước bình quân</th></tr></thead>
           <tbody>
             {overview.map((o) => <tr key={o.type}><td>{PRODUCT_TYPE_LABEL[o.type] ?? o.type}</td><td className="r num">{o.products}</td><td className="r num">{dec(o.rateMin)}–{dec(o.rateMax)}%</td><td className="r num">{dec(o.advanceAvgPct, 0)}%</td></tr>)}

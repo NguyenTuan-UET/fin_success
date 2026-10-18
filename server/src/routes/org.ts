@@ -136,13 +136,13 @@ export function orgRoutes(app: FastifyInstance, core: Core, openSession: (userId
     return reply.code(201).send({ ...o, name })
   })
 
-  /** URL tải có hạn: chủ sở hữu tệp, hoặc nhân sự FCC (thẩm định/vận hành/kiểm toán) khi xem hồ sơ. */
+  /** URL tải có hạn: chủ sở hữu tệp, hoặc nhân sự FCC với hồ sơ được giao thẩm định (KYC, bằng chứng ESG) — FCC không xem chứng từ hóa đơn, hợp đồng, giao nhận. */
   app.get('/api/files/:key/url', async (req) => {
     const a = await core.auth(req)
     const key = (req.params as { key: string }).key
     const own = await db.fileOf(key, a.activeOrgId)
     const fcc = orgOf(a.activeOrgId)?.type === 'fcc'
-    if (!own && !(fcc && (await db.anyFile(key)))) throw notFound('Không tìm thấy tệp')
+    if (!own && !(fcc && (await db.fccReviewableFile(key)))) throw notFound('Không tìm thấy tệp')
     return { url: core.files.signedPath(key, 300, core.clock().getTime()), expiresInSeconds: 300 }
   })
 

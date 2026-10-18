@@ -60,7 +60,7 @@ export default function LenderOverview() {
         </div>
         <div className="card flush grow-2">
           <div className="ch"><h2 className="ct">Hồ sơ gần đây</h2><Link className="btn bs sm" href="/lender/appraisal">Thẩm định</Link></div>
-          <div className="tw"><table>
+          <div className="tw" tabIndex={0} role="region" aria-label="Bảng dữ liệu, cuộn ngang để xem thêm"><table>
             <thead><tr><th>Hồ sơ</th><th>Doanh nghiệp</th><th className="r">Giá trị (đ)</th><th>Trạng thái</th></tr></thead>
             <tbody>
               {apps.slice(0, 6).map((a) => { const r = data.receivables.find((x) => x.id === a.receivableId); return <tr key={a.id}><td className="num strong">{a.id}<div className="muted">{date(a.submittedAt)}</div></td><td>{r ? orgName(data.orgs, r.sellerId) : "—"}</td><td className="r num">{r ? vnd(r.amount) : "—"}</td><td><span className={`chip ${APP_STATE_LABEL[a.state].chip}`}>{APP_STATE_LABEL[a.state].label}</span></td></tr>; })}

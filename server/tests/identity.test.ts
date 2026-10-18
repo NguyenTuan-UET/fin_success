@@ -132,6 +132,13 @@ describe('xác minh người đại diện (KYC) với giấy tờ trong kho t�
     expect(file.statusCode).toBe(200)
     expect(file.body).toContain('giấy tờ')
     expect((await app.inject({ method: 'GET', url: u.body.url.replace(/sig=(\w)/, (_: string, c: string) => `sig=${c === '0' ? '1' : '0'}`) })).statusCode).toBe(403)
+    // chứng từ hóa đơn: chỉ chủ sở hữu tải được; FCC và tổ chức khác không lấy được URL dù biết khóa tệp
+    const inv = await post('/api/files', { name: 'hoa-don.xml', mime: 'application/xml', dataBase64: Buffer.from('<HDon>chứng từ</HDon>').toString('base64'), kind: 'invoice' }, S.token)
+    expect(inv.status).toBe(201)
+    expect((await call('GET', `/api/files/${inv.body.key}/url`, undefined, S.token)).status).toBe(200)
+    expect((await call('GET', `/api/files/${inv.body.key}/url`, undefined, adm)).status).toBe(404)
+    expect((await call('GET', `/api/files/${inv.body.key}/url`, undefined, other.token)).status).toBe(404)
+    expect((await app.inject({ method: 'GET', url: `/v1/files/${inv.body.key}` })).statusCode).toBe(403) // không có chữ ký
     const d = await act(adm, 'decideKyc', S.orgId, true)
     expect(d.status, JSON.stringify(d.body)).toBe(200)
     expect(d.body.state.orgs.find((o: Json) => o.id === S.orgId).kyc).toMatchObject({ status: 'verified', method: 'manual_documents' })
