@@ -137,19 +137,22 @@ Vào **Kế toán**:
 
 ## 5. Dành cho nhân sự FCC
 
-Vào mục **Quản trị**. Menu gồm: **Bảng điều khiển**, **Người dùng & quyền**, **Thẩm định ESG**, **Nguồn dữ liệu công khai**, **Bảo mật & gian lận**, **Cài đặt hệ thống**.
+Vào mục **Quản trị**. Menu gồm: **Việc cần xử lý**, **Thành viên & quyền**, **Tổ chức**, **Thẩm định ESG**, **Nguồn dữ liệu công khai**, **Doanh thu & biểu phí**, **Nhật ký kiểm toán**, **Cài đặt hệ thống**.
 
 | Việc | Ở đâu |
 | --- | --- |
-| Theo dõi số liệu vận hành: người dùng, giá trị tài trợ, tỷ lệ phê duyệt, tỷ lệ tranh chấp, thời gian từng bước, ngoại lệ đang mở | Bảng điều khiển |
-| Xác minh tổ chức tài chính, duyệt hồ sơ người đại diện, duyệt sản phẩm | Bảng điều khiển → hàng đợi xác minh |
-| Xử lý hóa đơn bị gắn cờ, ghi kết quả đối chiếu thuế | Bảng điều khiển |
-| Phát hành điểm tín dụng chính thức, xử lý yêu cầu xem xét lại | Bảng điều khiển |
+| Xác minh tổ chức tài chính, duyệt hồ sơ người đại diện, duyệt sản phẩm (cần MFA) | Việc cần xử lý → hàng đợi xác minh |
+| Xử lý hóa đơn bị gắn cờ, ghi kết quả đối chiếu thuế | Việc cần xử lý |
+| Phát hành điểm tín dụng chính thức, xử lý yêu cầu xem xét lại | Việc cần xử lý |
+| Theo dõi chỉ số vận hành (hiện tử số/mẫu số; dưới 5 mẫu ghi "Không đủ dữ liệu") | Việc cần xử lý → Chỉ số vận hành |
+| Mời thành viên, đổi vai trò (cần MFA), xem lịch sử thay đổi và ma trận quyền | Thành viên & quyền |
+| Tra cứu tổ chức đã đăng ký, trạng thái xác minh và KYC | Tổ chức |
 | Thẩm định và **Phát hành chính thức** điểm ESG (cần MFA) | Thẩm định ESG |
 | Duyệt nguồn dữ liệu, ghi kết quả tra cứu thủ công, xử lý khiếu nại, xác minh mã chứng khoán của bên mua, nhập ý kiến kiểm toán | Nguồn dữ liệu công khai |
-| Biểu phí, doanh thu theo nguồn thu | Bảng điều khiển |
+| Biểu phí (cần MFA), doanh thu theo nguồn thu | Doanh thu & biểu phí |
+| Xem nhật ký, kiểm tra chuỗi băm | Nhật ký kiểm toán |
 
-Nhân sự FCC không xem chứng từ hay hồ sơ tài trợ chi tiết của doanh nghiệp. Mọi thao tác quản trị đều được ghi vào nhật ký và không thể sửa.
+Nhân sự FCC không xem chứng từ hay hồ sơ tài trợ chi tiết của doanh nghiệp. Mọi thao tác quản trị đều được ghi vào nhật ký và không thể sửa. Trên màn hình nhật ký của FCC, số tiền, lãi suất và kết quả chấm điểm của tổ chức khác được ẩn.
 
 ---
 
