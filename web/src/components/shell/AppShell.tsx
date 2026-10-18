@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
-import { Bell, CalendarDays, Menu, ShieldCheck, Sparkles, X } from "lucide-react";
+import { Bell, CalendarDays, CircleHelp, Menu, ShieldCheck, Sparkles, X } from "lucide-react";
 import { ROLES, roleOfOrgType, type Role } from "@/lib/roles";
 import { useFcc } from "@/lib/session";
 import { AuthGate } from "@/components/auth/AuthGate";
 import { Logo, NavIcon } from "@/components/ui/basic";
 import { useAssistant } from "@/components/assistant/Assistant";
+import { useTour } from "@/components/tour/Tour";
 
 const subscribeNever = () => () => {};
 const subscribeHash = (callback: () => void) => {
@@ -70,6 +71,7 @@ function Shell({ role, children }: { role: Role; children: ReactNode }) {
   const hash = useSyncExternalStore(subscribeHash, currentHash, () => "");
   const router = useRouter();
   const { open: openAssistant } = useAssistant();
+  const tour = useTour();
   const [navOpen, setNavOpen] = useState(false);
   const [bellOpen, setBellOpen] = useState(false);
   const bellRef = useRef<HTMLDivElement>(null);
@@ -169,7 +171,22 @@ function Shell({ role, children }: { role: Role; children: ReactNode }) {
           {today}
         </span>
 
-        <div ref={bellRef} style={{ position: "relative" }}>
+        <button
+          className="btn bs sm help-btn"
+          data-tour="help"
+          aria-label="Hướng dẫn sử dụng"
+          title="Hướng dẫn sử dụng: đi qua từng chức năng của hệ thống"
+          onClick={() => {
+            closeAll();
+            tour.start(role);
+          }}
+        >
+          <CircleHelp size={16} aria-hidden="true" />
+          <span className="help-label">Hướng dẫn sử dụng</span>
+          {!tour.seen(role) && <span className="dot-badge" />}
+        </button>
+
+        <div ref={bellRef} data-tour="bell" style={{ position: "relative" }}>
           <button
             className="ibtn"
             aria-label={`Thông báo (${unread.length} mới)`}
@@ -207,7 +224,7 @@ function Shell({ role, children }: { role: Role; children: ReactNode }) {
           )}
         </div>
 
-        <div className="tb-user">
+        <div className="tb-user" data-tour="user">
           <span className="avatar" aria-hidden="true">
             {initials}
           </span>
@@ -218,7 +235,7 @@ function Shell({ role, children }: { role: Role; children: ReactNode }) {
             </span>
           </span>
         </div>
-        <Link href="/security" className="btn bs sm tb-sec" onNavigate={closeAll}>
+        <Link href="/security" className="btn bs sm tb-sec" data-tour="security" onNavigate={closeAll}>
           Bảo mật
         </Link>
         <button className="btn bs sm" onClick={() => void logout().then(() => router.push("/"))}>
@@ -270,7 +287,7 @@ function Shell({ role, children }: { role: Role; children: ReactNode }) {
             ))}
           </nav>
           <span className="spacer" />
-          <div className="side-ai">
+          <div className="side-ai" data-tour="assistant">
             <strong>
               <Sparkles size={18} color="#DDF1C4" aria-hidden="true" />
               Trợ lý FCC 24/7

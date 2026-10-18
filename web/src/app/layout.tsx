@@ -3,6 +3,7 @@ import { Be_Vietnam_Pro, IBM_Plex_Mono } from "next/font/google";
 import { ToastProvider } from "@/components/providers/Toast";
 import { DialogProvider } from "@/components/providers/Dialog";
 import { AssistantProvider } from "@/components/assistant/Assistant";
+import { TourProvider } from "@/components/tour/Tour";
 import { FccProvider } from "@/lib/session";
 import { RegisterSW } from "@/components/providers/RegisterSW";
 import "./globals.css";
@@ -43,7 +44,9 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <ToastProvider>
           <DialogProvider>
             <FccProvider>
-              <AssistantProvider>{children}</AssistantProvider>
+              <AssistantProvider>
+                <TourProvider>{children}</TourProvider>
+              </AssistantProvider>
             </FccProvider>
           </DialogProvider>
         </ToastProvider>
