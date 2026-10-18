@@ -159,11 +159,16 @@ export function FccProvider({ children }: { children: ReactNode }) {
     void open();
     const onVis = () => document.visibilityState === "visible" && void refresh();
     document.addEventListener("visibilitychange", onVis);
+    window.addEventListener("focus", onVis);
+    // dự phòng khi proxy/CDN gom hoặc cắt luồng SSE: hỏi lại định kỳ (chỉ trả dữ liệu khi version đổi) lúc tab đang mở
+    const poll = setInterval(() => document.visibilityState === "visible" && void refresh(), 5000);
     return () => {
       stop = true;
       es?.close();
       clearTimeout(retry);
+      clearInterval(poll);
       document.removeEventListener("visibilitychange", onVis);
+      window.removeEventListener("focus", onVis);
     };
   }, [status, refresh]);
 

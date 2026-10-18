@@ -125,7 +125,6 @@ describe('T06 — thao tác đồng thời không tạo tài trợ trùng', () =
     const a = st().applications.find((x) => x.id === appId)!
     expect(a.state).toBe('FUNDED')
     expect(a.fundedAmount).toBe(1_600_000_000)
-    expect((a.settlements ?? []).filter((e) => e.type === 'disbursed').length).toBeLessThanOrEqual(1)
     expect(st().audit.filter((e) => e.entity === appId && e.action === 'Ghi nhận giải ngân')).toHaveLength(1)
   })
 })

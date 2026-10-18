@@ -3,23 +3,15 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { Check, Sparkles, Upload } from "lucide-react";
-import type { Receivable } from "@fcc/domain/types";
 import { cx, date, vnd } from "@/lib/format";
-import { daysLeft, orgName, RECEIVABLE_STAGE, STAGE_GROUPS } from "@/lib/model";
+import { daysLeft, flagLabel, orgName, RECEIVABLE_STAGE, STAGE_GROUPS } from "@/lib/model";
 import { useData } from "@/lib/session";
 import { useScores } from "@/lib/scores";
 import { useToast } from "@/components/providers/Toast";
 import { AskButton } from "@/components/assistant/Assistant";
 import { Term } from "@/components/ui/Term";
-
-const STEPS: { label: string; note: (r: Receivable) => string; done: (r: Receivable) => boolean }[] = [
-  { label: "Phát hành hóa đơn", note: (r) => `Ngày ${date(r.issueDate)}`, done: () => true },
-  { label: "Người mua xác nhận", note: () => "Xác nhận khoản phải thu", done: (r) => !["DRAFT", "BUYER_PENDING", "BUYER_DISPUTED", "CANCELLED"].includes(r.state) },
-  { label: "Gửi hồ sơ & thẩm định", note: () => "Tổ chức tài chính thẩm định", done: (r) => ["OFFERED", "ACCEPTED", "FUNDED", "SETTLED", "OVERDUE"].includes(r.state) },
-  { label: "Giải ngân", note: () => "Tổ chức tài chính chuyển trực tiếp", done: (r) => ["FUNDED", "SETTLED", "OVERDUE"].includes(r.state) },
-  { label: "Người mua thanh toán", note: (r) => `Đến hạn ${date(r.dueDate)}`, done: (r) => ["SETTLED", "EARLY_PAID"].includes(r.state) },
-  { label: "Tất toán", note: () => "Hoàn phần còn lại cho doanh nghiệp", done: (r) => ["SETTLED", "EARLY_PAID"].includes(r.state) },
-];
+import { DateInput, MoneyInput } from "@/components/ui/Fields";
+import { InvoiceDocuments, InvoiceTimeline, RevisionHistory } from "@/components/screens/InvoiceParts";
 
 export function InvoiceManager() {
   const { data, org, act } = useData();
@@ -29,8 +21,8 @@ export function InvoiceManager() {
   const [q, setQ] = useState("");
   const [sel, setSel] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [reviseTo, setReviseTo] = useState("");
-  const [amend, setAmend] = useState<{ amount: string; dueDate: string; note: string } | null>(null);
+  const [reviseTo, setReviseTo] = useState<number | null>(null);
+  const [amend, setAmend] = useState<{ amount: number | null; dueDate: string; note: string } | null>(null);
 
   const mine = useMemo(() => data.receivables.filter((r) => r.sellerId === org.id && r.state !== "CANCELLED"), [data.receivables, org.id]);
   const list = useMemo(() => {
@@ -149,7 +141,7 @@ export function InvoiceManager() {
               <div className="between" style={{ alignItems: "flex-start" }}>
                 <div>
                   <span className="muted">Chi tiết hóa đơn</span>
-                  <h2 className="num" style={{ fontSize: 20, fontWeight: 600 }}>{s.code}</h2>
+                  <h2 className="num" style={{ fontSize: 20, fontWeight: 600 }}>{s.code} <span className="muted" style={{ fontSize: 13, fontWeight: 500 }}>v{s.version}</span></h2>
                 </div>
                 <span className={`chip ${stage.chip}`}>{stage.label}</span>
               </div>
@@ -163,34 +155,11 @@ export function InvoiceManager() {
               </div>
               {s.disputeReason && <div className="err">Bên mua tranh chấp: {s.disputeReason}</div>}
               {s.taxCheck && <div className={s.taxCheck.status === "verified" ? "okmsg" : "err"}>Đối chiếu cơ quan thuế: {{ verified: "hợp lệ", mismatch: "không khớp", cancelled: "hóa đơn đã hủy" }[s.taxCheck.status]}{s.taxCheck.note ? ` — ${s.taxCheck.note}` : ""}</div>}
-              {(s.flags ?? []).map((f) => <div key={f.code} className={f.resolvedAt ? "muted" : "err"} style={{ fontSize: 12.5 }}>{f.resolvedAt ? "✓ Đã xem xét" : "⚑ Cờ bất thường"}: {f.detail}{f.resolutionNote ? ` — ${f.resolutionNote}` : ""}</div>)}
-              {s.files?.length ? (
-                <div className="muted" style={{ fontSize: 12.5 }}>Chứng từ gốc lưu bất biến (SHA-256): {s.files.map((f) => f.name).join(", ")}</div>
-              ) : null}
+              {(s.flags ?? []).map((f) => <div key={f.code} className={f.resolvedAt ? "muted" : "err"} style={{ fontSize: 12.5 }}>{f.resolvedAt ? "✓ Đã xem xét" : `⚑ ${flagLabel(f.code)}`}: {f.detail}{f.resolutionNote ? ` — ${f.resolutionNote}` : ""}</div>)}
 
-              <ol className="tl" style={{ listStyle: "none", margin: 0, padding: 0 }} aria-label="Tiến trình hóa đơn">
-                {(() => {
-                  const firstOpen = STEPS.findIndex((st) => !st.done(s));
-                  return STEPS.map((st, i) => {
-                    const done = st.done(s);
-                    const cur = i === firstOpen;
-                    const bad = s.state === "OVERDUE" && cur;
-                    const c = bad ? "var(--bad-strong)" : done ? "var(--brand-fill)" : cur ? "var(--warn-strong)" : "var(--line-strong)";
-                    return (
-                      <li key={st.label} className="tl-item">
-                        <div className="tl-rail">
-                          <span className="tl-dot" style={{ borderColor: c, background: done ? c : "#fff" }} />
-                          <span className="tl-line" style={{ background: i === STEPS.length - 1 ? "transparent" : done ? "var(--brand-fill)" : "var(--line)" }} />
-                        </div>
-                        <div className="tl-body">
-                          <span style={{ fontSize: 13, fontWeight: 600, color: done || cur ? "var(--ink)" : "var(--ink-3)" }}>{st.label}{cur && <span className="sr-only"> (bước hiện tại)</span>}</span>
-                          <span className="muted">{bad ? "Bên mua chậm thanh toán" : st.note(s)}</span>
-                        </div>
-                      </li>
-                    );
-                  });
-                })()}
-              </ol>
+              <InvoiceTimeline r={s} app={data.applications.find((a) => a.receivableId === s.id && !["REJECTED", "WITHDRAWN"].includes(a.state))} />
+              <InvoiceDocuments r={s} canAttach={["DRAFT", "BUYER_PENDING", "BUYER_DISPUTED", "BUYER_CONFIRMED"].includes(s.state) && !data.applications.some((a) => a.receivableId === s.id && !["REJECTED", "WITHDRAWN"].includes(a.state))} />
+              <RevisionHistory r={s} />
 
               {s.state === "DRAFT" && (
                 <div className="stack-sm" style={{ gap: 8 }}>
@@ -200,8 +169,8 @@ export function InvoiceManager() {
               )}
               {s.state === "BUYER_DISPUTED" && (
                 <div className="stack-sm" style={{ gap: 8 }}>
-                  <label className="field"><span>Điều chỉnh số tiền sau khi trao đổi với bên mua</span><input className="input num" inputMode="numeric" value={reviseTo} onChange={(e) => setReviseTo(e.target.value.replace(/\D/g, ""))} placeholder={String(s.amount)} /></label>
-                  <button className="btn bp" disabled={busy || !reviseTo} onClick={() => run(() => act("POST", `/v1/receivables/${s.id}/revise`, { amount: Number(reviseTo), note: "Điều chỉnh sau trao đổi với bên mua" }), "Đã điều chỉnh; bên mua cần xác nhận lại")}>Điều chỉnh & gửi lại</button>
+                  <MoneyInput key={s.id} label="Số tiền sau khi trao đổi với bên mua (đ)" value={reviseTo} onChange={setReviseTo} hint={`Hiện tại ${vnd(s.amount)} đ`} />
+                  <button className="btn bp" disabled={busy || !reviseTo} onClick={() => run(() => act("POST", `/v1/receivables/${s.id}/revise`, { amount: reviseTo, note: "Điều chỉnh sau trao đổi với bên mua" }), "Đã điều chỉnh; bên mua cần xác nhận lại")}>Điều chỉnh & gửi lại</button>
                 </div>
               )}
               {s.state === "BUYER_CONFIRMED" && (
@@ -215,16 +184,16 @@ export function InvoiceManager() {
                 amend ? (
                   <div className="stack-sm">
                     <strong style={{ fontSize: 13 }}>Hóa đơn điều chỉnh/thay thế</strong>
-                    <label className="field"><span>Số tiền mới (đ)</span><input className="input num" inputMode="numeric" value={amend.amount} onChange={(e) => setAmend({ ...amend, amount: e.target.value.replace(/\D/g, "") })} /></label>
-                    <label className="field"><span>Hạn thanh toán mới</span><input className="input num" type="date" value={amend.dueDate} onChange={(e) => setAmend({ ...amend, dueDate: e.target.value })} /></label>
+                    <MoneyInput label="Số tiền mới (đ)" value={amend.amount} onChange={(v) => setAmend({ ...amend, amount: v })} />
+                    <DateInput label="Hạn thanh toán mới" value={amend.dueDate} min={s.issueDate} onChange={(v) => setAmend({ ...amend, dueDate: v })} />
                     <label className="field"><span>Lý do (bắt buộc)</span><input className="input" value={amend.note} onChange={(e) => setAmend({ ...amend, note: e.target.value })} /></label>
                     <div className="muted">Xác nhận cũ của bên mua sẽ mất hiệu lực; RFQ đang mở bị đóng.</div>
                     <div className="row" style={{ gap: 8 }}>
                       <button className="btn bs" onClick={() => setAmend(null)}>Hủy</button>
-                      <button className="btn bp" disabled={busy || !amend.note.trim()} onClick={() => run(async () => { await act("POST", `/v1/receivables/${s.id}/amendment`, { ...(amend.amount && Number(amend.amount) !== s.amount ? { amount: Number(amend.amount) } : {}), ...(amend.dueDate && amend.dueDate !== s.dueDate ? { dueDate: amend.dueDate } : {}), note: amend.note }); setAmend(null); }, "Đã điều chỉnh; bên mua cần xác nhận lại")}>Điều chỉnh</button>
+                      <button className="btn bp" disabled={busy || !amend.note.trim() || !amend.amount} onClick={() => run(async () => { await act("POST", `/v1/receivables/${s.id}/amendment`, { ...(amend.amount && amend.amount !== s.amount ? { amount: amend.amount } : {}), ...(amend.dueDate && amend.dueDate !== s.dueDate ? { dueDate: amend.dueDate } : {}), note: amend.note }); setAmend(null); }, "Đã điều chỉnh; bên mua cần xác nhận lại")}>Điều chỉnh</button>
                     </div>
                   </div>
-                ) : <button className="btn bs" onClick={() => setAmend({ amount: String(s.amount), dueDate: s.dueDate, note: "" })}>Điều chỉnh hóa đơn…</button>
+                ) : <button className="btn bs" onClick={() => setAmend({ amount: s.amount, dueDate: s.dueDate, note: "" })}>Điều chỉnh hóa đơn…</button>
               )}
             </div>
             <div className="dark stack-sm">

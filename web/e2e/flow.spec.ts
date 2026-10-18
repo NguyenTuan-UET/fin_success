@@ -52,7 +52,7 @@ test("hóa đơn → xác nhận → RFQ → báo giá → thẩm định → đ
   // Bên mua xác nhận
   await buyer.goto("/buyer/invoices");
   await expect(buyer.getByRole("row", { name: new RegExp(INVOICE_NO) }).first()).toBeVisible({ timeout: 15_000 });
-  await buyer.getByRole("button", { name: "Xác nhận", exact: true }).first().click();
+  await buyer.getByRole("button", { name: /^Xác nhận v\d+$/ }).first().click();
   await expect(buyer.getByText(/Đã xác nhận/).first()).toBeVisible();
 
   // Nhà cung cấp so sánh gói, gửi RFQ

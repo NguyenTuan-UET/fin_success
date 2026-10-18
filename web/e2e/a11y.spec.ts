@@ -20,7 +20,7 @@ async function open(browser: Browser, role: keyof typeof PAGES, width: number): 
   const page = await ctx.newPage();
   if (role !== "none") {
     await page.goto(`/${role}`);
-    await expect(page.getByRole("navigation", { name: "Điều hướng chính" })).toBeAttached({ timeout: 30_000 });
+    await expect(page.locator("nav.nav")).toBeAttached({ timeout: 30_000 }); // menu đóng trên màn hẹp bị ẩn khỏi cây truy cập
   }
   return page;
 }

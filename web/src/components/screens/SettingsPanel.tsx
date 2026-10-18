@@ -11,14 +11,13 @@ import { PageHeader } from "@/components/ui/basic";
 import { PublicData } from "@/components/screens/PublicData";
 import { MembersSection } from "@/components/screens/Members";
 import { useToast } from "@/components/providers/Toast";
-import type { Role } from "@/lib/roles";
 
 type Keys = { keys: { id: string; name: string; scopes: string[]; createdAt: string; lastUsedAt?: string; revokedAt?: string }[]; scopes: Record<string, { label: string }>; endpoint: string | null };
 const SCOPE_LABEL: Record<string, string> = { products: "sản phẩm", rfqs: "báo giá", applications: "hồ sơ", packages: "gói hồ sơ", events: "sự kiện tiền" };
 const KYC_LABEL = { pending: ["Chờ FCC xác minh", "c-warn"], verified: ["Đã xác minh", "c-ok"], rejected: ["Chưa đạt", "c-bad"] } as const;
 
-export function SettingsPanel({ role }: { role: Role }) {
-  const { data, org, me, act } = useData();
+export function SettingsPanel() {
+  const { data, org, me, act, memberships } = useData();
   const toast = useToast();
   const isOwner = ["owner", "fcc_admin"].includes(me.role);
   const [profile, setProfile] = useState<Partial<Org>>({});
@@ -67,7 +66,7 @@ export function SettingsPanel({ role }: { role: Role }) {
 
   return (
     <>
-      <PageHeader eyebrow="Cài đặt" title="Tổ chức, thành viên & chia sẻ dữ liệu" sub="Quản lý hồ sơ tổ chức, thành viên và quyền, dữ liệu bạn chia sẻ cho tổ chức khác, và nhật ký truy cập." actions={<Link className="btn bs" href="/security">Bảo mật tài khoản (MFA)</Link>} />
+      <PageHeader eyebrow="Cài đặt" title={org.type === "fcc" ? "Hồ sơ FCC & chia sẻ dữ liệu" : "Tổ chức, thành viên & chia sẻ dữ liệu"} sub={org.type === "fcc" ? "Hồ sơ tổ chức FCC, quyền chia sẻ và nhật ký hoạt động. Biểu phí ở Doanh thu & biểu phí; phiên bản chấm điểm ở Việc cần xử lý; thành viên ở Thành viên & quyền." : "Quản lý hồ sơ tổ chức, thành viên và quyền, dữ liệu bạn chia sẻ cho tổ chức khác, và nhật ký truy cập."} actions={<Link className="btn bs" href="/security">Bảo mật tài khoản (MFA)</Link>} />
 
       <section className="card stack">
         <div className="between">
@@ -164,7 +163,7 @@ export function SettingsPanel({ role }: { role: Role }) {
             {myAudit.length === 0 && <tr><td colSpan={4} className="empty">Chưa có hoạt động.</td></tr>}
           </tbody></table></div>
       </section>
-      <span className="muted">Đang đăng nhập: {me.name} · {me.email} · vai trò {me.role} · {role}</span>
+      <span className="muted">Đang đăng nhập: {me.name} · {me.email} · vai trò {memberships.find((m) => m.orgId === org.id)?.roleLabel ?? "thành viên"}</span>
     </>
   );
 }

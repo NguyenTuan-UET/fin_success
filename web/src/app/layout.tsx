@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Be_Vietnam_Pro, IBM_Plex_Mono } from "next/font/google";
 import { ToastProvider } from "@/components/providers/Toast";
+import { DialogProvider } from "@/components/providers/Dialog";
 import { AssistantProvider } from "@/components/assistant/Assistant";
 import { FccProvider } from "@/lib/session";
 import { RegisterSW } from "@/components/providers/RegisterSW";
@@ -40,9 +41,11 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       <body>
         <RegisterSW />
         <ToastProvider>
-          <FccProvider>
-            <AssistantProvider>{children}</AssistantProvider>
-          </FccProvider>
+          <DialogProvider>
+            <FccProvider>
+              <AssistantProvider>{children}</AssistantProvider>
+            </FccProvider>
+          </DialogProvider>
         </ToastProvider>
       </body>
     </html>

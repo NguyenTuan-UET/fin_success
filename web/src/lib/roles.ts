@@ -107,7 +107,7 @@ export const ROLES: Record<Role, RoleMeta> = {
       },
       { href: "/lender/marketplace", label: "Marketplace", icon: "market" },
       { href: "/lender/esg", label: "ESG & Xanh", icon: "esg" },
-      { href: "/lender/accounting", label: "Kế toán", icon: "accounting" },
+      { href: "/lender/accounting", label: "Kế toán được chia sẻ", icon: "accounting" },
       { href: "/lender/settings", label: "Cài đặt", icon: "settings" },
     ],
   },
@@ -130,7 +130,7 @@ export const ROLES: Record<Role, RoleMeta> = {
       { href: "/admin/sources", label: "Nguồn dữ liệu công khai", icon: "shield" },
       { href: "/admin/revenue", label: "Doanh thu & biểu phí", icon: "revenue" },
       { href: "/admin/audit", label: "Nhật ký kiểm toán", icon: "log" },
-      { href: "/admin/settings", label: "Cài đặt hệ thống", icon: "settings" },
+      { href: "/admin/settings", label: "Hồ sơ FCC & chia sẻ", icon: "settings" },
     ],
   },
 };

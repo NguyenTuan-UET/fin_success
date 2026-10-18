@@ -31,9 +31,9 @@ export function businessRoutes(app: FastifyInstance, core: Core, opt: BusinessOp
     core.authorize(a, name)
     const args = (req.body as { args?: unknown[] } | undefined)?.args ?? []
     if (!Array.isArray(args)) throw bad('args phải là mảng')
-    if (name === 'createReceivable') {
+    if (name === 'createReceivable' || name === 'attachDocuments') {
       // chứng từ gắn vào khoản phải thu phải là tệp của chính tổ chức
-      const files = (args[0] as { files?: { key?: unknown }[] } | undefined)?.files
+      const files = name === 'attachDocuments' ? (args[1] as { key?: unknown }[] | undefined) : (args[0] as { files?: { key?: unknown }[] } | undefined)?.files
       for (const f of Array.isArray(files) ? files : []) if (typeof f?.key !== 'string' || !(await db.fileOf(f.key, a.activeOrgId))) throw bad('Chứng từ chưa được tải lên bởi tổ chức này')
     }
     if (name === 'addEsgDocument') {

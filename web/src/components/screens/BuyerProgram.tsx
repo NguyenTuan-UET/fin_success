@@ -10,7 +10,7 @@ import { Kpi } from "@/components/ui/basic";
 export function BuyerProgram() {
   const { data, org } = useData();
   const scores = useScores(data);
-  const mine = data.receivables.filter((r) => r.buyerId === org.id);
+  const mine = data.receivables.filter((r) => r.buyerId === org.id && r.state !== "DRAFT");
   const suppliers = [...new Set(mine.map((r) => r.sellerId))];
   const funded = data.applications.filter((a) => ["ACCEPTED", "FUNDED", "SETTLED"].includes(a.state) && mine.some((r) => r.id === a.receivableId));
   const fundedVnd = funded.reduce((a, x) => a + (x.fundedAmount ?? x.offer?.advanceVnd ?? 0), 0);

@@ -156,6 +156,17 @@ export type ReceivableState =
   | 'OVERDUE'
   | 'CANCELLED'
 
+export interface ReceivableRevision {
+  version: number
+  at: string
+  by?: string
+  note: string
+  before: { amount: number; dueDate: string }
+  after: { amount: number; dueDate: string }
+  /** Phiên bản trước đã được bên mua xác nhận và nay mất hiệu lực */
+  voidedConfirmation: boolean
+}
+
 export interface Receivable {
   id: string
   code: string
@@ -181,6 +192,10 @@ export interface Receivable {
   /** Chứng từ gốc đã tải lên kho tệp (bất biến, định danh theo SHA-256) */
   files?: { key: string; name: string; kind: 'invoice' | 'contract' | 'delivery' | 'other' }[]
   disputeReason?: string
+  /** Thời điểm gửi bên mua lần đầu; trước đó (bản nháp) chỉ bên bán thấy */
+  sentAt?: string
+  /** Lịch sử điều chỉnh: giá trị trước/sau, người sửa, lý do; xác nhận của phiên bản cũ mất hiệu lực */
+  revisions?: ReceivableRevision[]
   confirmedAt?: string
   paidAt?: string
   paidAmount?: number

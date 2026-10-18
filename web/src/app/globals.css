@@ -1521,11 +1521,15 @@ input[type="range"] {
     height: 100vh;
     z-index: 45;
     transform: translateX(-100%);
-    transition: transform 0.22s var(--ease);
+    /* menu đóng: ẩn khỏi thứ tự Tab và cây truy cập (visibility đổi sau khi trượt xong) */
+    visibility: hidden;
+    transition: transform 0.22s var(--ease), visibility 0s linear 0.22s;
     width: 280px;
   }
   .side.open {
     transform: none;
+    visibility: visible;
+    transition: transform 0.22s var(--ease), visibility 0s;
     box-shadow: var(--shadow-pop);
   }
   .roles-tb {
@@ -1645,4 +1649,111 @@ input[type="range"] {
   th.wrap {
     min-width: 170px;
   }
+}
+
+/* Trường nhập: lỗi tại chỗ, dòng đọc lại, chọn tệp tiếng Việt */
+.input.invalid {
+  border-color: var(--bad);
+  box-shadow: 0 0 0 3px var(--bad-bg);
+}
+.input.suggested {
+  border-style: dashed;
+  border-color: var(--warn-strong);
+}
+.field-note {
+  font-weight: 400 !important;
+  font-size: 12px;
+  color: var(--ink-3);
+}
+.field-err {
+  font-weight: 500 !important;
+  font-size: 12px;
+  color: var(--bad);
+}
+.file-pick {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-height: 40px;
+}
+.sr-only-file {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Bảng dạng thẻ trên màn hẹp: mã, số tiền và nút quyết định luôn nằm cùng một thẻ, không phải cuộn ngang */
+@media (max-width: 640px) {
+  table.cards,
+  table.cards tbody,
+  table.cards tr,
+  table.cards td {
+    display: block;
+    width: 100%;
+  }
+  table.cards thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+  table.cards tr {
+    border-bottom: 1px solid var(--line);
+    padding: 10px 14px;
+  }
+  table.cards td {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    border: 0;
+    padding: 4px 0;
+    text-align: right;
+    min-width: 0 !important;
+  }
+  table.cards td::before {
+    content: attr(data-label);
+    font-size: 12px;
+    color: var(--ink-3);
+    text-align: left;
+    flex: 0 0 auto;
+  }
+  table.cards td.empty::before {
+    content: none;
+  }
+}
+
+/* Tuổi nợ: một thanh xếp chồng theo tỷ trọng, kèm bảng số tiền chính xác */
+.aging-bar {
+  display: flex;
+  height: 14px;
+  border-radius: 7px;
+  overflow: hidden;
+  background: var(--line-2);
+}
+.aging-bar > span {
+  min-width: 3px;
+}
+.aging-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  margin-right: 8px;
+  vertical-align: -1px;
+}
+
+/* nút có nội dung dài (gợi ý, lựa chọn) xuống dòng thay vì tràn */
+.btn.btn-wrap {
+  white-space: normal;
+  height: auto;
+  min-height: 32px;
+  padding-top: 6px;
+  padding-bottom: 6px;
+  text-align: left;
+  max-width: 100%;
 }

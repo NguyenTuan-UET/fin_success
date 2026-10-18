@@ -6,7 +6,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import { Send, Sparkles, X } from "lucide-react";
 import type { Role } from "@/lib/roles";
 import { glossaryHit, greeting, norm, SUGGESTIONS, type Reply } from "./answers";
-import { allowedLinks, buildFacts } from "./facts";
+import { allowedLinks, buildFacts, fundingAdvice, isFundingQuestion } from "./facts";
 import { chat, parseJson } from "@/lib/ai";
 import { TEXT_MODEL } from "@/lib/ai";
 import { useFcc } from "@/lib/session";
@@ -45,6 +45,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
         const g = glossaryHit(norm(text));
         if (g) reply = g; // thuật ngữ: trả lời từ từ điển, không cần AI
         else if (!data || !org) reply = { text: "Bạn cần đăng nhập để mình xem dữ liệu của bạn." };
+        else if (role === "supplier" && isFundingQuestion(norm(text))) reply = fundingAdvice(data, org); // điều kiện nghiệp vụ: trả lời bằng quy tắc
         else reply = await askAi(role, text, buildFacts(role, data, org));
         setTyping(false);
         setLog((l) => ({ ...l, [role]: [...l[role], { from: "bot", reply }] }));
@@ -76,7 +77,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [isOpen]);
 
-  const messages: Msg[] = [{ from: "bot", reply: greeting(role, (me?.name.split(" ").slice(-1)[0] ?? "bạn")) }, ...log[role]];
+  const messages: Msg[] = [{ from: "bot", reply: greeting(role, me?.name?.trim() || "bạn") }, ...log[role]];
   const showAssistant = isOpen && roleFromPath(pathname) !== null;
 
   return (
@@ -170,7 +171,7 @@ export function AskButton({ question, className = "btn bl", children }: { questi
 async function askAi(role: Role, question: string, facts: unknown): Promise<Reply> {
   const links = allowedLinks(role);
   const system = `Bạn là Trợ lý FCC cho nền tảng tài trợ chuỗi cung ứng. Vai trò người dùng: ${role}.
-QUY TẮC: (1) Chỉ dùng dữ kiện JSON bên dưới; không tự suy ra, không bịa số, không đưa ra giá/lãi suất ngoài dữ kiện. (2) Điểm và xếp hạng chỉ là tham khảo của FCC, không phải quyết định tín dụng; dự báo không phải cam kết. (3) Thiếu dữ liệu thì nói rõ "chưa có dữ liệu" và chỉ nơi nhập. (4) Câu hỏi ngoài phạm vi dữ liệu/nền tảng thì từ chối lịch sự. (5) Trả lời tiếng Việt, ngắn gọn (tối đa 6 câu), nêu mã hóa đơn/hồ sơ cụ thể.
+QUY TẮC: (1) Chỉ dùng dữ kiện JSON bên dưới; không tự suy ra, không bịa số, không đưa ra giá/lãi suất ngoài dữ kiện. (2) Điểm và xếp hạng chỉ là tham khảo của FCC, không phải quyết định tín dụng; dự báo không phải cam kết. (3) Thiếu dữ liệu thì nói rõ "chưa có dữ liệu" và chỉ nơi nhập. (4) Câu hỏi ngoài phạm vi dữ liệu/nền tảng thì từ chối lịch sự. (5) Trả lời tiếng Việt, ngắn gọn (tối đa 6 câu), nêu mã hóa đơn/hồ sơ cụ thể; dùng nhãn trạng thái tiếng Việt trong dữ kiện, không dùng mã kỹ thuật hay tiếng Anh. (6) Chỉ gợi ý tài trợ hóa đơn có du_dieu_kien_tai_tro = true; hóa đơn khác phải nêu lý do chưa tài trợ được. (7) Về dự báo dòng tiền: luôn nói "theo các khoản đã khai", nhắc giới hạn dữ liệu (số dư tự khai, chi phí chưa khai) — không khẳng định chắc chắn không thiếu tiền.
 Trả JSON: {"answer": string, "links": [href...]} — links chọn từ: ${JSON.stringify(links.map((l) => l.href))}, tối đa 2, chỉ khi hữu ích.
 DỮ KIỆN: ${JSON.stringify(facts)}`;
   try {

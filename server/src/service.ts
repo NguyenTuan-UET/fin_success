@@ -4,7 +4,7 @@ import { createHash, randomBytes } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type {
-  AccountingConnection, Consent, CreditProfile, SignatureEvidence, EarlyPaymentOffer, EsgAssessment, EsgDocument, EsgIndicatorResult, FinancialYear,
+  ReceivableRevision, AccountingConnection, Consent, CreditProfile, SignatureEvidence, EarlyPaymentOffer, EsgAssessment, EsgDocument, EsgIndicatorResult, FinancialYear,
   ExternalRecord, FinancingProduct, FundingApplication, LedgerItem, ListedSnapshot, Org, Receivable, ReceivableState, Rfq, RfqResponse,
 } from '@fcc/domain/types'
 import { iso } from '@fcc/domain/util'
@@ -84,6 +84,14 @@ function notify(c: Ctx, orgId: string, title: string, body: string, link?: strin
 function grantConsent(c: Ctx, k: Omit<Consent, 'id' | 'grantedAt' | 'signature'>) {
   // nội dung đồng ý (bên nhận, mục đích, loại dữ liệu, thời hạn) được băm và ký bằng phương thức xác thực của người thao tác
   c.s.consents = [{ ...k, id: uid('CS'), grantedAt: iso(c.now), signature: signatureOf(c, k) }, ...c.s.consents]
+}
+function revision(c: Ctx, r: Receivable, next: { amount?: number; dueDate?: string }, note: string): ReceivableRevision {
+  return {
+    version: r.version + 1, at: c.now.toISOString(), by: c.userId, note: note.trim().slice(0, 300),
+    before: { amount: r.amount, dueDate: r.dueDate },
+    after: { amount: next.amount ?? r.amount, dueDate: next.dueDate ?? r.dueDate },
+    voidedConfirmation: r.state === 'BUYER_CONFIRMED',
+  }
 }
 function patchRecv(c: Ctx, id: string, patch: Partial<Receivable>) {
   c.s.receivables = c.s.receivables.map((r) => (r.id === id ? { ...r, ...patch } : r))
@@ -187,7 +195,7 @@ export const actions: Record<string, Action> = {
     c.s.receivables = [r, ...c.s.receivables]
     log(c, 'Tạo khoản phải thu', r.code, `${orgName(c, r.buyerId)} · ${vnd(r.amount)} ₫ · nguồn ${r.source}`)
     if (flags.length) {
-      log(c, 'Hóa đơn có cờ bất thường', r.code, flags.map((f) => f.code).join(', '))
+      log(c, 'Hóa đơn có cờ bất thường', r.code, flags.map((f) => f.detail).join(' '))
       for (const f of c.s.orgs.filter((x) => x.type === 'fcc')) notify(c, f.id, `Hóa đơn ${r.code} có cờ bất thường`, flags.map((x) => x.detail).join(' '), '/admin')
     }
     return r
@@ -196,14 +204,17 @@ export const actions: Record<string, Action> = {
     const r = recv(c, id)
     requireSelf(c, r.sellerId)
     requireState('Khoản phải thu', r.state, ['DRAFT'])
-    patchRecv(c, id, { state: 'BUYER_PENDING' })
+    patchRecv(c, id, { state: 'BUYER_PENDING', sentAt: r.sentAt ?? c.now.toISOString() })
     notify(c, r.buyerId, `Yêu cầu xác nhận ${r.code}`, `${orgName(c, r.sellerId)} đề nghị xác nhận khoản phải trả ${vnd(r.amount)} ₫.`, '/invoices')
     log(c, 'Gửi lời mời xác nhận', r.code, `Tới ${orgName(c, r.buyerId)}`)
   },
-  buyerDecision(c, id: string, confirm: boolean, reason?: string) {
+  buyerDecision(c, id: string, confirm: boolean, reason?: string, expectedVersion?: number) {
     const r = recv(c, id)
     requireSelf(c, r.buyerId)
     requireState('Khoản phải thu', r.state, ['BUYER_PENDING'])
+    // bên mua quyết định trên đúng phiên bản đang xem; hóa đơn vừa được điều chỉnh thì phải xem lại
+    if (expectedVersion !== undefined && expectedVersion !== null && Number(expectedVersion) !== r.version)
+      throw conflict(`${r.code} vừa được điều chỉnh lên phiên bản v${r.version} (${vnd(r.amount)} ₫, hạn ${r.dueDate}). Xem lại trước khi quyết định.`)
     if (!confirm && !reason?.trim()) throw bad('Cần nêu lý do tranh chấp')
     patchRecv(c, id, confirm ? { state: 'BUYER_CONFIRMED', confirmedAt: iso(c.now), disputeReason: undefined } : { state: 'BUYER_DISPUTED', disputeReason: reason!.trim().slice(0, 500) })
     notify(c, r.sellerId, confirm ? `${r.code} đã được xác nhận` : `${r.code} bị tranh chấp`, confirm ? `${orgName(c, r.buyerId)} xác nhận nghĩa vụ thanh toán phiên bản v${r.version}. Có thể đưa lên Marketplace.` : `Lý do: ${reason}`, '/invoices')
@@ -215,7 +226,7 @@ export const actions: Record<string, Action> = {
     requireState('Khoản phải thu', r.state, ['BUYER_DISPUTED'])
     positiveInt(amount, 'Số tiền')
     if (!note?.trim()) throw bad('Cần ghi chú điều chỉnh')
-    patchRecv(c, id, { amount, version: r.version + 1, state: 'BUYER_PENDING', description: `${r.description} (điều chỉnh: ${note.trim()})` })
+    patchRecv(c, id, { amount, version: r.version + 1, state: 'BUYER_PENDING', description: `${r.description} (điều chỉnh: ${note.trim()})`, revisions: [...(r.revisions ?? []), revision(c, r, { amount }, note)] })
     notify(c, r.buyerId, `${r.code} đã điều chỉnh — cần xác nhận lại`, note, '/invoices')
     log(c, 'Tạo phiên bản mới sau tranh chấp', r.code, `v${r.version + 1}: ${note}`)
   },
@@ -241,9 +252,29 @@ export const actions: Record<string, Action> = {
       c.s.rfqs = c.s.rfqs.map((x) => (x.id === q.id ? { ...x, state: 'CANCELLED' } : x))
       c.s.consents = c.s.consents.map((k) => (k.purpose === `Gói tóm tắt RFQ ${q.id}` && !k.revokedAt ? { ...k, revokedAt: iso(c.now) } : k))
     }
-    patchRecv(c, id, { ...next, version: r.version + 1, state: 'BUYER_PENDING', confirmedAt: undefined, description: `${r.description} (điều chỉnh v${r.version + 1}: ${patch.note.trim()})`.slice(0, 500) })
+    patchRecv(c, id, { ...next, version: r.version + 1, state: 'BUYER_PENDING', confirmedAt: undefined, revisions: [...(r.revisions ?? []), revision(c, r, next, patch.note)], description: `${r.description} (điều chỉnh v${r.version + 1}: ${patch.note.trim()})`.slice(0, 500) })
     notify(c, r.buyerId, `${r.code} đã điều chỉnh — cần xác nhận lại`, patch.note, '/invoices')
     log(c, 'Điều chỉnh hóa đơn (xác nhận cũ mất hiệu lực)', r.code, `v${r.version + 1}: ${patch.note.trim()}`)
+  },
+  /**
+   * Bổ sung chứng từ (hợp đồng, biên bản giao nhận, hóa đơn gốc) cho khoản chưa tài trợ. Không đổi số tiền/hạn nên
+   * không làm mất xác nhận; bên mua được báo khi khoản đã gửi.
+   */
+  attachDocuments(c, id: string, files: { key: string; name: string; kind: 'invoice' | 'contract' | 'delivery' | 'other' }[]) {
+    const r = recv(c, id)
+    requireSelf(c, r.sellerId)
+    requireState('Khoản phải thu', r.state, ['DRAFT', 'BUYER_PENDING', 'BUYER_DISPUTED', 'BUYER_CONFIRMED'])
+    if (openApplicationFor(c, id)) throw conflict('Khoản phải thu đang có hồ sơ tài trợ — bổ sung chứng từ qua hồ sơ')
+    const clean = (Array.isArray(files) ? files : []).slice(0, 10).filter((f) => /^[0-9a-f]{64}$/.test(f?.key)).map((f) => ({ key: f.key, name: String(f.name ?? '').slice(0, 200), kind: (['invoice', 'contract', 'delivery'] as const).find((k) => k === f.kind) ?? ('other' as const) }))
+    if (!clean.length) throw bad('Chưa chọn chứng từ')
+    const existing = r.files ?? []
+    const merged = [...existing, ...clean.filter((f) => !existing.some((e) => e.key === f.key && e.kind === f.kind))].slice(0, 20)
+    const docs = { xml: r.docs.xml || merged.some((f) => f.kind === 'invoice'), contract: r.docs.contract || merged.some((f) => f.kind === 'contract'), delivery: r.docs.delivery || merged.some((f) => f.kind === 'delivery') }
+    patchRecv(c, id, { files: merged, docs })
+    const label = { invoice: 'hóa đơn gốc', contract: 'hợp đồng', delivery: 'biên bản giao nhận', other: 'chứng từ khác' }
+    const what = [...new Set(clean.map((f) => label[f.kind]))].join(', ')
+    if (r.state !== 'DRAFT') notify(c, r.buyerId, `${r.code}: bổ sung chứng từ`, `${orgName(c, r.sellerId)} đã bổ sung ${what}.`, '/invoices')
+    log(c, 'Bổ sung chứng từ', r.code, what)
   },
   /** Vận hành FCC xử lý cờ bất thường (đã xem xét), kèm ghi chú. */
   resolveFlag(c, receivableId: string, code: string, note: string) {
@@ -512,7 +543,7 @@ export const actions: Record<string, Action> = {
     } else if (!['draft', 'pending_review', 'paused'].includes(status)) throw bad('Trạng thái không hợp lệ')
     if (status === 'pending_review' && p.fccApproved) throw conflict('Sản phẩm đã được duyệt')
     c.s.products = c.s.products.map((x) => (x.id === id ? { ...x, status } : x))
-    log(c, 'Đổi trạng thái sản phẩm', id, status)
+    log(c, 'Đổi trạng thái sản phẩm', id, `${p.name}: ${{ draft: 'nháp', pending_review: 'chờ FCC duyệt', paused: 'tạm dừng', published: 'đang công bố' }[status] ?? status}`)
   },
 
   /** Cập nhật hồ sơ tổ chức của chính mình (MST không đổi được). */

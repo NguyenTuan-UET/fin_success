@@ -137,7 +137,7 @@ Vào **Kế toán**:
 
 ## 5. Dành cho nhân sự FCC
 
-Vào mục **Quản trị**. Menu gồm: **Việc cần xử lý**, **Thành viên & quyền**, **Tổ chức**, **Thẩm định ESG**, **Nguồn dữ liệu công khai**, **Doanh thu & biểu phí**, **Nhật ký kiểm toán**, **Cài đặt hệ thống**.
+Vào mục **Quản trị**. Menu gồm: **Việc cần xử lý**, **Thành viên & quyền**, **Tổ chức**, **Thẩm định ESG**, **Nguồn dữ liệu công khai**, **Doanh thu & biểu phí**, **Nhật ký kiểm toán**, **Hồ sơ FCC & chia sẻ**.
 
 | Việc | Ở đâu |
 | --- | --- |

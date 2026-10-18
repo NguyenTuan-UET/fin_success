@@ -142,7 +142,11 @@ export function orgRoutes(app: FastifyInstance, core: Core, openSession: (userId
     const key = (req.params as { key: string }).key
     const own = await db.fileOf(key, a.activeOrgId)
     const fcc = orgOf(a.activeOrgId)?.type === 'fcc'
-    if (!own && !(fcc && (await db.fccReviewableFile(key)))) throw notFound('Không tìm thấy tệp')
+    // bên mua của khoản đã gửi, hoặc tổ chức tài chính có hồ sơ trên khoản đó, được xem chứng từ gắn với khoản phải thu
+    const st = core.getState()
+    const party = st.receivables.some((r) => r.files?.some((f) => f.key === key) && r.state !== 'DRAFT' &&
+      (r.buyerId === a.activeOrgId || st.applications.some((x) => x.receivableId === r.id && x.lenderId === a.activeOrgId)))
+    if (!own && !party && !(fcc && (await db.fccReviewableFile(key)))) throw notFound('Không tìm thấy tệp')
     return { url: core.files.signedPath(key, 300, core.clock().getTime()), expiresInSeconds: 300 }
   })
 

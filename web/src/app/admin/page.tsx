@@ -2,11 +2,14 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import type { FinancingProduct } from "@fcc/domain/types";
 import { api } from "@/lib/api";
-import { date, money } from "@/lib/format";
+import { date, money, vnd } from "@/lib/format";
+import { ASSESSMENT_KIND_LABEL, flagLabel, PRODUCT_TYPE_LABEL } from "@/lib/model";
 import { useData } from "@/lib/session";
 import { Kpi, PageHeader } from "@/components/ui/basic";
 import { useToast } from "@/components/providers/Toast";
+import { useAsk } from "@/components/providers/Dialog";
 
 /** Dưới ngưỡng này tỷ lệ dễ gây hiểu nhầm: hiển thị "Không đủ dữ liệu" kèm tử số/mẫu số. */
 const MIN_SAMPLES = 5;
@@ -16,7 +19,14 @@ const sample = (den: number) => (den < MIN_SAMPLES ? `Không đủ dữ liệu (
 export default function AdminPage() {
   const { data, act } = useData();
   const toast = useToast();
+  const ask = useAsk();
   const [busy, setBusy] = useState(false);
+  const [review, setReview] = useState<FinancingProduct | null>(null);
+  /** Hỏi lý do/ghi chú bằng hộp thoại của ứng dụng rồi thực hiện. */
+  const withNote = async (title: string, label: string, f: (note: string, choice?: string) => Promise<unknown>, ok: string, choices?: { value: string; label: string }[]) => {
+    const a = await ask({ title, label, choices, minLength: 5 });
+    if (a) await run(() => f(a.text, a.choice), ok);
+  };
   const run = async (f: () => Promise<unknown>, ok: string) => {
     setBusy(true);
     try { await f(); toast(ok); } catch (e) { toast((e as Error).message); }
@@ -65,17 +75,14 @@ export default function AdminPage() {
             <span><strong>{o.name}</strong> · KYC người đại diện {o.kyc!.representativeName}<div className="muted">{o.kyc!.documentKeys.length} giấy tờ · nộp {date(o.kyc!.submittedAt)}{" "}{o.kyc!.documentKeys.map((k, i) => <button key={k} className="link-btn" style={{ marginLeft: 6 }} onClick={async () => { const u = await api<{ url: string }>("GET", `/api/files/${k}/url`); window.open(u.url, "_blank"); }}>Giấy tờ {i + 1}</button>)}</div></span>
             <span className="row" style={{ gap: 6 }}>
               <button className="btn bp sm" disabled={busy} onClick={() => run(() => act("POST", `/v1/organizations/${o.id}/kyc-decision`, { approve: true }), "Đã xác minh người đại diện (cần MFA)")}>Duyệt</button>
-              <button className="btn bs sm" disabled={busy} onClick={() => { const note = prompt("Lý do chưa đạt"); if (note) void run(() => act("POST", `/v1/organizations/${o.id}/kyc-decision`, { approve: false, note }), "Đã từ chối"); }}>Từ chối</button>
+              <button className="btn bs sm" disabled={busy} onClick={() => withNote(`Từ chối KYC · ${o.name}`, "Lý do chưa đạt (doanh nghiệp sẽ nhận được)", (note) => act("POST", `/v1/organizations/${o.id}/kyc-decision`, { approve: false, note }), "Đã từ chối")}>Từ chối</button>
             </span>
           </div>
         ))}
         {productsPending.map((p) => (
           <div key={p.id} className="between soft" style={{ margin: "0 16px 8px" }}>
             <span><strong>{p.name}</strong> · {data.orgs.find((o) => o.id === p.lenderId)?.name}<div className="muted">v{p.version} · ứng {p.pricing.advancePct}% · lãi {p.pricing.rateMin}–{p.pricing.rateMax}% · kiểm tra trình bày, FCC không quyết định giá</div></span>
-            <span className="row" style={{ gap: 6 }}>
-              <button className="btn bp sm" disabled={busy} onClick={() => run(() => act("POST", `/v1/financing-products/${p.id}/review`, { approve: true }), "Đã duyệt")}>Duyệt</button>
-              <button className="btn bs sm" disabled={busy} onClick={() => { const note = prompt("Lý do chưa duyệt"); if (note) void run(() => act("POST", `/v1/financing-products/${p.id}/review`, { approve: false, note }), "Đã từ chối"); }}>Từ chối</button>
-            </span>
+            <button className="btn bp sm" disabled={busy} onClick={() => setReview(p)}>Xem và quyết định</button>
           </div>
         ))}
       </section>
@@ -87,11 +94,11 @@ export default function AdminPage() {
           <div key={r.id} className="stack-sm" style={{ padding: "12px 16px", borderTop: "1px solid var(--line-2)" }}>
             <div className="between"><span><strong className="num">{r.code}</strong> · {data.orgs.find((o) => o.id === r.sellerId)?.shortName} → {data.orgs.find((o) => o.id === r.buyerId)?.shortName} · {r.amount.toLocaleString("vi-VN")} đ</span>
               <span className="row" style={{ gap: 6 }}>
-                <button className="btn bs sm" disabled={busy} onClick={() => { const note = prompt("Kết quả tra cứu cơ quan thuế (ghi chú)"); if (note) void run(() => act("POST", `/v1/receivables/${r.id}/tax-check`, { status: /hủy/i.test(note) ? "cancelled" : /không khớp|sai/i.test(note) ? "mismatch" : "verified", note }), "Đã ghi nhận đối chiếu thuế"); }}>Ghi kết quả đối chiếu thuế</button>
+                <button className="btn bs sm" disabled={busy} onClick={() => withNote(`Đối chiếu thuế · ${r.code}`, "Căn cứ tra cứu (cổng tra cứu, thời điểm, mã tra cứu)", (note, status) => act("POST", `/v1/receivables/${r.id}/tax-check`, { status, note }), "Đã ghi nhận đối chiếu thuế", [{ value: "verified", label: "Khớp — hóa đơn hợp lệ" }, { value: "mismatch", label: "Không khớp thông tin" }, { value: "cancelled", label: "Hóa đơn đã bị hủy" }])}>Ghi kết quả đối chiếu thuế</button>
               </span></div>
             {(r.flags ?? []).filter((f) => !f.resolvedAt).map((f) => (
-              <div key={f.code} className="between soft"><span><span className={`chip ${f.severity === "high" ? "c-bad" : f.severity === "medium" ? "c-warn" : "c-neu"}`}>{f.code}</span> {f.detail}</span>
-                <button className="btn bp sm" disabled={busy} onClick={() => { const note = prompt("Ghi chú xử lý"); if (note) void run(() => act("POST", `/v1/receivables/${r.id}/flags/${f.code}/resolve`, { note }), "Đã xử lý cờ"); }}>Đã xem xét</button></div>
+              <div key={f.code} className="between soft"><span><span className={`chip ${f.severity === "high" ? "c-bad" : f.severity === "medium" ? "c-warn" : "c-neu"}`} title={`Mã kỹ thuật: ${f.code}`}>{flagLabel(f.code)}</span> {f.detail}</span>
+                <button className="btn bp sm" disabled={busy} onClick={() => withNote(`Xử lý cờ · ${flagLabel(f.code)}`, "Ghi chú xử lý (đã kiểm tra gì, kết luận)", (note) => act("POST", `/v1/receivables/${r.id}/flags/${f.code}/resolve`, { note }), "Đã xử lý cờ")}>Đã xem xét</button></div>
             ))}
           </div>
         ))}
@@ -102,11 +109,11 @@ export default function AdminPage() {
         <div className="stack-sm" style={{ padding: "0 16px 12px" }}>
           <strong style={{ fontSize: 13 }}>Chờ phát hành chính thức ({toIssue.length})</strong>
           {toIssue.length === 0 && <span className="muted">Không có kết quả đủ điều kiện (cần độ bao phủ đạt ngưỡng).</span>}
-          {toIssue.map((a) => <div key={a.id} className="between soft"><span>{data.orgs.find((o) => o.id === a.orgId)?.shortName} · {a.kind} · {a.rating} {Math.round(a.score)} · bao phủ {Math.round(a.coverage * 100)}%</span><button className="btn bp sm" disabled={busy} onClick={() => run(async () => { await act("POST", `/v1/credit-assessments/${a.id}/issue`); await loadScoring(); }, "Đã phát hành điểm chính thức")}>Phát hành (MFA)</button></div>)}
+          {toIssue.map((a) => <div key={a.id} className="between soft"><span>{data.orgs.find((o) => o.id === a.orgId)?.shortName} · {ASSESSMENT_KIND_LABEL[a.kind] ?? a.kind} · {a.rating} {Math.round(a.score)} · bao phủ {Math.round(a.coverage * 100)}%</span><button className="btn bp sm" disabled={busy} onClick={() => run(async () => { await act("POST", `/v1/credit-assessments/${a.id}/issue`); await loadScoring(); }, "Đã phát hành điểm chính thức")}>Phát hành (MFA)</button></div>)}
           <strong style={{ fontSize: 13 }}>Yêu cầu xem xét lại ({appeals.length})</strong>
           {appeals.map((a) => <div key={a.id} className="between soft"><span><strong>{data.orgs.find((o) => o.id === a.orgId)?.shortName}</strong>: {a.reason}</span><span className="row" style={{ gap: 6 }}>
-            <button className="btn bp sm" disabled={busy} onClick={() => { const note = prompt("Ghi chú (chấp nhận → chấm lại bằng dữ liệu hiện tại)"); if (note) void run(async () => { await act("POST", `/v1/appeals/${a.id}/resolve`, { outcome: "upheld", note }); await loadScoring(); }, "Đã chấp nhận và chấm lại"); }}>Chấp nhận</button>
-            <button className="btn bs sm" disabled={busy} onClick={() => { const note = prompt("Lý do từ chối"); if (note) void run(async () => { await act("POST", `/v1/appeals/${a.id}/resolve`, { outcome: "rejected", note }); await loadScoring(); }, "Đã từ chối"); }}>Từ chối</button></span></div>)}
+            <button className="btn bp sm" disabled={busy} onClick={() => withNote("Chấp nhận xem xét lại", "Ghi chú (chấp nhận → chấm lại bằng dữ liệu hiện tại)", async (note) => { await act("POST", `/v1/appeals/${a.id}/resolve`, { outcome: "upheld", note }); await loadScoring(); }, "Đã chấp nhận và chấm lại")}>Chấp nhận</button>
+            <button className="btn bs sm" disabled={busy} onClick={() => withNote("Từ chối xem xét lại", "Lý do từ chối (doanh nghiệp sẽ nhận được)", async (note) => { await act("POST", `/v1/appeals/${a.id}/resolve`, { outcome: "rejected", note }); await loadScoring(); }, "Đã từ chối")}>Từ chối</button></span></div>)}
           <strong style={{ fontSize: 13 }}>Phiên bản bộ chấm điểm</strong>
           {versions.map((v) => <div key={v.id} className="between soft"><span><strong>{v.name}</strong> <span className="muted">· ngưỡng {v.params.ratingCutoffs.join("/")}</span></span><span className="row" style={{ gap: 6 }}><span className={`chip ${v.status === "active" ? "c-ok" : v.status === "proposed" ? "c-warn" : "c-neu"}`}>{{ active: "Đang dùng", proposed: `Chờ duyệt ${v.approvals.length}/2`, retired: "Đã thay" }[v.status]}</span>{v.status === "proposed" && <button className="btn bs sm" disabled={busy} onClick={() => run(async () => { await act("POST", `/v1/operations/scorecard-versions/${v.id}/approve`); await loadScoring(); }, "Đã duyệt")}>Duyệt (MFA)</button>}</span></div>)}
         </div>
@@ -130,6 +137,29 @@ export default function AdminPage() {
           </div>
           <div className="muted">Ngoại lệ đang mở: {kpis.exceptions.openInvoiceFlags} cờ hóa đơn · {kpis.exceptions.openRefunds} hoàn tiền chưa trả · {kpis.exceptions.disputedPublicData} khiếu nại dữ liệu công khai.</div>
         </section>
+      )}
+      {review && (
+        <div className="modal-scrim" role="dialog" aria-modal="true" aria-labelledby="pr-title">
+          <div className="card modal wide stack-sm">
+            <h2 className="ct" id="pr-title">Duyệt trình bày sản phẩm · {review.name}</h2>
+            <div className="muted">{data.orgs.find((o) => o.id === review.lenderId)?.name} · phiên bản v{review.version} · {PRODUCT_TYPE_LABEL[review.type] ?? review.type}. FCC kiểm tra thông tin công bố có đầy đủ, rõ ràng, không gây hiểu nhầm — không quyết định giá hay khẩu vị tín dụng.</div>
+            <div className="tw" tabIndex={0} role="region" aria-label="Thông tin sản phẩm"><table><tbody>
+              <tr><th>Mô tả</th><td className="wrap">{review.description || <span className="t-bad">Chưa có mô tả</span>}</td></tr>
+              <tr><th>Tỷ lệ ứng trước</th><td className="num">{review.pricing.advancePct}%</td></tr>
+              <tr><th>Lãi suất</th><td className="num">{review.pricing.rateMin}–{review.pricing.rateMax}%/năm · phạt quá hạn {review.pricing.latePenaltyPct}% lãi</td></tr>
+              <tr><th>Phí</th><td className="wrap">{review.pricing.fees.length ? review.pricing.fees.map((f) => `${f.name}: ${f.kind === "fixed" ? `${vnd(f.value)} đ` : `${f.value}%`}${f.upfront ? " (trả trước)" : ""}`).join("; ") : "Không có phí"}</td></tr>
+              <tr><th>Hạn mức mỗi hồ sơ</th><td className="num">{vnd(review.eligibility.minAmount)} – {vnd(review.eligibility.maxAmount)} đ · kỳ hạn tối đa {review.eligibility.maxTenorDays} ngày{review.eligibility.requireBuyerConfirmation ? " · cần bên mua xác nhận" : ""}</td></tr>
+              <tr><th>Cam kết thời gian</th><td>{review.sla.quoteHours ? `báo giá ${review.sla.quoteHours} giờ` : "—"}{review.sla.reviewHours ? ` · thẩm định ${review.sla.reviewHours} giờ` : ""}</td></tr>
+              <tr><th>Ưu đãi xanh</th><td>{review.greenRule ? `ESG ≥ ${review.greenRule.minEsg}: giảm ${review.greenRule.discountPct} điểm %` : "Không"}</td></tr>
+              <tr><th>Hiệu lực</th><td className="num">{date(review.effectiveFrom)} → {date(review.effectiveTo)}</td></tr>
+            </tbody></table></div>
+            <div className="row" style={{ justifyContent: "flex-end", gap: 8, flexWrap: "wrap" }}>
+              <button className="btn bs" onClick={() => setReview(null)}>Đóng</button>
+              <button className="btn bs" disabled={busy} onClick={async () => { const p = review; setReview(null); await withNote(`Từ chối · ${p.name}`, "Lý do chưa duyệt (tổ chức tài chính sẽ nhận được)", (note) => act("POST", `/v1/financing-products/${p.id}/review`, { approve: false, note }), "Đã từ chối, đã báo tổ chức tài chính"); }}>Từ chối</button>
+              <button className="btn bp" disabled={busy} onClick={() => { const p = review; setReview(null); void run(() => act("POST", `/v1/financing-products/${p.id}/review`, { approve: true }), "Đã duyệt công bố"); }}>Duyệt công bố (cần MFA)</button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );

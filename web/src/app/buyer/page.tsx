@@ -38,7 +38,7 @@ export default function BuyerOverview() {
 
   return (
     <>
-      <PageHeader eyebrow="Tổng quan · Người mua" title={`Xin chào ${me.name.split(" ").slice(-1)[0]}`} sub="Xác nhận hóa đơn, lên lịch thanh toán và theo dõi nhà cung cấp của bạn." />
+      <PageHeader eyebrow="Tổng quan · Người mua" title={`Xin chào, ${me.name}`} sub="Xác nhận hóa đơn, lên lịch thanh toán và theo dõi nhà cung cấp của bạn." />
       {todos.length > 0 ? <TodoTiles items={todos} /> : <section className="card empty">Chưa có việc cần làm. Hóa đơn nhà cung cấp gửi tới sẽ xuất hiện ở đây.</section>}
       <section className="grid-kpi">
         <Kpi label="Phải trả (đã xác nhận)" value={money(sumAmount(payable))} note={`${payable.length} hóa đơn`} />

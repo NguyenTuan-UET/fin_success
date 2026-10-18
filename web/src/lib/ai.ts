@@ -165,11 +165,17 @@ export interface ExtractedInvoice {
   total?: number
   description?: string
   lookupCode?: string
+  /** Hạn thanh toán chỉ khi in trên chứng từ; không có thì để trống (không tự tính) */
+  dueDate?: string
+  /** Trường mô hình không chắc (mờ, bị che, nhiều cách đọc) */
+  uncertain?: string[]
   confidence?: number
 }
 
 export function extractInvoice(base64: string) {
-  const prompt = `Đọc ảnh hóa đơn GTGT điện tử Việt Nam. Trả về JSON: series (ký hiệu), number (số hóa đơn), issueDate (YYYY-MM-DD), sellerTaxCode, sellerName, buyerTaxCode, buyerName, total (tổng tiền thanh toán, số nguyên VND), description (tóm tắt hàng hóa), lookupCode (mã của cơ quan thuế nếu có), confidence (0..1). Không bịa; trường không đọc được để trống. Chỉ trả JSON.`
+  const prompt = `Đọc ảnh hóa đơn GTGT điện tử Việt Nam (có thể có nhãn tiếng Anh như "Buyer tax code", "Due date"). Trả về JSON: series (ký hiệu), number (số hóa đơn), issueDate (YYYY-MM-DD), dueDate (hạn thanh toán YYYY-MM-DD — CHỈ khi in trên chứng từ, không có thì để trống, không tự cộng ngày), sellerTaxCode, sellerName, buyerTaxCode, buyerName, total (tổng tiền thanh toán, số nguyên VND), description (tóm tắt hàng hóa), lookupCode (mã của cơ quan thuế nếu có), uncertain (mảng tên trường đọc không chắc chắn).
+Mã số thuế: chép ĐÚNG từng chữ số theo thứ tự trên ảnh, không thêm/bớt số 0; MST doanh nghiệp thường có 10 chữ số (hoặc 10-3). Ngày: giữ nguyên ngày in trên ảnh, đổi sang YYYY-MM-DD.
+Không bịa; trường không đọc được để trống. Chỉ trả JSON.`
   return runAi(VISION_MODEL, async () => parseJson<ExtractedInvoice>(await chat(VISION_MODEL, [{ role: 'user', content: prompt, images: [base64] }])))
 }
 

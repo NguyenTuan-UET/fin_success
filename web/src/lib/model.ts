@@ -61,3 +61,21 @@ export const PRODUCT_TYPE_LABEL: Record<string, string> = {
 };
 
 export const ratingTone = (r?: string) => (!r ? "c-neu" : ["AAA", "AA", "A"].includes(r) ? "c-ok" : ["BBB", "BB"].includes(r) ? "c-info" : "c-warn");
+
+/** Nhãn tiếng Việt cho mã cờ hóa đơn; mã gốc chỉ hiện ở chi tiết kỹ thuật (title). */
+export const FLAG_LABEL: Record<string, string> = {
+  NO_SOURCE_DOCUMENT: "Thiếu chứng từ gốc",
+  AMOUNT_ANOMALY: "Số tiền bất thường",
+  BURST_SAME_BUYER: "Nhiều hóa đơn dồn dập cho cùng bên mua",
+  NEW_BUYER_LARGE: "Hóa đơn lớn với bên mua mới",
+  ROUND_LARGE_MANUAL: "Số tròn lớn nhập tay",
+  FUTURE_ISSUE_DATE: "Ngày lập ở tương lai",
+  CONCENTRATION: "Tập trung vào một bên mua",
+  BUYER_LATE_HISTORY: "Bên mua có lịch sử trả chậm",
+  BUYER_RATING_LOW: "Bên mua xếp hạng thấp",
+  DISPUTE_ON_FUNDED: "Tranh chấp sau khi đã tài trợ",
+  DUP: "Nghi trùng hóa đơn",
+};
+export const flagLabel = (code: string) => FLAG_LABEL[code] ?? "Cờ bất thường";
+
+export const ASSESSMENT_KIND_LABEL: Record<string, string> = { supplier: "Nhà cung cấp", buyer: "Bên mua", application: "Hồ sơ tài trợ" };

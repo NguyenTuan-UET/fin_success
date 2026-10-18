@@ -97,11 +97,20 @@ function Shell({ role, children }: { role: Role; children: ReactNode }) {
     };
   }, [bellOpen]);
 
+  // mở menu: chuyển focus vào menu; đóng: trả focus về nút mở (bàn phím không lạc vào vùng ẩn)
+  const menuBtnRef = useRef<HTMLButtonElement>(null);
+  const sideRef = useRef<HTMLElement>(null);
   useEffect(() => {
     if (!navOpen) return;
+    const side = sideRef.current;
+    const btn = menuBtnRef.current;
+    requestAnimationFrame(() => side?.querySelector<HTMLElement>(".nav a")?.focus());
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && setNavOpen(false);
     document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      if (side?.contains(document.activeElement)) btn?.focus();
+    };
   }, [navOpen]);
 
   const closeAll = () => {
@@ -116,6 +125,7 @@ function Shell({ role, children }: { role: Role; children: ReactNode }) {
       </a>
       <header className="tb">
         <button
+          ref={menuBtnRef}
           className="ibtn menu-btn"
           aria-label="Mở menu điều hướng"
           aria-expanded={navOpen}
@@ -204,7 +214,7 @@ function Shell({ role, children }: { role: Role; children: ReactNode }) {
           <span className="tb-user-text">
             <strong>{me?.name}</strong>
             <span className="muted">
-              {me?.title} · {org?.shortName}
+              {me?.title && !me.name.includes(me.title) ? `${me.title} · ` : ""}{org?.shortName}
             </span>
           </span>
         </div>
@@ -218,7 +228,7 @@ function Shell({ role, children }: { role: Role; children: ReactNode }) {
 
       <div className="body">
         {navOpen && <div className="scrim" onClick={() => setNavOpen(false)} aria-hidden="true" />}
-        <aside id="side-nav" className={`side${navOpen ? " open" : ""}`} aria-label="Điều hướng">
+        <aside id="side-nav" ref={sideRef} className={`side${navOpen ? " open" : ""}`} aria-label="Điều hướng">
           <div className="between" style={{ paddingRight: 4 }}>
             <span className="slabel">{meta.label}</span>
             {navOpen && (

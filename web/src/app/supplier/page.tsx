@@ -47,7 +47,7 @@ export default function SupplierOverview() {
     <>
       <PageHeader
         eyebrow="Tổng quan · Nhà cung cấp"
-        title={`Xin chào ${me.name.split(" ").slice(-1)[0]}`}
+        title={`Xin chào, ${me.name}`}
         sub={short ? `Dự báo thiếu hụt ${money(-short.value)} ngày ${date(short.date)}. Xem các gói tài trợ để bù thiếu hụt.` : "Theo dõi vốn lưu động, hóa đơn và tài trợ của bạn."}
         actions={<Link className="btn bp" href="/supplier/invoices/upload"><Upload size={16} aria-hidden="true" /> Tải hóa đơn</Link>}
       />
@@ -64,7 +64,7 @@ export default function SupplierOverview() {
       <section className="row">
         <div className="card grow-2">
           {forecast ? (
-            <CashForecast forecast={forecast} openingCash={openingCash} safeBalance={SAFE} />
+            <CashForecast forecast={forecast} openingCash={openingCash} safeBalance={SAFE} orgId={org.id} recurringCount={data.connections.find((c) => c.orgId === org.id)?.recurringMonthlyOut?.length ?? 0} />
           ) : (
             <div className="empty stack" style={{ alignItems: "center" }}>
               <strong>Chưa có dự báo dòng tiền.</strong>
@@ -86,7 +86,7 @@ export default function SupplierOverview() {
               <Link className="btn bl" href={`/supplier/marketplace?r=${best.id}`}>So sánh gói cho hóa đơn này</Link>
             </>
           ) : <p>Chưa có hóa đơn nào được người mua xác nhận. Sau khi được xác nhận, FCC gợi ý hóa đơn nên tài trợ.</p>}
-          <AskButton className="btn bl" question="Nên tài trợ hóa đơn nào?">Hỏi trợ lý</AskButton>
+          <AskButton className="btn bl">Hỏi trợ lý (chọn câu hỏi)</AskButton>
         </div>
       </section>
 

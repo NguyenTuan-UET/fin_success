@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { Forecast } from "@fcc/domain/cashflow";
 import { vnd } from "@/lib/format";
+import { MoneyInput } from "@/components/ui/Fields";
 
 const W = 720;
 const TOP = 12;
@@ -11,12 +12,20 @@ const x = (i: number, n: number) => (i / (n - 1)) * W;
 const dm = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
 
 /** Dự báo số dư tiền mặt từ dữ liệu thật (lịch phải thu/phải trả, chi định kỳ, độ trễ thanh toán). Đơn vị hiển thị: triệu đồng. */
-export function CashForecast({ forecast, openingCash, safeBalance }: { forecast: Forecast; openingCash: number; safeBalance: number }) {
+export function CashForecast({ forecast, openingCash, safeBalance, orgId, recurringCount }: { forecast: Forecast; openingCash: number; safeBalance: number; orgId?: string; recurringCount?: number }) {
   const [range, setRange] = useState<7 | 30>(30);
   const [hover, setHover] = useState<number | null>(null);
+  // mức dự trữ tối thiểu do doanh nghiệp tự đặt (lưu trên trình duyệt này)
+  const key = orgId ? `fcc-reserve-${orgId}` : null;
+  const [reserve, setReserve] = useState<number | null>(() => {
+    if (!key || typeof window === "undefined") return safeBalance;
+    const v = Number(window.localStorage.getItem(key));
+    return Number.isFinite(v) && window.localStorage.getItem(key) !== null ? v : safeBalance;
+  });
+  const [editReserve, setEditReserve] = useState(false);
 
   const n = range;
-  const SAFE_BALANCE = safeBalance / 1e6;
+  const SAFE_BALANCE = (reserve ?? 0) / 1e6;
   const base = forecast.points.slice(0, n).map((p) => p.base / 1e6);
   const data = base;
   const cons = forecast.points.slice(0, n).map((p) => p.conservative / 1e6);
@@ -45,8 +54,8 @@ export function CashForecast({ forecast, openingCash, safeBalance }: { forecast:
   };
 
   const summary = hasDip
-    ? `Thấp nhất ${vnd(data[minI])} tr ngày ${forecastDates[minI]}, dưới mức an toàn ${vnd(SAFE_BALANCE)} tr.`
-    : `Không có ngày nào dưới mức an toàn trong ${n} ngày tới.`;
+    ? `Thấp nhất ${vnd(data[minI])} tr ngày ${forecastDates[minI]}, dưới mức dự trữ ${vnd(SAFE_BALANCE)} tr.`
+    : `Theo các khoản đã khai, không có ngày nào dưới mức dự trữ ${vnd(SAFE_BALANCE)} tr trong ${n} ngày tới.`;
 
   return (
     <div>
@@ -111,7 +120,7 @@ export function CashForecast({ forecast, openingCash, safeBalance }: { forecast:
               padding: "0 4px",
             }}
           >
-            Mức an toàn {vnd(SAFE_BALANCE)}
+            Mức dự trữ {vnd(SAFE_BALANCE)}
           </span>
           {hasDip && (
             <span
@@ -225,7 +234,7 @@ export function CashForecast({ forecast, openingCash, safeBalance }: { forecast:
             ["Số dư hôm nay", openingCash / 1e6, "do doanh nghiệp khai"],
             ["Thu dự kiến", flows.inn, flows.innNote],
             ["Chi dự kiến", -flows.out, flows.outNote],
-            [`Cuối kỳ ${n} ngày`, data[n - 1], data[n - 1] >= SAFE_BALANCE ? "trên mức an toàn" : "dưới mức an toàn"],
+            [`Cuối kỳ ${n} ngày`, data[n - 1], data[n - 1] >= SAFE_BALANCE ? "trên mức dự trữ" : "dưới mức dự trữ"],
           ] as const
         ).map(([label, v, note]) => (
           <div key={label} className="soft">
@@ -239,8 +248,15 @@ export function CashForecast({ forecast, openingCash, safeBalance }: { forecast:
         ))}
       </div>
       <p className="muted" style={{ marginTop: 10 }}>
-        Dự báo – không phải cam kết. Số dư đầu kỳ và chi định kỳ do doanh nghiệp tự khai; phải thu/phải trả lấy từ công nợ đã nhập và hóa đơn trên FCC.
+        {summary} Dự báo – không phải cam kết. Số dư đầu kỳ và chi định kỳ do doanh nghiệp tự khai (chưa đối chiếu ngân hàng); phải thu/phải trả lấy từ công nợ đã nhập và hóa đơn trên FCC.
       </p>
+      {recurringCount === 0 && <div className="err" style={{ marginTop: 8, fontSize: 12.5 }}>Chưa khai chi định kỳ (lương, thuê, thuế…) — dự báo đang thiếu các khoản chi này nên có thể quá lạc quan. Khai ở mục Kế toán.</div>}
+      {key && (editReserve ? (
+        <div className="row" style={{ gap: 8, alignItems: "flex-end", marginTop: 8, flexWrap: "wrap" }}>
+          <MoneyInput label="Mức dự trữ tối thiểu (đ)" value={reserve} min={0} onChange={setReserve} hint="Số dư tối thiểu bạn muốn luôn giữ" />
+          <button className="btn bp sm" disabled={reserve === null} onClick={() => { window.localStorage.setItem(key, String(reserve ?? 0)); setEditReserve(false); }}>Lưu mức dự trữ</button>
+        </div>
+      ) : <button className="link-btn" style={{ marginTop: 6 }} onClick={() => setEditReserve(true)}>Đặt mức dự trữ tối thiểu (hiện {vnd(reserve ?? 0)} đ)</button>)}
     </div>
   );
 }

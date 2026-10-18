@@ -31,11 +31,14 @@ export function viewFor(s: State, actorId: string, now = new Date()): State {
   const myProducts = new Set(s.products.filter((p) => p.lenderId === actorId).map((p) => p.id))
   const lenderRfqRecv = new Set(s.rfqs.filter((q) => ['OPEN', 'RESPONDED'].includes(q.state) && q.productIds.some((p) => myProducts.has(p))).map((q) => q.receivableId))
   const lenderAppRecv = new Set(s.applications.filter((a) => a.lenderId === actorId).map((a) => a.receivableId))
+  // bản nháp (chưa gửi) chỉ bên bán thấy — kể cả bên mua có tên trên hóa đơn
+  const unsent = (r: Receivable) => r.state === 'DRAFT' || (r.state === 'CANCELLED' && !r.sentAt && !r.confirmedAt)
+  const shared = s.receivables.filter((r) => r.sellerId === actorId || !unsent(r))
   const fullRecv = new Set(s.receivables.filter((r) => r.sellerId === actorId || r.buyerId === actorId || lenderRfqRecv.has(r.id) || lenderAppRecv.has(r.id)).map((r) => r.id))
 
   // Phần còn lại chỉ giữ các trường cần cho lịch sử thanh toán/tỷ trọng khi chấm điểm
-  const strip = (r: Receivable): Receivable => ({ ...r, invoiceSeries: '', invoiceNumber: '', description: '', fingerprint: '', docs: { xml: false, contract: false, delivery: false }, disputeReason: undefined })
-  const receivables = s.receivables.map((r) => (fullRecv.has(r.id) ? r : strip(r)))
+  const strip = (r: Receivable): Receivable => ({ ...r, invoiceSeries: '', invoiceNumber: '', description: '', fingerprint: '', docs: { xml: false, contract: false, delivery: false }, disputeReason: undefined, files: undefined, revisions: undefined })
+  const receivables = shared.map((r) => (fullRecv.has(r.id) ? r : strip(r)))
 
   const rfqs = s.rfqs
     .filter((q) => q.sellerId === actorId || q.productIds.some((p) => myProducts.has(p)))
@@ -49,7 +52,7 @@ export function viewFor(s: State, actorId: string, now = new Date()): State {
   const earlyOffers = s.earlyOffers.filter((o) => o.buyerId === actorId || recvById.get(o.receivableId)?.sellerId === actorId)
 
   const visibleEntities = new Set<string>()
-  for (const r of s.receivables) if (fullRecv.has(r.id)) { visibleEntities.add(r.code); visibleEntities.add(r.id) }
+  for (const r of shared) if (fullRecv.has(r.id)) { visibleEntities.add(r.code); visibleEntities.add(r.id) }
   for (const q of rfqs) visibleEntities.add(q.id)
   for (const a of applications) if (appFull(a)) visibleEntities.add(a.id)
   for (const o of earlyOffers) visibleEntities.add(o.id)
