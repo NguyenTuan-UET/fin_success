@@ -19,17 +19,17 @@ Phase này **không kết nối ngân hàng thật**. Phía ngân hàng và tổ
 - Sao lưu và diễn tập khôi phục; PWA (cài lên điện thoại, không lưu dữ liệu API trên thiết bị).
 
 ### Nghiệp vụ
-- **Hóa đơn / khoản phải thu:** nhập XML, ảnh/PDF qua AI OCR (người dùng xác nhận trước khi lưu) hoặc nhập tay; phát hiện bất thường (số tiền lạ, bên mua mới số tiền lớn, ngày phát hành tương lai, dồn dập…); hóa đơn điều chỉnh; hàng đợi cờ do FCC xử lý; đối chiếu thuế do FCC nhập kết quả tra cứu.
-- **Chấm điểm:** điểm nhà cung cấp theo 5C, điểm bên mua, điểm hồ sơ tài trợ. Tính ở máy chủ, lưu bất biến, cùng đầu vào cho cùng kết quả. Có xem xét lại (appeal). Phiên bản bộ chấm điểm cần hai người duyệt.
+- **Hóa đơn / khoản phải thu:** nhập XML, ảnh/PDF qua AI OCR (người dùng xác nhận trước khi lưu) hoặc nhập tay; phát hiện bất thường (số tiền lạ, bên nhập khẩu mới số tiền lớn, ngày phát hành tương lai, dồn dập…); hóa đơn điều chỉnh; hàng đợi cờ do FCC xử lý; đối chiếu thuế do FCC nhập kết quả tra cứu.
+- **Chấm điểm:** điểm đơn vị xuất khẩu theo 5C, điểm bên nhập khẩu, điểm hồ sơ tài trợ. Tính ở máy chủ, lưu bất biến, cùng đầu vào cho cùng kết quả. Có xem xét lại (appeal). Phiên bản bộ chấm điểm cần hai người duyệt.
 - **ESG:** hồ sơ và bằng chứng, AI đề xuất mức kèm trích dẫn, luật kiểm tra ở máy chủ; FCC phát hành điểm chính thức (cần MFA).
 - **Marketplace và tài trợ:** sản phẩm của tổ chức tài chính, khớp và chi phí ước tính, RFQ (tối đa 3 sản phẩm), báo giá, thẩm định, đề nghị chính thức, chấp thuận (MFA), giải ngân.
-- **Thu hồi:** thu theo phí → lãi → gốc (có lãi quá hạn), thanh toán một phần, đối soát, thanh lý tài sản bảo đảm, hoàn phần dư cho nhà cung cấp. Định giá sơ bộ tài sản bảo đảm và phân loại (i)/(ii)/(iii). Cảnh báo sớm (EWS).
-- **Thanh toán sớm từ bên mua.**
+- **Thu hồi:** thu theo phí → lãi → gốc (có lãi quá hạn), thanh toán một phần, đối soát, thanh lý tài sản bảo đảm, hoàn phần dư cho đơn vị xuất khẩu. Định giá sơ bộ tài sản bảo đảm và phân loại (i)/(ii)/(iii). Cảnh báo sớm (EWS).
+- **Thanh toán sớm từ bên nhập khẩu.**
 - **Kế toán và dòng tiền:** nhập CSV công nợ; bút toán đề xuất theo TT133/TT200 (xuất file); sao kê ngân hàng giả lập; dự báo dòng tiền 3 kịch bản, lưu kèm sai số dự báo.
 - **Phí và doanh thu:** biểu phí có phiên bản, 6 nguồn thu, hóa đơn phí in được, xuất CSV, chạy tính phí hằng tháng.
 - **Thông báo:** trong ứng dụng và email (hàng đợi có thử lại), tùy chọn theo loại thông báo.
 - **Dữ liệu công khai:** đọc tự động website do doanh nghiệp tự khai (khi FCC duyệt nguồn); FCC tra cứu thủ công nguồn nhà nước kèm đường dẫn; bản chụp có băm; doanh nghiệp khiếu nại được. Dữ liệu này chỉ để tham khảo, không đưa vào điểm.
-- **Bên mua niêm yết (vnstock):** FCC xác minh ánh xạ MST ↔ mã chứng khoán trước khi nạp; dữ liệu tự làm mới định kỳ; ý kiến kiểm toán và diện cảnh báo do FCC đối chiếu và xác nhận có nguồn (chưa xác nhận thì không được chấm).
+- **Bên nhập khẩu niêm yết (vnstock):** FCC xác minh ánh xạ MST ↔ mã chứng khoán trước khi nạp; dữ liệu tự làm mới định kỳ; ý kiến kiểm toán và diện cảnh báo do FCC đối chiếu và xác nhận có nguồn (chưa xác nhận thì không được chấm).
 - **Trợ lý AI:** chỉ diễn giải số liệu do máy chủ trả về, từ chối câu hỏi ngoài phạm vi.
 - **Quản trị (`/admin`):** chỉ số vận hành thật, duyệt tổ chức tài chính và sản phẩm, KYC, ESG, điểm tín dụng, nguồn dữ liệu, biểu phí; tài khoản kiểm toán viên chỉ đọc, mọi lần truy cập được ghi lại.
 
@@ -42,7 +42,7 @@ Phase này **không kết nối ngân hàng thật**. Phía ngân hàng và tổ
 
 **Cần đối tác hoặc quyết định bên ngoài**
 - Kết nối ngân hàng thật (để phase sau).
-- Chữ ký số từ xa và eKYC qua nhà cung cấp (đang dùng MFA + băm nội dung và FCC đối chiếu giấy tờ).
+- Chữ ký số từ xa và eKYC qua đơn vị xuất khẩu (đang dùng MFA + băm nội dung và FCC đối chiếu giấy tờ).
 - Kết nối trực tiếp phần mềm kế toán (MISA…): hiện nhập CSV.
 - Tra cứu tự động cơ quan thuế, đăng ký kinh doanh, hóa đơn điện tử, tòa án, BHXH: các cổng này dùng CAPTCHA, đăng nhập hoặc không kết nối được, nên chỉ tra cứu thủ công.
 - Giấy phép vnstock cho mục đích thương mại; pháp chế duyệt từng nguồn crawl.
@@ -58,7 +58,7 @@ Phase này **không kết nối ngân hàng thật**. Phía ngân hàng và tổ
 **Cần làm trước pilot (không thuộc mã)**
 - Quyết định AI nội bộ hay dịch vụ ngoài (hiện gọi ollama.com, chứng từ đi ra ngoài khi dùng AI đọc chứng từ).
 - Hiệu chỉnh tham số chấm điểm bởi chuyên gia tín dụng (hiện là giá trị khởi tạo, chưa thẩm định).
-- Biểu phí ban đầu, nhà cung cấp email (SMTP).
+- Biểu phí ban đầu, đơn vị xuất khẩu email (SMTP).
 - Hạ tầng có TLS, quản lý khóa bí mật, cảnh báo job, neo băm nhật ký ra nơi lưu độc lập.
 - Đổi khóa Ollama đã lộ trong quá trình phát triển.
 
@@ -91,32 +91,33 @@ cloudflared tunnel --url http://127.0.0.1:8787     # in ra địa chỉ https://
 Trên Vercel đặt biến `FCC_API_URL` bằng địa chỉ tunnel và Redeploy. Địa chỉ tunnel miễn phí **đổi mỗi lần chạy lại**; hệ thống chỉ truy cập được khi máy bật và cả hai tiến trình đang chạy. Đặt `APP_URL` trong `server/.env.production` bằng địa chỉ Vercel. Không nhập dữ liệu doanh nghiệp thật khi chạy kiểu này.
 
 ### 3.2. Đăng nhập, MFA, thành viên
-1. Vào `/login` → tab **Đăng ký tổ chức** để tạo tổ chức (nhà cung cấp, bên mua hoặc tổ chức tài chính) kèm tài khoản chủ tổ chức. Tài khoản quản trị FCC được tạo từ `ADMIN_EMAIL` và `ADMIN_PASSWORD` khi khởi động.
+1. Vào `/login` → tab **Đăng ký tổ chức** để tạo tổ chức (đơn vị xuất khẩu, bên nhập khẩu hoặc tổ chức tài chính) kèm tài khoản chủ tổ chức. Tài khoản quản trị FCC được tạo từ `ADMIN_EMAIL` và `ADMIN_PASSWORD` khi khởi động.
 2. Vào `/security` để bật **MFA** (quét mã bằng app Authenticator). Các hành động nhạy cảm yêu cầu nhập mã lại: xác nhận hoặc tranh chấp hóa đơn, gửi RFQ, chọn báo giá, chấp thuận đề nghị, chia sẻ dữ liệu, giải ngân, ghi nhận tiền về, phát hành điểm.
 3. Ở **Cài đặt**: sửa hồ sơ tổ chức, nộp KYC, mời thành viên (email + vai trò), đổi hoặc thu hồi vai trò, chọn loại thông báo gửi email.
 
-Vai trò: nhà cung cấp và bên mua có *Chủ tổ chức*, *Người phê duyệt*, *Người lập hồ sơ*; tổ chức tài chính có *Chuyên viên thẩm định*, *Quản lý sản phẩm*; FCC có *Quản trị*, *Thẩm định tín dụng/ESG*, *Vận hành*, *Chủ mô hình chấm điểm*, *Kiểm toán (chỉ đọc)*. Người lập hồ sơ không được phê duyệt hay cam kết.
+Vai trò: đơn vị xuất khẩu và bên nhập khẩu có *Chủ tổ chức*, *Người phê duyệt*, *Người lập hồ sơ*; tổ chức tài chính có *Chuyên viên thẩm định*, *Quản lý sản phẩm*; FCC có *Quản trị*, *Thẩm định tín dụng/ESG*, *Vận hành*, *Chủ mô hình chấm điểm*, *Kiểm toán (chỉ đọc)*. Người lập hồ sơ không được phê duyệt hay cam kết.
 
-### 3.3. Nhà cung cấp
+### 3.3. Đơn vị xuất khẩu
 1. **Cài đặt:** khai đủ hồ sơ (năm thành lập, lao động, ngành…), nhập website nếu muốn FCC đọc chứng nhận công bố, nộp KYC.
-2. **Hóa đơn** → thêm khoản phải thu: tải XML hoặc ảnh/PDF để AI trích xuất (kiểm tra lại số liệu rồi mới lưu), hoặc nhập tay; đính chứng từ gốc (hóa đơn, hợp đồng, biên bản giao hàng). Gửi cho bên mua xác nhận. Nếu bị tranh chấp, sửa và gửi lại.
-3. **Marketplace:** xem danh sách sản phẩm phù hợp với chi phí ước tính; chọn tối đa 3 sản phẩm để gửi **RFQ**; so sánh báo giá và **chọn báo giá** (MFA).
-4. **Hồ sơ tài trợ:** theo dõi thẩm định; khi có đề nghị chính thức thì **chấp thuận** (MFA) trước hạn.
-5. **Giải ngân & thu hồi:** xem tiền về, thu theo phí → lãi → gốc, phần dư được hoàn.
-6. **Chấm điểm & ESG:** xem điểm 5C, mức xếp hạng và lý do; nếu không đồng ý thì gửi *yêu cầu xem xét lại*. Khai hồ sơ ESG và tải bằng chứng; điểm chính thức do FCC phát hành.
-7. **Kế toán:** nhập CSV công nợ, xem bút toán đề xuất, sao kê giả lập và dự báo dòng tiền.
-8. **Dữ liệu công khai:** xem những gì FCC có về doanh nghiệp bạn; nếu sai thì bấm **Khiếu nại** và nêu lý do.
+2. **Hóa đơn** → thêm khoản phải thu: tải XML hoặc ảnh/PDF để AI trích xuất (kiểm tra lại số liệu rồi mới lưu), hoặc nhập tay; đính chứng từ gốc (hóa đơn, hợp đồng ngoại thương, chứng từ giao hàng). Gửi cho bên nhập khẩu xác nhận. Nếu bị tranh chấp, sửa và gửi lại.
+3. **Chứng từ hải quan:** mở chi tiết hóa đơn → mục *Chứng từ hải quan*: chọn loại (tờ khai xuất khẩu, vận đơn, phiếu đóng gói, C/O…), tải tệp và khai số tờ khai, ngày, tình trạng thông quan. Chỉ thêm, không gỡ. Bên nhập khẩu thêm tờ khai nhập khẩu / xác nhận nhận hàng ở cùng mục (sau khi hóa đơn được gửi). Cần có tờ khai xuất khẩu đã thông quan trước khi gửi RFQ (hằng `CUSTOMS_GATE` trong `packages/domain/src/customs.ts`: `warn` cảnh báo, `block` chặn). FCC chỉ ghi nhận thông tin bạn khai, chưa đối chiếu với cơ quan hải quan.
+4. **Marketplace:** xem danh sách sản phẩm phù hợp với chi phí ước tính; chọn tối đa 3 sản phẩm để gửi **RFQ**; so sánh báo giá và **chọn báo giá** (MFA).
+5. **Hồ sơ tài trợ:** theo dõi thẩm định; khi có đề nghị chính thức thì **chấp thuận** (MFA) trước hạn.
+6. **Giải ngân & thu hồi:** xem tiền về, thu theo phí → lãi → gốc, phần dư được hoàn.
+7. **Chấm điểm & ESG:** xem điểm 5C, mức xếp hạng và lý do; nếu không đồng ý thì gửi *yêu cầu xem xét lại*. Khai hồ sơ ESG và tải bằng chứng; điểm chính thức do FCC phát hành.
+8. **Kế toán:** nhập CSV công nợ, xem bút toán đề xuất, sao kê giả lập và dự báo dòng tiền.
+9. **Dữ liệu công khai:** xem những gì FCC có về doanh nghiệp bạn; nếu sai thì bấm **Khiếu nại** và nêu lý do.
 
-### 3.4. Bên mua
-- **Xác nhận hoặc tranh chấp** hóa đơn nhà cung cấp gửi (MFA).
-- **Ghi nhận đã thanh toán:** nhập số tiền, ngày, mã giao dịch. Việc này chỉ là bên mua tự báo; hồ sơ chỉ tất toán khi tổ chức tài chính xác nhận tiền về.
-- **Chương trình thanh toán sớm:** tạo đề nghị cho nhà cung cấp, ghi nhận khi đã trả.
-- Bên mua niêm yết khai mã chứng khoán ở Cài đặt; sau khi FCC xác minh, máy chủ tự lấy dữ liệu từ vnstock định kỳ; bấm **Làm mới ngay** ở Cài đặt để lấy ngay.
+### 3.4. Bên nhập khẩu
+- **Xác nhận hoặc tranh chấp** hóa đơn đơn vị xuất khẩu gửi (MFA).
+- **Ghi nhận đã thanh toán:** nhập số tiền, ngày, mã giao dịch. Việc này chỉ là bên nhập khẩu tự báo; hồ sơ chỉ tất toán khi tổ chức tài chính xác nhận tiền về.
+- **Chương trình thanh toán sớm:** tạo đề nghị cho đơn vị xuất khẩu, ghi nhận khi đã trả.
+- Bên nhập khẩu niêm yết khai mã chứng khoán ở Cài đặt; sau khi FCC xác minh, máy chủ tự lấy dữ liệu từ vnstock định kỳ; bấm **Làm mới ngay** ở Cài đặt để lấy ngay.
 
 ### 3.5. Tổ chức tài chính
 1. Đăng ký tổ chức rồi **chờ FCC xác minh** (chưa xác minh thì chưa đăng sản phẩm hoặc báo giá được).
 2. **Sản phẩm:** tạo và sửa sản phẩm (điều kiện, biểu giá, SLA, ưu đãi xanh); sản phẩm mới hoặc sửa phải được FCC duyệt.
-3. **Thẩm định:** *RFQ chờ báo giá* → trả báo giá (lãi, % ứng) hoặc từ chối. *Hàng đợi hồ sơ* → bắt đầu thẩm định, xem điểm hồ sơ, điểm nhà cung cấp, điểm bên mua, chứng từ gốc, tài sản bảo đảm khai báo và dữ liệu công khai được chia sẻ → ra đề nghị chính thức hoặc từ chối.
+3. **Thẩm định:** *RFQ chờ báo giá* → trả báo giá (lãi, % ứng) hoặc từ chối. *Hàng đợi hồ sơ* → bắt đầu thẩm định, xem điểm hồ sơ, điểm đơn vị xuất khẩu, điểm bên nhập khẩu, chứng từ gốc, tài sản bảo đảm khai báo và dữ liệu công khai được chia sẻ → ra đề nghị chính thức hoặc từ chối.
 4. **Giải ngân:** *Ghi nhận giải ngân* (MFA). **Thu hồi:** nhập số tiền về (đúng số còn phải thu để tất toán), có thể chọn loại *thanh lý tài sản bảo đảm*; nếu có phần dư thì ghi nhận *đã hoàn*.
 5. **Giám sát:** cảnh báo sớm (EWS) theo luật.
 6. **Cài đặt → tích hợp:** tạo **khóa tích hợp** theo phạm vi và đặt địa chỉ nhận webhook. Với API: tài liệu OpenAPI ở `/v1/openapi.json`; gọi `/v1/partner/*` với `Authorization: Bearer fcck_...`; webhook gửi tới bạn có header `x-fcc-signature` dạng `t=<unix>,v1=<HMAC>`, sai lệch thời gian quá ±5 phút bị từ chối.
@@ -127,7 +128,7 @@ Vai trò: nhà cung cấp và bên mua có *Chủ tổ chức*, *Người phê d
 - **Cờ hóa đơn:** xử lý cờ bất thường, ghi kết quả đối chiếu thuế (nhập thủ công).
 - **Chấm điểm:** phát hành điểm chính thức (MFA); xử lý yêu cầu xem xét lại (chấp nhận thì chấm lại bằng dữ liệu hiện tại); đề xuất và duyệt phiên bản bộ chấm điểm (cần hai người khác nhau).
 - **Thẩm định ESG** (`/admin/esg`): thẩm định bằng chứng và phát hành điểm ESG.
-- **Nguồn dữ liệu công khai** (`/admin/sources`): duyệt hoặc chặn từng nguồn (cần MFA và ghi căn cứ); xem hàng đợi crawl và việc tra cứu thủ công; ghi kết quả tra cứu kèm URL; xử lý khiếu nại (chấp nhận thì gỡ bản ghi, giữ nguyên thì ghi lý do); xác minh mã chứng khoán của bên mua; nhập ý kiến kiểm toán và diện giao dịch.
+- **Nguồn dữ liệu công khai** (`/admin/sources`): duyệt hoặc chặn từng nguồn (cần MFA và ghi căn cứ); xem hàng đợi crawl và việc tra cứu thủ công; ghi kết quả tra cứu kèm URL; xử lý khiếu nại (chấp nhận thì gỡ bản ghi, giữ nguyên thì ghi lý do); xác minh mã chứng khoán của bên nhập khẩu; nhập ý kiến kiểm toán và diện giao dịch.
 - **Biểu phí và doanh thu:** tạo biểu phí mới (có ngày hiệu lực, không sửa biểu cũ), xem doanh thu theo 6 nguồn, chạy tính phí hằng tháng, đánh dấu đã thanh toán.
 - **Nhật ký:** xem, lọc theo thời gian, kiểm tra toàn vẹn chuỗi băm. Tài khoản kiểm toán viên chỉ đọc và mọi lần truy cập đều được ghi lại.
 
@@ -140,8 +141,8 @@ Vai trò: nhà cung cấp và bên mua có *Chủ tổ chức*, *Người phê d
 ### 3.8. Thử cùng ngân hàng giả lập
 1. Dừng backend, cấp phát: `cd server && npx tsx scripts/provision-sim-bank.ts` (ghi `sim-bank/config.local.json`).
 2. Chạy lại backend, rồi `cd sim-bank && npm install && npm start` (bảng điều khiển ở `http://127.0.0.1:8790`).
-3. Nhà cung cấp tạo hóa đơn → bên mua xác nhận → gửi RFQ → ngân hàng giả lập tự báo giá theo hạng → chọn báo giá → ngân hàng ra đề nghị → chấp thuận → giải ngân sau khoảng 30 giây.
-4. Trên bảng điều khiển có thể ép kịch bản cho từng hồ sơ: từ chối, trễ giải ngân, bên mua trả một phần, không có tiền về, gửi lại giải ngân trùng hoặc sai chữ ký.
+3. Đơn vị xuất khẩu tạo hóa đơn → bên nhập khẩu xác nhận → gửi RFQ → ngân hàng giả lập tự báo giá theo hạng → chọn báo giá → ngân hàng ra đề nghị → chấp thuận → giải ngân sau khoảng 30 giây.
+4. Trên bảng điều khiển có thể ép kịch bản cho từng hồ sơ: từ chối, trễ giải ngân, bên nhập khẩu trả một phần, không có tiền về, gửi lại giải ngân trùng hoặc sai chữ ký.
 
 Xem chi tiết ở [sim-bank/README.md](../sim-bank/README.md).
 

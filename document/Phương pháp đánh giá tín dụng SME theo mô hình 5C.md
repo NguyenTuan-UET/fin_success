@@ -1,3 +1,5 @@
+> **Ghi chú (23/10/2026):** tài liệu này là báo cáo lịch sử, viết trước khi hệ thống chuyển sang bối cảnh xuất nhập khẩu. Các từ “nhà cung cấp”, “bên mua”, “SME” trong tài liệu tương ứng với “đơn vị xuất khẩu”, “bên nhập khẩu”, “doanh nghiệp xuất khẩu” trên giao diện hiện nay (mã nội bộ vẫn là supplier/buyer). Nội dung không được sửa.
+
 # **Phương pháp đánh giá tín dụng SME theo mô hình 5C**
 
 *5C Credit Assessment Model for SME*

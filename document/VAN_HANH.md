@@ -42,6 +42,7 @@ Chạy `backup.sh` hằng ngày (cron/lịch của nền tảng) và `restore-ch
 - `audit_events` chỉ thêm; mỗi sự kiện chứa băm của sự kiện trước. `GET /v1/audit-events/integrity` (FCC) và `verify-db.ts` kiểm tra chuỗi; sửa một dòng bất kỳ thì báo đúng vị trí.
 - Xuất theo khoảng thời gian: `GET /v1/audit-events?from=&to=` (cursor).
 - Tài khoản `fcc_auditor` chỉ đọc; mọi lần truy cập của họ được ghi "Kiểm toán viên truy cập".
+- Bản ghi nhật ký cũ không được sửa (chuỗi băm) nên vẫn ghi “nhà cung cấp”, “bên mua”; chỉ bản ghi mới dùng “đơn vị xuất khẩu”, “bên nhập khẩu”.
 - Khuyến nghị: mỗi ngày gửi băm cuối chuỗi tới một nơi lưu độc lập (hộp thư kiểm toán hoặc kho khóa ghi) để chống sửa toàn bộ chuỗi.
 
 ## 5. Theo dõi và cảnh báo
@@ -71,6 +72,6 @@ KPI vận hành (người dùng, hóa đơn, giá trị tài trợ, tỷ lệ ph
 1. **AI nội bộ hay dịch vụ ngoài.** Hiện gọi `ollama.com` (mô hình văn bản và thị giác). Chứng từ doanh nghiệp (BCTC, hóa đơn, CIC) đi ra ngoài khi dùng AI đọc chứng từ. Cần ý kiến pháp chế theo Luật Bảo vệ dữ liệu cá nhân 91/2025/QH15: hoặc tự vận hành mô hình, hoặc giữ dịch vụ ngoài kèm hợp đồng xử lý dữ liệu và thông báo rõ cho người dùng. Trong lúc chờ, AI luôn cần người xác nhận trước khi dùng số liệu.
 2. **Giấy phép vnstock** cho mục đích thương mại; song song khảo sát nguồn công bố thông tin của sở giao dịch.
 3. **Pháp chế duyệt từng nguồn crawl**, thời gian lưu bản chụp.
-4. **Nhà cung cấp chữ ký số từ xa và eKYC**; **SMTP** của tên miền công ty.
+4. **Đơn vị xuất khẩu chữ ký số từ xa và eKYC**; **SMTP** của tên miền công ty.
 5. **Biểu phí ban đầu** (hệ thống chạy được với biểu phí 0 đồng).
 6. **Hiệu chỉnh tham số chấm điểm** bởi chuyên gia tín dụng; đổi tham số cần hai người duyệt.

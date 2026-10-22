@@ -1,3 +1,5 @@
+> **Ghi chú (23/10/2026):** tài liệu này là báo cáo lịch sử, viết trước khi hệ thống chuyển sang bối cảnh xuất nhập khẩu. Các từ “nhà cung cấp”, “bên mua”, “SME” trong tài liệu tương ứng với “đơn vị xuất khẩu”, “bên nhập khẩu”, “doanh nghiệp xuất khẩu” trên giao diện hiện nay (mã nội bộ vẫn là supplier/buyer). Nội dung không được sửa.
+
 # **KHUNG CHẤM ĐIỂM ESG CHO DOANH NGHIỆP SMEs VAY VỐN**
 
 Phát triển theo nguyên tắc đánh giá vấn đề ESG trọng yếu theo ngành của MSCI ESG Ratings 

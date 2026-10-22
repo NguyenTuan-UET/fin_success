@@ -1,10 +1,10 @@
 # FCC — Hướng dẫn sử dụng
 
-**FCC (Fast Cash Connect)** là nền tảng giúp **nhà cung cấp** (doanh nghiệp nhỏ và vừa) nhận tiền sớm cho hóa đơn đã giao hàng. Khoản tiền do **tổ chức tài chính** ứng trước, căn cứ vào uy tín thanh toán của **bên mua**. FCC kết nối các bên, chấm điểm và theo dõi quá trình tài trợ.
+**FCC (Fast Cash Connect)** là nền tảng giúp **đơn vị xuất khẩu** (doanh nghiệp nhỏ và vừa) nhận tiền sớm cho hóa đơn đã giao hàng. Khoản tiền do **tổ chức tài chính** ứng trước, căn cứ vào uy tín thanh toán của **bên nhập khẩu**. FCC kết nối các bên, chấm điểm và theo dõi quá trình tài trợ.
 
 **FCC không giữ tiền, không cho vay và không quyết định tín dụng.** Hạn mức, lãi suất, phê duyệt và giải ngân luôn do tổ chức tài chính quyết định. Điểm số và xếp hạng của FCC chỉ để **tham khảo**.
 
-Tài liệu này dành cho người dùng của ba nhóm: **nhà cung cấp**, **bên mua** và **tổ chức tài chính**, kèm phần ngắn cho nhân sự FCC.
+Tài liệu này dành cho người dùng của ba nhóm: **đơn vị xuất khẩu**, **bên nhập khẩu** và **tổ chức tài chính**, kèm phần ngắn cho nhân sự FCC.
 
 ---
 
@@ -13,7 +13,7 @@ Tài liệu này dành cho người dùng của ba nhóm: **nhà cung cấp**, *
 ### 1.1. Đăng ký và đăng nhập
 1. Mở địa chỉ FCC bằng trình duyệt (Chrome hoặc Edge, máy tính hoặc điện thoại).
 2. Chọn **Đăng ký tổ chức** và điền thông tin:
-   - loại tổ chức: *nhà cung cấp*, *bên mua* hoặc *tổ chức tài chính*;
+   - loại tổ chức: *đơn vị xuất khẩu*, *bên nhập khẩu* hoặc *tổ chức tài chính*;
    - tên, **mã số thuế** (10 hoặc 13 chữ số, mỗi mã chỉ đăng ký một lần), ngành nghề, tỉnh/thành, năm thành lập, số lao động;
    - tài khoản của chủ tổ chức: họ tên, chức danh, email, mật khẩu dài và khó đoán.
 3. Đăng nhập bằng email và mật khẩu. Quên mật khẩu thì bấm **Quên mật khẩu** để nhận liên kết đặt lại qua email.
@@ -24,8 +24,8 @@ Ban tổ chức cấp sẵn **4 tài khoản**, mỗi bên một tài khoản to
 | Bên | Vai trò | Email |
 | --- | --- | --- |
 | FCC | Quản trị | admin@fcc.com |
-| Nhà cung cấp | Chủ tổ chức | supplier@fcc.com |
-| Bên mua | Chủ tổ chức | buyer@fcc.com |
+| Đơn vị xuất khẩu | Chủ tổ chức | supplier@fcc.com |
+| Bên nhập khẩu | Chủ tổ chức | buyer@fcc.com |
 | Tổ chức tài chính | Chủ tổ chức | lender@fcc.com |
 
 Tổ chức tài chính chỉ đăng sản phẩm và báo giá được sau khi FCC xác minh.
@@ -45,8 +45,8 @@ Chủ tổ chức vào **Cài đặt → Thành viên & vai trò**, nhập email
 | Vai trò | Làm được |
 | --- | --- |
 | **Chủ tổ chức** | Toàn quyền, kể cả sửa hồ sơ tổ chức, mời và phân quyền thành viên |
-| **Người phê duyệt** (nhà cung cấp, bên mua) | Xác nhận, cam kết, chia sẻ dữ liệu |
-| **Người lập hồ sơ** (nhà cung cấp, bên mua) | Nhập hóa đơn và hồ sơ; không được phê duyệt hay cam kết |
+| **Người phê duyệt** (đơn vị xuất khẩu, bên nhập khẩu) | Xác nhận, cam kết, chia sẻ dữ liệu |
+| **Người lập hồ sơ** (đơn vị xuất khẩu, bên nhập khẩu) | Nhập hóa đơn và hồ sơ; không được phê duyệt hay cam kết |
 | **Chuyên viên thẩm định** (tổ chức tài chính) | Báo giá, thẩm định, đề nghị, giải ngân, thu hồi |
 | **Quản lý sản phẩm** (tổ chức tài chính) | Đăng và sửa sản phẩm |
 
@@ -60,7 +60,7 @@ Chủ tổ chức vào **Cài đặt → Thành viên & vai trò**, nhập email
 
 ---
 
-## 2. Dành cho nhà cung cấp
+## 2. Dành cho đơn vị xuất khẩu
 
 ### 2.1. Hoàn thiện hồ sơ (làm một lần)
 1. **Cài đặt → Hồ sơ tổ chức**: bổ sung năm thành lập, số lao động, ngành nghề, tỉnh/thành, (tùy chọn) website. Bấm **Lưu hồ sơ**.
@@ -69,20 +69,20 @@ Chủ tổ chức vào **Cài đặt → Thành viên & vai trò**, nhập email
 ### 2.2. Tạo khoản phải thu (hóa đơn)
 1. Vào **Hóa đơn → Tải hóa đơn OCR/AI**.
 2. Chọn một trong ba cách: tải **tệp XML** của hóa đơn, tải **ảnh/PDF** để AI đọc, hoặc **Nhập tay**.
-3. **Kiểm tra kỹ** các số AI đọc được (ký hiệu, số hóa đơn, ngày, bên mua, số tiền). AI có thể đọc sai; sửa rồi mới lưu.
+3. **Kiểm tra kỹ** các số AI đọc được (ký hiệu, số hóa đơn, ngày, bên nhập khẩu, số tiền). AI có thể đọc sai; sửa rồi mới lưu.
 4. Tải thêm chứng từ gốc: hợp đồng, biên bản giao hàng. Hồ sơ có đủ chứng từ thì được thẩm định thuận lợi hơn.
-5. Bấm **Gửi người mua xác nhận**.
-6. Nếu bên mua **tranh chấp**, mở lại hóa đơn, bấm **Điều chỉnh & gửi lại**. Hóa đơn nháp chưa gửi có thể **Hủy hóa đơn nháp**.
+5. Bấm **Gửi bên nhập khẩu xác nhận**.
+6. Nếu bên nhập khẩu **tranh chấp**, mở lại hóa đơn, bấm **Điều chỉnh & gửi lại**. Hóa đơn nháp chưa gửi có thể **Hủy hóa đơn nháp**.
 
 Hệ thống có thể gắn **cờ** cho hóa đơn có dấu hiệu bất thường (số tiền lạ, hóa đơn trùng, thiếu chứng từ…) để nhân sự FCC xem xét. Cờ không tự động từ chối hóa đơn. Hóa đơn trùng với hóa đơn đã có sẽ bị từ chối.
 
 ### 2.3. Xin tài trợ
-1. Khi bên mua đã xác nhận, vào **Marketplace**.
+1. Khi bên nhập khẩu đã xác nhận, vào **Marketplace**.
 2. Xem các sản phẩm phù hợp kèm **chi phí ước tính**. Chọn **tối đa 3 sản phẩm**.
 3. Bấm **Gửi yêu cầu báo giá (n/3)**. Hệ thống chỉ chia sẻ gói tóm tắt (điểm tín dụng, ESG) cho các tổ chức bạn chọn, trong 5 ngày.
 4. Khi có báo giá, so sánh rồi bấm **Chọn & gửi hồ sơ** ở báo giá phù hợp (cần MFA). Quyền xem của các bên còn lại bị thu hồi.
 5. Theo dõi ở **Hồ sơ tài trợ**. Khi tổ chức tài chính ra **đề nghị chính thức**, vào **Giải ngân & thu hồi** và bấm **Chấp thuận đề nghị (cần MFA)** **trước hạn**. Quá hạn thì đề nghị tự rút lại.
-6. Sau khi giải ngân, màn hình **Giải ngân & thu hồi** cho thấy tiền về và tiến độ thu hồi. Khi bên mua trả tiền, số tiền được trừ theo thứ tự **phí → lãi → gốc**. Nếu trả dư, phần dư được hoàn cho bạn. Khi đủ, hồ sơ chuyển sang **Đã tất toán**.
+6. Sau khi giải ngân, màn hình **Giải ngân & thu hồi** cho thấy tiền về và tiến độ thu hồi. Khi bên nhập khẩu trả tiền, số tiền được trừ theo thứ tự **phí → lãi → gốc**. Nếu trả dư, phần dư được hoàn cho bạn. Khi đủ, hồ sơ chuyển sang **Đã tất toán**.
 
 ### 2.4. Điểm tín dụng
 - Ở **Hồ sơ tài trợ** (phần chấm điểm): nhập **BCTC** từng năm rồi bấm **Lưu BCTC**, khai tài sản bảo đảm (nếu có), bấm **Chấm điểm & lưu**.
@@ -108,15 +108,15 @@ Vào **Kế toán**:
 
 ---
 
-## 3. Dành cho bên mua
+## 3. Dành cho bên nhập khẩu
 
-1. **Xác nhận hóa đơn**: danh sách hóa đơn nhà cung cấp gửi cho bạn. Với mỗi hóa đơn, bấm **Xác nhận** (cần MFA), hoặc tranh chấp và nêu lý do. Xác nhận là cam kết khoản phải trả nên hãy đối chiếu hàng hóa, số tiền và hạn thanh toán.
+1. **Xác nhận hóa đơn**: danh sách hóa đơn đơn vị xuất khẩu gửi cho bạn. Với mỗi hóa đơn, bấm **Xác nhận** (cần MFA), hoặc tranh chấp và nêu lý do. Xác nhận là cam kết khoản phải trả nên hãy đối chiếu hàng hóa, số tiền và hạn thanh toán.
 2. **Ghi nhận thanh toán**: khi đã trả tiền, bấm **Ghi nhận đã thanh toán**, nhập số tiền, ngày, mã giao dịch rồi bấm **Ghi nhận**. Có thể trả một phần và ghi nhận nhiều lần.
-   - Đây là bên mua **tự báo**. Hồ sơ chỉ **tất toán** khi tổ chức tài chính xác nhận đã nhận tiền.
-3. **Thanh toán sớm**: bấm **Đề nghị trả sớm** để đề nghị với nhà cung cấp, rồi **Ghi nhận đã trả** khi đã trả.
-4. **Bên mua niêm yết chứng khoán**: ở **Cài đặt**, điền **mã chứng khoán**. Nhờ nhân sự FCC **xác minh** mã thuộc đúng mã số thuế của bạn. Sau đó vào phần chấm điểm và nạp dữ liệu, bạn sẽ thấy báo cáo tài chính công bố và điểm bên mua. Nếu bị từ chối: FCC chưa xác minh, hoặc mã khác với mã đã khai.
-5. **ESG chuỗi cung ứng** và **Kế toán** dùng tương tự nhà cung cấp.
-6. Điểm bên mua ảnh hưởng đến khả năng nhà cung cấp của bạn được tài trợ. Thanh toán đúng hạn giúp cải thiện điểm hành vi thanh toán.
+   - Đây là bên nhập khẩu **tự báo**. Hồ sơ chỉ **tất toán** khi tổ chức tài chính xác nhận đã nhận tiền.
+3. **Thanh toán sớm**: bấm **Đề nghị trả sớm** để đề nghị với đơn vị xuất khẩu, rồi **Ghi nhận đã trả** khi đã trả.
+4. **Bên nhập khẩu niêm yết chứng khoán**: ở **Cài đặt**, điền **mã chứng khoán**. Nhờ nhân sự FCC **xác minh** mã thuộc đúng mã số thuế của bạn. Sau đó vào phần chấm điểm và nạp dữ liệu, bạn sẽ thấy báo cáo tài chính công bố và điểm bên nhập khẩu. Nếu bị từ chối: FCC chưa xác minh, hoặc mã khác với mã đã khai.
+5. **ESG chuỗi cung ứng** và **Kế toán** dùng tương tự đơn vị xuất khẩu.
+6. Điểm bên nhập khẩu ảnh hưởng đến khả năng đơn vị xuất khẩu của bạn được tài trợ. Thanh toán đúng hạn giúp cải thiện điểm hành vi thanh toán.
 
 ---
 
@@ -126,10 +126,10 @@ Vào **Kế toán**:
 2. **Sản phẩm** (Marketplace): điền loại sản phẩm, điều kiện, biểu phí, thời gian xử lý, ưu đãi xanh (nếu có); bấm **Lưu nháp** rồi **Gửi FCC duyệt**. Sản phẩm mới hoặc đã sửa phải được FCC duyệt mới hiển thị. Có thể **Tạm dừng** và **Mở lại**.
 3. **Thẩm định hồ sơ:**
    - *RFQ chờ báo giá*: bấm **Gửi báo giá** (lãi suất, % ứng trước) hoặc **Từ chối**.
-   - *Hàng đợi hồ sơ*: bấm **Bắt đầu thẩm định**. Xem điểm hồ sơ, điểm nhà cung cấp, điểm bên mua, chứng từ gốc, tài sản bảo đảm, dữ liệu công khai (nếu được chia sẻ). Sau đó bấm **Gửi đề nghị tài trợ** hoặc **Từ chối** (kèm lý do).
+   - *Hàng đợi hồ sơ*: bấm **Bắt đầu thẩm định**. Xem điểm hồ sơ, điểm đơn vị xuất khẩu, điểm bên nhập khẩu, chứng từ gốc, tài sản bảo đảm, dữ liệu công khai (nếu được chia sẻ). Sau đó bấm **Gửi đề nghị tài trợ** hoặc **Từ chối** (kèm lý do).
    - Điểm của FCC chỉ để tham khảo; bạn tự thẩm định và ra quyết định.
-4. Khi nhà cung cấp chấp thuận, bấm **Ghi nhận giải ngân** (cần MFA).
-5. **Thu hồi**: ở ô **Số tiền về**, nhập đúng số còn phải thu để tất toán (hệ thống gợi ý số này), chọn loại *Thanh toán của bên mua* hoặc *Thanh lý tài sản bảo đảm*, bấm **Ghi nhận tiền về (cần MFA)**. Nếu có phần dư, bấm **Ghi nhận đã hoàn** sau khi hoàn cho nhà cung cấp.
+4. Khi đơn vị xuất khẩu chấp thuận, bấm **Ghi nhận giải ngân** (cần MFA).
+5. **Thu hồi**: ở ô **Số tiền về**, nhập đúng số còn phải thu để tất toán (hệ thống gợi ý số này), chọn loại *Thanh toán của bên nhập khẩu* hoặc *Thanh lý tài sản bảo đảm*, bấm **Ghi nhận tiền về (cần MFA)**. Nếu có phần dư, bấm **Ghi nhận đã hoàn** sau khi hoàn cho đơn vị xuất khẩu.
 6. **Giám sát & EWS**: các cảnh báo sớm theo từng hồ sơ (ví dụ chậm thanh toán, thay đổi điểm).
 7. Nếu cần kết nối hệ thống của tổ chức, liên hệ FCC để được cấp khóa tích hợp và tài liệu kỹ thuật.
 
@@ -148,7 +148,7 @@ Vào mục **Quản trị**. Menu gồm: **Việc cần xử lý**, **Thành vi�
 | Mời thành viên, đổi vai trò (cần MFA), xem lịch sử thay đổi và ma trận quyền | Thành viên & quyền |
 | Tra cứu tổ chức đã đăng ký, trạng thái xác minh và KYC | Tổ chức |
 | Thẩm định và **Phát hành chính thức** điểm ESG (cần MFA) | Thẩm định ESG |
-| Duyệt nguồn dữ liệu, ghi kết quả tra cứu thủ công, xử lý khiếu nại, xác minh mã chứng khoán của bên mua, nhập ý kiến kiểm toán | Nguồn dữ liệu công khai |
+| Duyệt nguồn dữ liệu, ghi kết quả tra cứu thủ công, xử lý khiếu nại, xác minh mã chứng khoán của bên nhập khẩu, nhập ý kiến kiểm toán | Nguồn dữ liệu công khai |
 | Biểu phí (cần MFA), doanh thu theo nguồn thu | Doanh thu & biểu phí |
 | Xem nhật ký, kiểm tra chuỗi băm | Nhật ký kiểm toán |
 
@@ -159,20 +159,20 @@ Nhân sự FCC không xem chứng từ hay hồ sơ tài trợ chi tiết của 
 ## 6. Quy trình tài trợ tiêu chuẩn
 
 ```
-Nhà cung cấp tạo hóa đơn → Bên mua xác nhận → Nhà cung cấp gửi yêu cầu báo giá
-→ Tổ chức tài chính báo giá → Nhà cung cấp chọn báo giá → Thẩm định → Đề nghị chính thức
-→ Nhà cung cấp chấp thuận → Giải ngân → Bên mua thanh toán → Thu hồi (phí → lãi → gốc) → Tất toán / hoàn phần dư
+Đơn vị xuất khẩu tạo hóa đơn → Bên nhập khẩu xác nhận → Đơn vị xuất khẩu gửi yêu cầu báo giá
+→ Tổ chức tài chính báo giá → Đơn vị xuất khẩu chọn báo giá → Thẩm định → Đề nghị chính thức
+→ Đơn vị xuất khẩu chấp thuận → Giải ngân → Bên nhập khẩu thanh toán → Thu hồi (phí → lãi → gốc) → Tất toán / hoàn phần dư
 ```
 
 | Bước | Ai làm | Cần MFA |
 | --- | --- | --- |
-| Tạo hóa đơn, gửi bên mua | Nhà cung cấp | Không |
-| Xác nhận hóa đơn | Bên mua | Có |
-| Gửi yêu cầu báo giá, chọn báo giá | Nhà cung cấp | Có |
+| Tạo hóa đơn, gửi bên nhập khẩu | Đơn vị xuất khẩu | Không |
+| Xác nhận hóa đơn | Bên nhập khẩu | Có |
+| Gửi yêu cầu báo giá, chọn báo giá | Đơn vị xuất khẩu | Có |
 | Báo giá, thẩm định, đề nghị | Tổ chức tài chính | Không |
-| Chấp thuận đề nghị | Nhà cung cấp | Có |
+| Chấp thuận đề nghị | Đơn vị xuất khẩu | Có |
 | Giải ngân | Tổ chức tài chính | Có |
-| Bên mua báo đã thanh toán | Bên mua | Có |
+| Bên nhập khẩu báo đã thanh toán | Bên nhập khẩu | Có |
 | Ghi nhận tiền về, hoàn phần dư | Tổ chức tài chính | Có |
 
 Thời hạn cần nhớ: yêu cầu báo giá có hiệu lực **5 ngày**; đề nghị chính thức phải được chấp thuận **trước hạn ghi trên đề nghị**; hóa đơn quá hạn chưa thanh toán được đánh dấu quá hạn và tính lãi quá hạn theo điều kiện sản phẩm.
@@ -187,8 +187,8 @@ Thời hạn cần nhớ: yêu cầu báo giá có hiệu lực **5 ngày**; đ�
 | Báo "cần MFA" hoặc mã sai | Bật MFA ở **Bảo mật** (mục 1.2). Mã sai thì chờ mã mới (mỗi mã dùng một lần) |
 | Mất điện thoại có ứng dụng xác thực | Liên hệ hỗ trợ để được xác minh danh tính và đặt lại |
 | Tổ chức tài chính không đăng được sản phẩm | Chờ FCC xác minh tổ chức; sản phẩm mới cũng phải được FCC duyệt |
-| Điểm bên mua báo "Thiếu BCTC" | Chưa có báo cáo tài chính: nhập, tải lên, hoặc (bên mua niêm yết) nạp dữ liệu sau khi FCC xác minh |
-| Bên mua đã báo thanh toán nhưng hồ sơ chưa tất toán | Bình thường: tổ chức tài chính phải **ghi nhận tiền về** đúng số còn phải thu |
+| Điểm bên nhập khẩu báo "Thiếu BCTC" | Chưa có báo cáo tài chính: nhập, tải lên, hoặc (bên nhập khẩu niêm yết) nạp dữ liệu sau khi FCC xác minh |
+| Bên nhập khẩu đã báo thanh toán nhưng hồ sơ chưa tất toán | Bình thường: tổ chức tài chính phải **ghi nhận tiền về** đúng số còn phải thu |
 | Số AI đọc từ hóa đơn bị sai | Sửa tay trước khi lưu. AI chỉ là gợi ý |
 | Hóa đơn bị từ chối vì trùng | Hóa đơn đó đã được nhập trước đó (cùng ký hiệu, số, ngày). Kiểm tra lại danh sách hóa đơn |
 | Không thấy nút cần bấm | Vai trò của bạn không có quyền đó, hoặc bước trước chưa hoàn tất |

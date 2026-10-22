@@ -4,7 +4,7 @@
 
 `SPEC_FCC_MVP.md` mô tả **hệ thống cần có**: nguyên tắc, yêu cầu F01–F27, mô hình dữ liệu, API, pháp lý. Tài liệu này mô tả **cách đi từ code hiện tại tới đủ chức năng** mà hồ sơ dự án cam kết: hiện trạng từng yêu cầu, quyết định phạm vi, gói việc (WP) kèm tiêu chí nghiệm thu, và thứ tự làm. Khi hai tài liệu khác nhau về phạm vi, tài liệu này áp dụng cho phase hiện tại; nguyên tắc ở mục 1.2 của SPEC v2.0 vẫn giữ nguyên.
 
-**Thay đổi so với 1.0:** phía ngân hàng/tổ chức tài chính được **giả lập** thay vì bỏ trống; mọi chức năng khác trong hồ sơ dự án đều làm thật. Bổ sung theo hồ sơ dự án: tài sản bảo đảm và định giá sơ bộ, phân loại (i)/(ii)/(iii), xác thực hóa đơn với cơ quan thuế, đồng bộ hóa đơn điện tử, chữ ký số khi chia sẻ dữ liệu, sổ nhật ký chống sửa (thay blockchain), bút toán khi giải ngân/tất toán, phí và doanh thu, phát hiện gian lận. vnstock chuyển từ "ưu tiên thấp" sang nguồn chính cho bên mua đầu chuỗi niêm yết.
+**Thay đổi so với 1.0:** phía ngân hàng/tổ chức tài chính được **giả lập** thay vì bỏ trống; mọi chức năng khác trong hồ sơ dự án đều làm thật. Bổ sung theo hồ sơ dự án: tài sản bảo đảm và định giá sơ bộ, phân loại (i)/(ii)/(iii), xác thực hóa đơn với cơ quan thuế, đồng bộ hóa đơn điện tử, chữ ký số khi chia sẻ dữ liệu, sổ nhật ký chống sửa (thay blockchain), bút toán khi giải ngân/tất toán, phí và doanh thu, phát hiện gian lận. vnstock chuyển từ "ưu tiên thấp" sang nguồn chính cho bên nhập khẩu đầu chuỗi niêm yết.
 
 ## 0. Trạng thái thực hiện (cập nhật cuối ngày 16/10/2026)
 
@@ -14,7 +14,7 @@ Các mục 1 và 3 bên dưới là **hiện trạng trước khi thực hiện*
 | --- | --- | --- |
 | WP0 Dọn nền | Xong | `packages/domain` dùng chung; `web-legacy/` đã gỡ (ảnh mẫu chuyển `ocr_lab/samples/`); CI còn `server`, `web`, `packages/domain`, `sim-bank`. Chưa sinh client TypeScript từ OpenAPI (giao diện dùng `api()` gọi trực tiếp) |
 | WP1 Dữ liệu | Xong | PostgreSQL, ràng buộc duy nhất, nhật ký chuỗi băm, kho tệp mã hóa, sao lưu + diễn tập khôi phục, di chuyển từ SQLite |
-| WP2 Danh tính | Xong, trừ phần nhà cung cấp ngoài | Nhiều tổ chức/vai trò, MFA TOTP, step-up, KYC bằng giấy tờ FCC đối chiếu. Chữ ký số từ xa và eKYC qua nhà cung cấp: chưa tích hợp (chờ chọn nhà cung cấp, quyết định 8) |
+| WP2 Danh tính | Xong, trừ phần đơn vị xuất khẩu ngoài | Nhiều tổ chức/vai trò, MFA TOTP, step-up, KYC bằng giấy tờ FCC đối chiếu. Chữ ký số từ xa và eKYC qua đơn vị xuất khẩu: chưa tích hợp (chờ chọn đơn vị xuất khẩu, quyết định 8) |
 | WP3 API | Xong | `/v1` + OpenAPI sinh từ bảng endpoint, SSE, khóa tích hợp theo phạm vi, webhook hai chiều ký HMAC, `Idempotency-Key`, cursor |
 | WP4 Giao diện | Xong | `web/` nối backend, không còn dữ liệu cứng; PWA (manifest, service worker chỉ lưu vỏ ứng dụng, không lưu API); e2e Playwright 4 ngữ cảnh |
 | WP5 Hóa đơn | Xong, trừ tra cứu tự động | Luật bất thường, hóa đơn điều chỉnh, hàng đợi cờ, đối chiếu thuế nhập thủ công có hỗ trợ (cổng thuế không cho tự động hóa — xem WP10). OCR dùng AI thị giác (`gemma4:31b`), người dùng xác nhận trước khi lưu; `ocr_lab/` giữ làm thí nghiệm đối chiếu |
@@ -31,17 +31,17 @@ Các mục 1 và 3 bên dưới là **hiện trạng trước khi thực hiện*
 
 **Kiểm thử:** `server` 78 test, `packages/domain` 37, `sim-bank` 5, e2e Playwright 2 kịch bản (cần CSDL mới mỗi lần chạy).
 
-**Việc còn lại trước pilot (không thuộc code):** các quyết định ở mục 6 (AI, giấy phép vnstock, pháp chế cho nguồn crawl, nhà cung cấp chữ ký số/eKYC/email, biểu phí, hiệu chỉnh tham số chấm điểm); hạ tầng staging có TLS; đổi khóa Ollama đã lộ trong hội thoại phát triển.
+**Việc còn lại trước pilot (không thuộc code):** các quyết định ở mục 6 (AI, giấy phép vnstock, pháp chế cho nguồn crawl, đơn vị xuất khẩu chữ ký số/eKYC/email, biểu phí, hiệu chỉnh tham số chấm điểm); hạ tầng staging có TLS; đổi khóa Ollama đã lộ trong hội thoại phát triển.
 
 ## 1. Hiện trạng code (16/10/2026)
 
 | Thư mục | Là gì | Tình trạng |
 | --- | --- | --- |
-| `web/` | Giao diện Next.js 16, 16 màn hình theo vai trò (nhà cung cấp, bên mua, tổ chức tài chính, quản trị) | Giao diện hoàn chỉnh, **dữ liệu cứng** trong `src/lib/data.ts`, không gọi API. Các nút xuất file, báo cáo, mời, liên kết… chỉ hiện thông báo. Trợ lý FCC trả lời theo luật cứng |
+| `web/` | Giao diện Next.js 16, 16 màn hình theo vai trò (đơn vị xuất khẩu, bên nhập khẩu, tổ chức tài chính, quản trị) | Giao diện hoàn chỉnh, **dữ liệu cứng** trong `src/lib/data.ts`, không gọi API. Các nút xuất file, báo cáo, mời, liên kết… chỉ hiện thông báo. Trợ lý FCC trả lời theo luật cứng |
 | `web-legacy/` | Giao diện React + Vite nối với `server/` | Chạy được trọn luồng nghiệp vụ. Bộ chấm điểm tín dụng, ESG, khớp sản phẩm, dòng tiền nằm ở `src/domain/` và **chạy trong trình duyệt** |
 | `server/` | Fastify + SQLite | Luật nghiệp vụ và phân quyền ở `service.ts`; 37 action qua `POST /api/actions/:name`; webhook giải ngân HMAC + idempotency; proxy AI Ollama; tác vụ định kỳ mỗi phút. **Import mã domain từ `web-legacy/`** |
 | `ocr_lab/` | Thí nghiệm OCR hóa đơn (RapidOCR + VietOCR) trên 10 hóa đơn mẫu | Chưa tích hợp vào ứng dụng |
-| `scripts/fetch_listed.py` | Lấy BCTC bên mua niêm yết qua vnstock | Chạy tay, ghi JSON vào `web-legacy/public/listed/` |
+| `scripts/fetch_listed.py` | Lấy BCTC bên nhập khẩu niêm yết qua vnstock | Chạy tay, ghi JSON vào `web-legacy/public/listed/` |
 
 Các đặc điểm kỹ thuật quyết định khối lượng việc:
 
@@ -56,10 +56,10 @@ Các đặc điểm kỹ thuật quyết định khối lượng việc:
 ### 2.1. Quyết định đã chốt
 
 1. **Phía ngân hàng/tổ chức tài chính được giả lập, không liên hệ đối tác thật.** Một dịch vụ giả lập (WP14) đóng vai các tổ chức tài chính và đi qua **đúng các API và webhook mà đối tác thật sẽ dùng**: đăng sản phẩm, báo giá, thẩm định, cấp hạn mức, ký đề nghị, giải ngân, nhận thanh toán, tất toán, xử lý quá hạn. Dữ liệu vốn chỉ ngân hàng có (sao kê tài khoản, sự kiện tiền vào/ra) cũng do dịch vụ này sinh ra. Thay bằng ngân hàng thật về sau chỉ là cấp khóa tích hợp và cấu hình, không sửa nghiệp vụ.
-2. **Mọi chức năng khác làm thật.** Chức năng phụ thuộc đối tác không phải ngân hàng (nhà cung cấp hóa đơn điện tử, phần mềm kế toán, nhà cung cấp chữ ký số) được xây đủ adapter và chạy được khi có tài khoản đối tác; trong lúc chờ, dùng đường thay thế thật (nhập file, tra cứu thủ công có hỗ trợ), **không giả lập**.
+2. **Mọi chức năng khác làm thật.** Chức năng phụ thuộc đối tác không phải ngân hàng (đơn vị xuất khẩu hóa đơn điện tử, phần mềm kế toán, đơn vị xuất khẩu chữ ký số) được xây đủ adapter và chạy được khi có tài khoản đối tác; trong lúc chờ, dùng đường thay thế thật (nhập file, tra cứu thủ công có hỗ trợ), **không giả lập**.
 3. **`web/` là giao diện duy nhất.** Nối `web/` với `server/` theo từng màn hình; khi `web/` phủ đủ chức năng của `web-legacy/` thì ngừng `web-legacy/`.
 4. **Bật lại xác thực** trước khi chạy ngoài localhost. Phiên theo vai trò chỉ còn trong môi trường `dev`.
-5. **vnstock giữ lại cho bên mua đầu chuỗi niêm yết.** Hồ sơ dự án đặt uy tín và khả năng thanh toán của bên mua (anchor buyer) làm cơ sở để tổ chức tài chính tài trợ cả khi nhà cung cấp không có tài sản bảo đảm (mục 3.3.b, bước 2–3). Các ngành mục tiêu (thép, vật liệu xây dựng, giấy, sợi) có nhiều bên mua đầu chuỗi niêm yết, và BCTC đã công bố là nguồn số liệu tài chính tốt nhất về họ. Không nguồn crawl nào trong WP10-B cung cấp BCTC có cấu trúc. Vì vnstock có ràng buộc giấy phép thương mại (SPEC v2.0 mục 9.1), truy cập qua một interface để thay được bằng nguồn công bố thông tin của Sở giao dịch chứng khoán (WP10-A).
+5. **vnstock giữ lại cho bên nhập khẩu đầu chuỗi niêm yết.** Hồ sơ dự án đặt uy tín và khả năng thanh toán của bên nhập khẩu (anchor buyer) làm cơ sở để tổ chức tài chính tài trợ cả khi đơn vị xuất khẩu không có tài sản bảo đảm (mục 3.3.b, bước 2–3). Các ngành mục tiêu (thép, vật liệu xây dựng, giấy, sợi) có nhiều bên nhập khẩu đầu chuỗi niêm yết, và BCTC đã công bố là nguồn số liệu tài chính tốt nhất về họ. Không nguồn crawl nào trong WP10-B cung cấp BCTC có cấu trúc. Vì vnstock có ràng buộc giấy phép thương mại (SPEC v2.0 mục 9.1), truy cập qua một interface để thay được bằng nguồn công bố thông tin của Sở giao dịch chứng khoán (WP10-A).
 6. **Crawl dữ liệu công khai để hiển thị** (F27): nguồn công khai nào lấy được hợp lệ thì làm, theo SPEC v2.0 mục 9.2 — không vượt CAPTCHA, đăng nhập hay biện pháp chặn kỹ thuật. Dữ liệu crawl hiển thị với nhãn "Nguồn công khai – tham khảo"; chưa đưa vào điểm tín dụng ở phase này.
 7. **Blockchain → sổ nhật ký chống sửa.** Hồ sơ dự án dùng blockchain để "xác thực thông tin, giao dịch và hạn chế giả mạo". Phase này đạt cùng mục đích bằng nhật ký nối chuỗi băm (mỗi sự kiện chứa hash của sự kiện trước) và SHA-256 cho mọi chứng từ, kèm công cụ kiểm tra toàn vẹn. Không dùng blockchain công khai: không cần thêm bên thứ ba để đạt mục đích và tránh đưa dữ liệu doanh nghiệp ra ngoài.
 8. **Ứng dụng di động → web responsive cài được (PWA).** `web/` đã responsive; thêm manifest và service worker để cài lên điện thoại. Ứng dụng native để sau khi có người dùng thật.
@@ -82,25 +82,25 @@ Các đặc điểm kỹ thuật quyết định khối lượng việc:
 | F02 | Tải chứng từ | Một phần | Hóa đơn không lưu tệp gốc; không SHA-256, không quét mã độc, không object storage | WP1, WP5 |
 | F03 | Trích xuất, kiểm tra hóa đơn | Một phần | Có đọc XML TT78 và AI OCR; không lưu song song giá trị AI và giá trị người sửa, không vị trí trang và độ tin cậy; chưa xác thực với cơ quan thuế | WP5 |
 | F04 | Chống trùng | Đã có | Có dấu vân tay hóa đơn và test chặn trùng; thiếu hàng đợi xử lý xung đột | WP5 |
-| F05 | Bên mua xác nhận/tranh chấp | Đã có | Thiếu ủy quyền theo người và MFA; nhập lại mật khẩu đang tắt | WP2, WP5 |
+| F05 | Bên nhập khẩu xác nhận/tranh chấp | Đã có | Thiếu ủy quyền theo người và MFA; nhập lại mật khẩu đang tắt | WP2, WP5 |
 | F06 | Quyền chia sẻ dữ liệu | Một phần | Quyền được cấp tự động khi gửi RFQ/chọn báo giá và thu hồi được; doanh nghiệp chưa tự chọn bên nhận, mục đích, thời hạn; chưa ký số | WP2, WP8 |
 | F07 | Gửi và theo dõi hồ sơ | Đã có | Idempotency mới có ở webhook; ràng buộc "một hồ sơ hoạt động" mới ở mức code, chưa ở CSDL | WP1, WP3 |
 | F08 | Báo giá và chấp thuận | Đã có | — | WP4 (giao diện) |
-| F09 | Giải ngân, thanh toán, tất toán | Một phần | Thanh toán một phần, sự kiện tiền từ phía ngân hàng, hoàn phần còn lại cho nhà cung cấp, đối soát số dư | WP8, WP14 |
+| F09 | Giải ngân, thanh toán, tất toán | Một phần | Thanh toán một phần, sự kiện tiền từ phía ngân hàng, hoàn phần còn lại cho đơn vị xuất khẩu, đối soát số dư | WP8, WP14 |
 | F10 | Nhật ký | Một phần | Không có trước/sau, correlation ID, chuỗi băm; nhật ký nằm chung khối JSON nên sửa được | WP1, WP12 |
 | F11 | Thông báo | Một phần | Chỉ trong ứng dụng; không email, không hàng đợi thử lại | WP11 |
-| F12 | Chấm điểm bên bán | Một phần | Chạy trong trình duyệt; kết quả không lưu bất biến; phiên bản là chuỗi cố định; tham số là giá trị khởi tạo; chưa tính tài sản bảo đảm và phân loại (i)/(ii)/(iii) ở server | WP6, WP8 |
-| F13 | Chấm điểm bên mua qua vnstock | Một phần | Script tay; ánh xạ MST ↔ mã chưa xác minh; thiếu ý kiến kiểm toán, diện cảnh báo | WP10 |
+| F12 | Chấm điểm đơn vị xuất khẩu | Một phần | Chạy trong trình duyệt; kết quả không lưu bất biến; phiên bản là chuỗi cố định; tham số là giá trị khởi tạo; chưa tính tài sản bảo đảm và phân loại (i)/(ii)/(iii) ở server | WP6, WP8 |
+| F13 | Chấm điểm bên nhập khẩu qua vnstock | Một phần | Script tay; ánh xạ MST ↔ mã chưa xác minh; thiếu ý kiến kiểm toán, diện cảnh báo | WP10 |
 | F14 | Điểm hồ sơ và giải thích | Một phần | Chưa có yêu cầu xem xét lại (appeal) | WP6 |
 | F15 | AI trích xuất BCTC/CIC/thuế | Một phần (\*) | Không vị trí trang, độ tin cậy, ngưỡng chính xác | WP5, WP9 |
 | F16 | Hồ sơ ESG và bằng chứng | Một phần (\*) | Lưu bằng chứng trong CSDL; cần kiểm tra quy tắc loại tài liệu quá 12 tháng | WP1, WP7 |
 | F17 | AI đề xuất mức ESG | Một phần (\*) | Bắt buộc trích dẫn cho mức ≥ 2; bắt buộc lý do khi reviewer sửa | WP7 |
 | F18 | Tính điểm ESG | Đã có | Có test tái lập 66,67, N/A, cờ trọng yếu | — |
-| F19 | ESG chuỗi cung ứng | Một phần (\*) | Cần đối chiếu công thức gia quyền và định nghĩa "nhà cung cấp xanh" với SPEC 5.5 | WP7 |
+| F19 | ESG chuỗi cung ứng | Một phần (\*) | Cần đối chiếu công thức gia quyền và định nghĩa "đơn vị xuất khẩu xanh" với SPEC 5.5 | WP7 |
 | F20 | Sản phẩm Marketplace | Một phần | Có trạng thái và FCC duyệt (đang tự duyệt ở chế độ hiện tại); chưa có phiên bản sản phẩm; chưa có loại bảo lãnh, LC | WP8, WP14 |
 | F21 | Khớp và chi phí ước tính | Đã có | Có test công thức | — |
 | F22 | RFQ | Đã có | Chạy đúng vì server một tiến trình; cần ràng buộc CSDL khi chuyển PostgreSQL | WP1 |
-| F23 | Thanh toán sớm từ bên mua | Đã có (\*) | Ghi nhận chứng từ thanh toán | WP8 |
+| F23 | Thanh toán sớm từ bên nhập khẩu | Đã có (\*) | Ghi nhận chứng từ thanh toán | WP8 |
 | F24 | Tổng quan theo vai trò | Một phần | `web-legacy/` tính từ dữ liệu thật; `web/` toàn số cứng | WP4 |
 | F25 | Kết nối kế toán | Một phần | Có nhập CSV công nợ; chưa có connector, chưa sinh bút toán | WP9 |
 | F26 | Dự báo dòng tiền | Một phần (\*) | Đo và hiển thị sai số dự báo; chưa dùng sao kê | WP9, WP14 |
@@ -117,7 +117,7 @@ web/ (Next.js, PWA) ──HTTPS──▶ server/ (Fastify, API /v1) ──▶ Po
                                       │      ├─ crawl nguồn công khai · vnstock · đồng bộ HĐĐT/kế toán
                                       │      └─ chấm lại điểm · EWS · dự báo · thông báo
                                       ├──▶ Dịch vụ AI (OCR, trích xuất, gợi ý ESG, trợ lý)
-                                      ├──▶ Email (SMTP) · nhà cung cấp chữ ký số/eKYC
+                                      ├──▶ Email (SMTP) · đơn vị xuất khẩu chữ ký số/eKYC
                                       └──▶ Adapter đối tác: HĐĐT, kế toán
 sim-bank/ (dịch vụ giả lập tổ chức tài chính) ──API /v1/partner + webhook──▶ server/
 packages/domain/ — chấm điểm, ESG, khớp sản phẩm, dòng tiền, biểu phí; dùng chung cho server và web/
@@ -157,8 +157,8 @@ Mỗi gói việc chỉ xong khi đạt **Definition of Done** của SPEC v2.0 m
 - Nhiều người dùng mỗi tổ chức; vai trò theo SPEC v2.0 mục 2 (owner, operator, approver, analyst, product manager, FCC reviewer, operations, auditor).
 - Mời thành viên qua email, thu hồi, quên mật khẩu.
 - MFA (TOTP) cho owner, approver, analyst, reviewer, admin; xác thực lại cho hành động nhạy cảm: xác nhận nghĩa vụ, chấp thuận đề nghị, chọn báo giá, cấp quyền chia sẻ, phát hành điểm.
-- **Chữ ký số khi chia sẻ dữ liệu và chấp thuận đề nghị** (hồ sơ dự án mục 6.3: chia sẻ khi "có sự đồng ý chủ động và xác thực bằng chữ ký số của đại diện doanh nghiệp"): adapter ký số từ xa của nhà cung cấp dịch vụ chứng thực chữ ký số; lưu tệp đã ký và chứng thư. Khi chưa có hợp đồng nhà cung cấp, dùng xác thực MFA + snapshot nội dung như đường thay thế, ghi rõ phương thức trong nhật ký.
-- **eKYC người đại diện** khi tổ chức đăng ký (hồ sơ dự án mục 3.3.a): adapter nhà cung cấp eKYC; khi chưa có hợp đồng, FCC operations đối chiếu giấy tờ tải lên.
+- **Chữ ký số khi chia sẻ dữ liệu và chấp thuận đề nghị** (hồ sơ dự án mục 6.3: chia sẻ khi "có sự đồng ý chủ động và xác thực bằng chữ ký số của đại diện doanh nghiệp"): adapter ký số từ xa của đơn vị xuất khẩu dịch vụ chứng thực chữ ký số; lưu tệp đã ký và chứng thư. Khi chưa có hợp đồng đơn vị xuất khẩu, dùng xác thực MFA + snapshot nội dung như đường thay thế, ghi rõ phương thức trong nhật ký.
+- **eKYC người đại diện** khi tổ chức đăng ký (hồ sơ dự án mục 3.3.a): adapter đơn vị xuất khẩu eKYC; khi chưa có hợp đồng, FCC operations đối chiếu giấy tờ tải lên.
 - Một người thuộc nhiều tổ chức, chuyển `active_org_id` trên topbar (thay bộ chuyển vai trò của bản demo).
 - Khôi phục các bước FCC xác minh tổ chức tài chính và duyệt sản phẩm.
 
@@ -168,11 +168,11 @@ Mỗi gói việc chỉ xong khi đạt **Definition of Done** của SPEC v2.0 m
 
 - API REST `/v1` theo SPEC v2.0 mục 13; OpenAPI là hợp đồng nguồn; sinh client TypeScript cho `web/`.
 - Mọi POST tạo nghiệp vụ nhận `Idempotency-Key`; mã lỗi `409` (xung đột trạng thái/phiên bản), `422` (dữ liệu sai); phân trang bằng cursor.
-- **API đối tác** `/v1/partner/*` cho tổ chức tài chính: đọc gói hồ sơ được chia sẻ, đăng/sửa sản phẩm, trả báo giá, ghi quyết định thẩm định, đề nghị, hạn mức; **webhook đến** cho sự kiện tiền (giải ngân, nhận thanh toán, tất toán, quá hạn) ký HMAC, có timestamp, event ID, chống replay (mở rộng từ webhook giải ngân đã có); **webhook đi** báo cho đối tác khi có RFQ mới, hồ sơ mới, bên mua xác nhận. Khóa tích hợp theo tổ chức và phạm vi quyền (`POST /v1/integration-keys`).
+- **API đối tác** `/v1/partner/*` cho tổ chức tài chính: đọc gói hồ sơ được chia sẻ, đăng/sửa sản phẩm, trả báo giá, ghi quyết định thẩm định, đề nghị, hạn mức; **webhook đến** cho sự kiện tiền (giải ngân, nhận thanh toán, tất toán, quá hạn) ký HMAC, có timestamp, event ID, chống replay (mở rộng từ webhook giải ngân đã có); **webhook đi** báo cho đối tác khi có RFQ mới, hồ sơ mới, bên nhập khẩu xác nhận. Khóa tích hợp theo tổ chức và phạm vi quyền (`POST /v1/integration-keys`).
 - Thay polling 4 giây bằng **SSE** `GET /v1/events`: server đẩy sự kiện "đối tượng X đã đổi", client tải lại phần liên quan.
 - Giữ `/api/actions/:name` cho `web-legacy/` tới khi ngừng `web-legacy/`.
 
-**Nghiệm thu:** OpenAPI kiểm tra tự động khớp với route; báo giá mới hiện bên nhà cung cấp trong ≤ 2 giây không cần tải lại; gọi lặp cùng `Idempotency-Key` hoặc cùng event ID trả cùng kết quả; webhook có timestamp quá hạn bị từ chối.
+**Nghiệm thu:** OpenAPI kiểm tra tự động khớp với route; báo giá mới hiện bên đơn vị xuất khẩu trong ≤ 2 giây không cần tải lại; gọi lặp cùng `Idempotency-Key` hoặc cùng event ID trả cùng kết quả; webhook có timestamp quá hạn bị từ chối.
 
 ### WP4 — Nối `web/` với backend
 
@@ -186,8 +186,8 @@ Thay `src/lib/data.ts` bằng client API theo từng màn hình. Mỗi màn hìn
 | `/supplier/marketplace` | Gói phù hợp/chưa phù hợp, chi phí, RFQ, đồng ý chia sẻ (ký số) | `GET /v1/receivables/{id}/matches`, `POST /v1/rfqs`, `POST /v1/consents` |
 | `/supplier/disbursement` | Vòng tuần hoàn giải ngân – thu hồi, các lớp bảo vệ, cảnh báo sớm | `GET /v1/funding-applications/{id}`, `settlement_events`, `GET /v1/ews-alerts` |
 | `/buyer`, `/buyer/invoices` | Phải trả, lịch thanh toán, xác nhận/tranh chấp, trả sớm | `POST /v1/receivables/{id}/buyer-decision`, `POST /v1/early-payment-offers` |
-| `/buyer/marketplace` | Chương trình tài trợ cho nhà cung cấp của mình | `GET /v1/financing-products?anchor=` |
-| `/buyer/esg` | ESG chuỗi cung ứng (nhà cung cấp đã đồng ý) | `GET /v1/buyers/{id}/supply-chain-esg` |
+| `/buyer/marketplace` | Chương trình tài trợ cho đơn vị xuất khẩu của mình | `GET /v1/financing-products?anchor=` |
+| `/buyer/esg` | ESG chuỗi cung ứng (đơn vị xuất khẩu đã đồng ý) | `GET /v1/buyers/{id}/supply-chain-esg` |
 | `/lender`, `/lender/appraisal` | Danh mục, hàng đợi thẩm định, quyết định | `GET /v1/funding-applications`, `POST .../offers`, `POST .../reject` |
 | `/lender/monitoring` | Cảnh báo sớm, lịch thu hồi | `GET /v1/ews-alerts` |
 | `/lender/marketplace` | Sản phẩm của mình, mặt bằng lãi suất, chính sách ưu đãi ESG | `GET/POST /v1/financing-products`, `GET /v1/market-overview` |
@@ -202,7 +202,7 @@ Các nút hiện chỉ hiện thông báo phải được làm thật:
 | --- | --- |
 | Xuất Excel hóa đơn, xuất BCTC, xuất nhật ký truy cập | Xuất CSV/XLSX phía server |
 | Tạo báo cáo danh mục / báo cáo vận hành | PDF hoặc XLSX từ dữ liệu thật |
-| Mời thành viên, mời nhà cung cấp chia sẻ ESG | WP2, WP11 |
+| Mời thành viên, mời đơn vị xuất khẩu chia sẻ ESG | WP2, WP11 |
 | Tạo API key cho đối tác | WP3 |
 | Tải mẫu file nhập liệu | File mẫu tĩnh |
 | Đồng bộ ERP, ủy quyền nguồn dữ liệu kế toán | WP9: chạy connector nếu đã kết nối; chưa kết nối thì mở hướng dẫn kết nối hoặc nhập file |
@@ -217,17 +217,17 @@ Các nút hiện chỉ hiện thông báo phải được làm thật:
 
 - Tải lên XML, PDF, ảnh; lưu bản gốc bất biến + SHA-256 (WP1); quét mã độc; giới hạn loại và kích thước.
 - Trích xuất: XML theo TT78 (đã có); ảnh/PDF qua OCR. **Chọn một hướng OCR** (mục 6): AI qua Ollama (đang dùng) hoặc RapidOCR + VietOCR (`ocr_lab/`). Lưu bảng `extractions`: giá trị AI, trang, độ tin cậy, giá trị người xác nhận. Trường độ tin cậy thấp bắt buộc xác nhận.
-- **Đồng bộ hóa đơn điện tử** (hồ sơ dự án mục 6.3: VNPT, Viettel, BKAV): adapter theo API của từng nhà cung cấp, chạy khi doanh nghiệp cấp quyền tài khoản của họ. Khi chưa có quyền truy cập API, doanh nghiệp tải XML tay (đã có).
+- **Đồng bộ hóa đơn điện tử** (hồ sơ dự án mục 6.3: VNPT, Viettel, BKAV): adapter theo API của từng đơn vị xuất khẩu, chạy khi doanh nghiệp cấp quyền tài khoản của họ. Khi chưa có quyền truy cập API, doanh nghiệp tải XML tay (đã có).
 - **Xác thực hóa đơn với cơ quan thuế:** tra cứu hóa đơn trên cổng hóa đơn điện tử của cơ quan thuế theo mã tra cứu/ký hiệu/số. Phân loại nguồn theo WP10-B bước 1; nếu cổng có CAPTCHA thì là tra cứu thủ công có hỗ trợ (hệ thống mở sẵn thông tin tra cứu, người kiểm tra ghi kết quả và ảnh chụp). Trạng thái hóa đơn: chưa xác thực / đã xác thực / không khớp / đã hủy.
-- Hóa đơn điều chỉnh/thay thế/hủy (mẫu `inv02_fpt_dieuchinh` trong `ocr_lab/`): liên kết với hóa đơn gốc, tăng `version` khoản phải thu, buộc bên mua xác nhận lại nếu số tiền hoặc hạn đổi.
-- **Phát hiện gian lận theo luật** (hồ sơ dự án mục 3.3.a): trùng lặp (đã có), hóa đơn đã hủy, giá trị bất thường so với lịch sử cặp mua–bán, nhiều hóa đơn sát ngưỡng sản phẩm, bên mua mới không có lịch sử, chứng từ bị sửa (hash khác bản đã nộp). Mỗi cờ có lý do; hồ sơ có cờ vào hàng đợi FCC operations, không tự từ chối.
+- Hóa đơn điều chỉnh/thay thế/hủy (mẫu `inv02_fpt_dieuchinh` trong `ocr_lab/`): liên kết với hóa đơn gốc, tăng `version` khoản phải thu, buộc bên nhập khẩu xác nhận lại nếu số tiền hoặc hạn đổi.
+- **Phát hiện gian lận theo luật** (hồ sơ dự án mục 3.3.a): trùng lặp (đã có), hóa đơn đã hủy, giá trị bất thường so với lịch sử cặp mua–bán, nhiều hóa đơn sát ngưỡng sản phẩm, bên nhập khẩu mới không có lịch sử, chứng từ bị sửa (hash khác bản đã nộp). Mỗi cờ có lý do; hồ sơ có cờ vào hàng đợi FCC operations, không tự từ chối.
 
-**Nghiệm thu:** đo độ chính xác trích xuất trên 10 hóa đơn trong `ocr_lab/invoices` so với `ocr_lab/expected_output`, đạt ngưỡng chốt ở mục 6; sửa hóa đơn sau khi bên mua xác nhận thì xác nhận cũ mất hiệu lực; mỗi luật gian lận có ca kiểm thử dương tính và âm tính.
+**Nghiệm thu:** đo độ chính xác trích xuất trên 10 hóa đơn trong `ocr_lab/invoices` so với `ocr_lab/expected_output`, đạt ngưỡng chốt ở mục 6; sửa hóa đơn sau khi bên nhập khẩu xác nhận thì xác nhận cũ mất hiệu lực; mỗi luật gian lận có ca kiểm thử dương tính và âm tính.
 
 ### WP6 — Chấm điểm tín dụng
 
 - Chạy bộ chấm điểm ở server từ `packages/domain/`; lưu `credit_assessments` và `credit_factor_results` bất biến, kèm `input_hash`; chấm lại tạo bản ghi mới.
-- Đầu vào theo hồ sơ dự án mục 6.3: sức khỏe tài chính, chất lượng hóa đơn, lịch sử thanh toán của bên mua trên FCC, độ ổn định dòng tiền (sao kê từ WP14, công nợ từ WP9), nghĩa vụ thuế và báo cáo CIC do doanh nghiệp tự cung cấp (AI trích xuất, người xác nhận), tài sản bảo đảm (WP8).
+- Đầu vào theo hồ sơ dự án mục 6.3: sức khỏe tài chính, chất lượng hóa đơn, lịch sử thanh toán của bên nhập khẩu trên FCC, độ ổn định dòng tiền (sao kê từ WP14, công nợ từ WP9), nghĩa vụ thuế và báo cáo CIC do doanh nghiệp tự cung cấp (AI trích xuất, người xác nhận), tài sản bảo đảm (WP8).
 - `scorecard_versions` lưu tham số (bảng rủi ro ngành, trung vị biên lợi nhuận, ngưỡng hạng, bảng ngành giai đoạn 2); đổi phiên bản cần hai người duyệt.
 - Phát hành chính thức khi Coverage đạt ngưỡng; dưới ngưỡng thì "tạm tính" kèm khoảng điểm.
 - Yêu cầu xem xét lại (appeal): doanh nghiệp gửi lý do + bằng chứng, reviewer xử lý, có nhật ký.
@@ -242,23 +242,23 @@ Các nút hiện chỉ hiện thông báo phải được làm thật:
 - AI đề xuất mức 0–4 cho 18 chỉ tiêu, mỗi đề xuất có trích dẫn (tài liệu, trang); không có trích dẫn thì không đề xuất mức ≥ 2.
 - Reviewer FCC xác nhận/sửa; sửa khác AI bắt buộc ghi lý do; phát hành chính thức khi Coverage ≥ 80% và xử lý hết cờ trọng yếu.
 - Xác minh chứng chỉ (ví dụ ISO 14001) theo số chứng chỉ và tổ chức cấp; nguồn tra cứu xếp loại theo WP10-B.
-- ESG chuỗi cung ứng cho bên mua: chỉ gồm nhà cung cấp đã đồng ý chia sẻ; công thức theo SPEC v2.0 mục 5.5.
+- ESG chuỗi cung ứng cho bên nhập khẩu: chỉ gồm đơn vị xuất khẩu đã đồng ý chia sẻ; công thức theo SPEC v2.0 mục 5.5.
 - Ưu đãi xanh: chỉ áp khi tổ chức tài chính (hoặc ngân hàng giả lập) cấu hình trong sản phẩm. Mức giảm 0,3–0,5% trong hồ sơ dự án là cấu hình mặc định của ngân hàng giả lập, không phải cam kết của FCC.
 
-**Nghiệm thu:** test 66,67 hiện có vẫn xanh khi chạy ở server; không phát hành được khi Coverage < 80%; bên mua không thấy ESG của nhà cung cấp chưa đồng ý.
+**Nghiệm thu:** test 66,67 hiện có vẫn xanh khi chạy ở server; không phát hành được khi Coverage < 80%; bên nhập khẩu không thấy ESG của đơn vị xuất khẩu chưa đồng ý.
 
 ### WP8 — Marketplace, tài trợ, thu hồi, theo dõi
 
-- Phiên bản sản phẩm (`product_versions`); báo giá tham chiếu đúng phiên bản; sửa sản phẩm cần FCC duyệt lại; hết hiệu lực tự ẩn. Loại sản phẩm: bao thanh toán có/không truy đòi, tài trợ người mua (reverse factoring), tài trợ đơn hàng, bảo lãnh, LC (hồ sơ dự án mục 1.2).
+- Phiên bản sản phẩm (`product_versions`); báo giá tham chiếu đúng phiên bản; sửa sản phẩm cần FCC duyệt lại; hết hiệu lực tự ẩn. Loại sản phẩm: bao thanh toán có/không truy đòi, tài trợ bên nhập khẩu (reverse factoring), tài trợ đơn hàng, bảo lãnh, LC (hồ sơ dự án mục 1.2).
 - Màn hình cấp quyền chia sẻ: doanh nghiệp chọn bên nhận, mục đích, loại dữ liệu, thời hạn; ký theo WP2; thu hồi có hiệu lực ngay.
 - **Tài sản bảo đảm** (hồ sơ dự án mục 3.3.b, bước 2): doanh nghiệp khai bất động sản, máy móc, phương tiện, hàng tồn kho kèm giấy tờ; FCC kiểm tra hồ sơ đủ/thiếu và **định giá sơ bộ tham khảo** theo phương pháp công khai (giá trị khai báo có chứng từ, khấu hao theo loại tài sản và tuổi, hệ số chiết khấu theo loại), ghi rõ "không phải định giá có giá trị pháp lý". Tổ chức tài chính quyết định giá trị được công nhận.
-- **Phân loại (i)/(ii)/(iii)** tính ở server: (i) có tài sản bảo đảm và khoản phải thu tốt; (ii) không tài sản bảo đảm nhưng khoản phải thu chất lượng, bên mua uy tín, dòng tiền tốt; (iii) không đủ điều kiện — FCC không gợi ý sản phẩm. Ngưỡng nằm trong `scorecard_versions`.
+- **Phân loại (i)/(ii)/(iii)** tính ở server: (i) có tài sản bảo đảm và khoản phải thu tốt; (ii) không tài sản bảo đảm nhưng khoản phải thu chất lượng, bên nhập khẩu uy tín, dòng tiền tốt; (iii) không đủ điều kiện — FCC không gợi ý sản phẩm. Ngưỡng nằm trong `scorecard_versions`.
 - Giải ngân: tổ chức tài chính ghi nhận bằng nút hoặc webhook, kèm số hợp đồng và tệp hợp đồng.
-- **Thu hồi theo các lớp** (hồ sơ dự án mục 3.3.b): lớp 1 — bên mua thanh toán, ngân hàng ghi nhận tiền về, trừ gốc và phí/lãi, **hoàn phần còn lại cho nhà cung cấp**; hỗ trợ thanh toán một phần; lớp 2 — thiếu hụt thì ngân hàng ghi nhận xử lý tài sản bảo đảm, FCC cung cấp hồ sơ tài sản; lớp 3–4 — quá hạn sinh cảnh báo, ngân hàng ghi nhận biện pháp. FCC không trực tiếp thu giữ hay bán tài sản.
-- Bên mua ghi nhận thanh toán kèm chứng từ; đối chiếu với sự kiện tiền về từ ngân hàng (WP14). Lệch nhau vào hàng đợi đối soát.
+- **Thu hồi theo các lớp** (hồ sơ dự án mục 3.3.b): lớp 1 — bên nhập khẩu thanh toán, ngân hàng ghi nhận tiền về, trừ gốc và phí/lãi, **hoàn phần còn lại cho đơn vị xuất khẩu**; hỗ trợ thanh toán một phần; lớp 2 — thiếu hụt thì ngân hàng ghi nhận xử lý tài sản bảo đảm, FCC cung cấp hồ sơ tài sản; lớp 3–4 — quá hạn sinh cảnh báo, ngân hàng ghi nhận biện pháp. FCC không trực tiếp thu giữ hay bán tài sản.
+- Bên nhập khẩu ghi nhận thanh toán kèm chứng từ; đối chiếu với sự kiện tiền về từ ngân hàng (WP14). Lệch nhau vào hàng đợi đối soát.
 - Hạn mức (`credit_limits`): chỉ do tổ chức tài chính cấp.
-- **Cảnh báo sớm (EWS)** theo luật: khoản sắp đến hạn/quá hạn, điểm bên mua giảm, doanh thu suy giảm, thanh toán chậm dần, tập trung rủi ro vào một bên mua, tranh chấp mới, cờ dữ liệu công khai mới. Hiện ở `/lender/monitoring` và `/supplier/disbursement`.
-- Gian lận sau giải ngân: một khoản phải thu bị đem tài trợ lại, bên mua thanh toán thẳng cho nhà cung cấp mà không báo.
+- **Cảnh báo sớm (EWS)** theo luật: khoản sắp đến hạn/quá hạn, điểm bên nhập khẩu giảm, doanh thu suy giảm, thanh toán chậm dần, tập trung rủi ro vào một bên nhập khẩu, tranh chấp mới, cờ dữ liệu công khai mới. Hiện ở `/lender/monitoring` và `/supplier/disbursement`.
+- Gian lận sau giải ngân: một khoản phải thu bị đem tài trợ lại, bên nhập khẩu thanh toán thẳng cho đơn vị xuất khẩu mà không báo.
 
 **Nghiệm thu:** trọn vòng tuần hoàn của hồ sơ dự án (ví dụ hóa đơn 2 tỷ, 90 ngày, ứng 80% = 1,6 tỷ) từ tạo hóa đơn tới tất toán, kể cả thanh toán hai lần và hoàn phần còn lại; nhánh thiếu hụt có xử lý tài sản bảo đảm; số dư khoản tài trợ khớp tổng sự kiện; quá hạn sinh cảnh báo trong ≤ 1 phút.
 
@@ -274,10 +274,10 @@ Các nút hiện chỉ hiện thông báo phải được làm thật:
 
 ### WP10 — Dữ liệu bên ngoài
 
-**A. Bên mua đầu chuỗi niêm yết (vnstock)**
+**A. Bên nhập khẩu đầu chuỗi niêm yết (vnstock)**
 
 - Interface `MarketDataProvider`; adapter đầu tiên là vnstock (dùng lại logic của `scripts/fetch_listed.py`, gồm kiểm tra thứ tự năm và nguồn VCI).
-- Job định kỳ theo SPEC v2.0 mục 9.1: giá hằng ngày; BCTC hằng tuần, hằng ngày trong mùa công bố; có kỳ BCTC mới thì tự chấm lại điểm bên mua.
+- Job định kỳ theo SPEC v2.0 mục 9.1: giá hằng ngày; BCTC hằng tuần, hằng ngày trong mùa công bố; có kỳ BCTC mới thì tự chấm lại điểm bên nhập khẩu.
 - Ánh xạ MST ↔ mã chứng khoán xác minh tay lần đầu (`listed_companies.verified_by`).
 - Ý kiến kiểm toán, diện cảnh báo: lấy từ nguồn công bố thông tin của Sở giao dịch chứng khoán (khảo sát ở WP10-B; loại B thì FCC operations nhập tay có nguồn và ngày).
 - **Giấy phép:** chốt giấy phép vnstock cho mục đích thương mại trước production. Nếu không được, thay adapter bằng nguồn công bố thông tin của Sở giao dịch (BCTC PDF + trích xuất như WP5), không đổi bộ chấm điểm.
@@ -295,7 +295,7 @@ Nguồn ứng viên (theo SPEC v2.0 mục 9.2 và hồ sơ dự án mục 6.3). 
 | Nguồn | Dữ liệu hiển thị | Hiển thị ở |
 | --- | --- | --- |
 | Cổng thông tin quốc gia về đăng ký doanh nghiệp | Tình trạng pháp lý, ngày thành lập, ngành nghề, địa chỉ, người đại diện | Hồ sơ tổ chức; gợi ý điền khi đăng ký |
-| Tra cứu người nộp thuế của cơ quan thuế | Trạng thái MST (đang hoạt động, ngừng, không còn ở địa chỉ đăng ký) | Hồ sơ tổ chức; cảnh báo cho bên mua và tổ chức tài chính |
+| Tra cứu người nộp thuế của cơ quan thuế | Trạng thái MST (đang hoạt động, ngừng, không còn ở địa chỉ đăng ký) | Hồ sơ tổ chức; cảnh báo cho bên nhập khẩu và tổ chức tài chính |
 | Cổng hóa đơn điện tử của cơ quan thuế | Trạng thái hóa đơn theo mã tra cứu | Xác thực hóa đơn (WP5) |
 | Danh sách công khai người nộp thuế nợ thuế, vi phạm (cơ quan thuế các cấp) | Có tên trong danh sách, kỳ công bố | Mục "Dữ liệu công khai" |
 | Danh sách đơn vị nợ BHXH do BHXH các tỉnh công bố | Có tên, kỳ công bố | Mục "Dữ liệu công khai"; gợi ý bằng chứng ESG nhóm S |
@@ -303,14 +303,14 @@ Nguồn ứng viên (theo SPEC v2.0 mục 9.2 và hồ sơ dự án mục 6.3). 
 | Cổng công bố bản án, quyết định của tòa án | Bản án kinh doanh thương mại, phá sản có liên quan | Mục "Dữ liệu công khai", cờ cần xem xét |
 | Thông báo xử phạt môi trường, lao động | Quyết định xử phạt | Gợi ý cho reviewer ESG (E5, S1, S2) |
 | Tra cứu chứng chỉ hệ thống quản lý (ISO 14001…) của tổ chức chứng nhận | Hiệu lực chứng chỉ | Xác minh bằng chứng ESG (WP7) |
-| Công bố thông tin của Sở giao dịch chứng khoán | BCTC, ý kiến kiểm toán, diện cảnh báo của bên mua niêm yết | WP10-A |
+| Công bố thông tin của Sở giao dịch chứng khoán | BCTC, ý kiến kiểm toán, diện cảnh báo của bên nhập khẩu niêm yết | WP10-A |
 | Website doanh nghiệp, báo chí | Chứng nhận, sự kiện, tin bất lợi | Gợi ý bằng chứng ESG; tin cho reviewer |
 
 *Bước 2 — khung crawler.*
 
 - Mỗi nguồn là một adapter: `fetch(taxCode)` → nội dung thô, `parse(raw)` → bản ghi chuẩn hóa. Thêm nguồn mới không sửa phần còn lại.
 - Chạy trên hàng đợi job; giới hạn tần suất theo từng nguồn; user-agent định danh có địa chỉ liên hệ; cache; tôn trọng `robots.txt` và thời gian chờ.
-- **Chỉ crawl theo MST cần tra cứu**, không quét toàn bộ nguồn. Kích hoạt khi: tổ chức đăng ký hoặc cập nhật MST; nhà cung cấp gửi RFQ; FCC operations bấm làm mới; làm mới định kỳ (mặc định 30 ngày, cấu hình theo nguồn).
+- **Chỉ crawl theo MST cần tra cứu**, không quét toàn bộ nguồn. Kích hoạt khi: tổ chức đăng ký hoặc cập nhật MST; đơn vị xuất khẩu gửi RFQ; FCC operations bấm làm mới; làm mới định kỳ (mặc định 30 ngày, cấu hình theo nguồn).
 - Phát hiện CAPTCHA, trang đăng nhập hoặc mã chặn thì **dừng ngay**, đánh dấu nguồn và tạo việc tra cứu thủ công. Không thử vượt.
 - Lưu `source_snapshots`: URL, thời điểm, hash nội dung, phiên bản parser, nội dung thô ở object storage. Parser lỗi (nguồn đổi định dạng) thì đưa vào hàng đợi ngoại lệ, không ghi dữ liệu.
 - Khớp thực thể theo MST; khớp theo tên/địa chỉ chỉ là gợi ý và cần người xác nhận.
@@ -318,13 +318,13 @@ Nguồn ứng viên (theo SPEC v2.0 mục 9.2 và hồ sơ dự án mục 6.3). 
 
 *Bước 3 — hiển thị và khiếu nại.*
 
-- Mục **"Dữ liệu công khai"** trong hồ sơ doanh nghiệp, hiện ở: trang tổ chức của chính doanh nghiệp, `/supplier/funding`, `/lender/appraisal` (khi có quyền chia sẻ), trang nhà cung cấp phía bên mua. Mỗi dòng có: giá trị, tên nguồn, liên kết gốc, ngày lấy, nhãn "Nguồn công khai – tham khảo".
+- Mục **"Dữ liệu công khai"** trong hồ sơ doanh nghiệp, hiện ở: trang tổ chức của chính doanh nghiệp, `/supplier/funding`, `/lender/appraisal` (khi có quyền chia sẻ), trang đơn vị xuất khẩu phía bên nhập khẩu. Mỗi dòng có: giá trị, tên nguồn, liên kết gốc, ngày lấy, nhãn "Nguồn công khai – tham khảo".
 - Doanh nghiệp xem được mọi dữ liệu công khai về mình và gửi khiếu nại sai lệch kèm bằng chứng. Dòng đang khiếu nại hiện nhãn "Đang được xem xét"; FCC operations xử lý và ghi nhật ký.
 - Phase này **chỉ hiển thị** (riêng trạng thái hóa đơn và chứng chỉ ESG dùng cho xác thực ở WP5, WP7). Đưa dữ liệu crawl vào điểm tín dụng hoặc cờ knock-out cần: nguồn chạy ổn định, quy trình khiếu nại đã vận hành, và một phiên bản bộ chấm điểm mới được duyệt theo WP6.
 
 **Nghiệm thu:**
 
-- Điểm bên mua niêm yết ghi rõ nguồn và kỳ BCTC; nguồn lỗi thì giữ dữ liệu cũ, gắn nhãn "dữ liệu cũ"; đổi adapter không đổi kết quả chấm trên cùng số liệu.
+- Điểm bên nhập khẩu niêm yết ghi rõ nguồn và kỳ BCTC; nguồn lỗi thì giữ dữ liệu cũ, gắn nhãn "dữ liệu cũ"; đổi adapter không đổi kết quả chấm trên cùng số liệu.
 - Có biên bản khảo sát cho mọi nguồn ứng viên; mỗi nguồn được xếp loại A/B/C và có người phê duyệt.
 - Nguồn chưa `approved` không chạy được (có test).
 - Gặp CAPTCHA hoặc đăng nhập: job dừng và tạo việc tra cứu thủ công (có test với trang có CAPTCHA dựng sẵn).
@@ -334,7 +334,7 @@ Nguồn ứng viên (theo SPEC v2.0 mục 9.2 và hồ sơ dự án mục 6.3). 
 
 ### WP11 — Thông báo
 
-- Email qua SMTP cho: mời thành viên, bên mua cần xác nhận, báo giá mới, đề nghị chờ chấp thuận, giải ngân, quá hạn, cảnh báo sớm.
+- Email qua SMTP cho: mời thành viên, bên nhập khẩu cần xác nhận, báo giá mới, đề nghị chờ chấp thuận, giải ngân, quá hạn, cảnh báo sớm.
 - Hàng đợi thử lại; người dùng chọn loại thông báo nhận.
 
 **Nghiệm thu:** máy chủ email lỗi tạm thời thì thư được gửi lại; không gửi trùng.
@@ -362,10 +362,10 @@ Thay cho đối tác tài chính thật trong phase này. Mục tiêu là mọi 
 
 - **Danh tính:** 3 tổ chức tài chính hư cấu (một ngân hàng thương mại, một công ty tài chính, một quỹ). **Không dùng tên ngân hàng thật** để tránh hiển thị như sản phẩm hay quyết định của một tổ chức có thật. Mỗi tổ chức là một `organization` loại `lender`, có cờ `simulated = true` trong danh mục nguồn dữ liệu, dùng khóa tích hợp như đối tác thật.
 - **Sản phẩm:** đăng qua `/v1/partner/*` đủ các loại ở WP8, có biểu giá, điều kiện, SLA, ưu đãi xanh (mặc định giảm 0,3–0,5% theo hồ sơ dự án); qua FCC duyệt như sản phẩm thật.
-- **Hành vi theo luật cấu hình:** nhận RFQ → báo giá theo hạng điểm, kỳ hạn, phân loại (i)/(ii)/(iii); thẩm định → duyệt/từ chối/yêu cầu bổ sung; cấp hạn mức; ra đề nghị; giải ngân sau T+1/T+2 (đồng hồ cấu hình được); nhận tiền bên mua; trừ gốc + phí/lãi, hoàn phần còn lại; quá hạn; xử lý tài sản bảo đảm.
+- **Hành vi theo luật cấu hình:** nhận RFQ → báo giá theo hạng điểm, kỳ hạn, phân loại (i)/(ii)/(iii); thẩm định → duyệt/từ chối/yêu cầu bổ sung; cấp hạn mức; ra đề nghị; giải ngân sau T+1/T+2 (đồng hồ cấu hình được); nhận tiền bên nhập khẩu; trừ gốc + phí/lãi, hoàn phần còn lại; quá hạn; xử lý tài sản bảo đảm.
 - **Tài khoản và sao kê:** doanh nghiệp "liên kết tài khoản" với ngân hàng giả lập; sao kê sinh từ các sự kiện tiền đã ghi nhận trên FCC (giải ngân, thanh toán, phí) cộng số dư đầu kỳ và chi định kỳ doanh nghiệp tự khai — **không sinh giao dịch ngẫu nhiên**. Sao kê ghi nguồn "Ngân hàng giả lập" để tách khỏi dữ liệu thật khi có ngân hàng thật.
 - **Thu phí của FCC:** nhận lệnh thu phí (WP15) và trả sự kiện đã thu.
-- **Bảng điều khiển kịch bản** cho FCC operations và kiểm thử: chọn hành vi cho từng hồ sơ (duyệt, từ chối, trễ giải ngân, bên mua trả một phần, trả chậm, vỡ nợ → xử lý tài sản bảo đảm), gửi lại webhook trùng, gửi webhook sai chữ ký.
+- **Bảng điều khiển kịch bản** cho FCC operations và kiểm thử: chọn hành vi cho từng hồ sơ (duyệt, từ chối, trễ giải ngân, bên nhập khẩu trả một phần, trả chậm, vỡ nợ → xử lý tài sản bảo đảm), gửi lại webhook trùng, gửi webhook sai chữ ký.
 - Người thật vẫn thao tác được vai tổ chức tài chính qua `/lender` trên `web/`; dịch vụ giả lập chỉ tự động hóa khi bật cho tổ chức đó.
 
 **Nghiệm thu:** chạy tự động trọn vòng tuần hoàn của WP8 với cả ba tổ chức giả lập, gồm các nhánh lỗi trong bảng điều khiển; webhook trùng không ghi nhận hai lần, webhook sai chữ ký bị từ chối; thay một tổ chức giả lập bằng một tổ chức do người thao tác qua `/lender` không cần sửa code; sao kê khớp tổng sự kiện tiền trên FCC.
@@ -391,11 +391,11 @@ Theo 6 nguồn thu trong hồ sơ dự án (mục 3.3.5): phí giao dịch tài 
 | 4 | Mô hình AI tự vận hành hay dịch vụ ngoài | WP5, WP7, WP13 | Cần ý kiến pháp chế trước pilot |
 | 5 | Ai hiệu chỉnh tham số chấm điểm khi chưa có ngân hàng thật | WP6, WP14 | Chuyên gia tín dụng trong ban cố vấn; dùng chung tham số cho hành vi ngân hàng giả lập |
 | 6 | Ai phê duyệt từng nguồn crawl; thời gian lưu snapshot thô | WP10 | FCC operations + pháp chế phê duyệt; lưu snapshot 24 tháng |
-| 7 | Nhà cung cấp hóa đơn điện tử, phần mềm kế toán làm trước | WP5, WP9 | Theo khảo sát doanh nghiệp pilot; trong lúc chờ tài khoản đối tác dùng nhập file |
-| 8 | Nhà cung cấp chữ ký số từ xa và eKYC | WP2 | Chọn một nhà cung cấp có API ký từ xa; trong lúc chờ dùng MFA + snapshot |
+| 7 | Đơn vị xuất khẩu hóa đơn điện tử, phần mềm kế toán làm trước | WP5, WP9 | Theo khảo sát doanh nghiệp pilot; trong lúc chờ tài khoản đối tác dùng nhập file |
+| 8 | Đơn vị xuất khẩu chữ ký số từ xa và eKYC | WP2 | Chọn một đơn vị xuất khẩu có API ký từ xa; trong lúc chờ dùng MFA + snapshot |
 | 9 | Giấy phép vnstock cho mục đích thương mại | WP10-A | Hỏi đơn vị phát triển vnstock trước staging; song song khảo sát nguồn công bố thông tin |
 | 10 | Biểu phí ban đầu (mức từng nguồn thu) | WP15 | Nhóm kinh doanh chốt; hệ thống chạy được với biểu phí 0 đồng |
-| 11 | Nhà cung cấp email | WP11 | SMTP của tên miền công ty |
+| 11 | Đơn vị xuất khẩu email | WP11 | SMTP của tên miền công ty |
 
 ## 7. Lộ trình
 
@@ -405,16 +405,16 @@ Theo 6 nguồn thu trong hồ sơ dự án (mục 3.3.5): phí giao dịch tài 
 | --- | --- | --- | --- |
 | M1 — Nền | WP0, WP1, WP2 (trừ chữ ký số, eKYC); khảo sát nguồn (WP10-B bước 1) | 6–8 tuần | Đăng nhập thật, nhiều người dùng, dữ liệu trên PostgreSQL, tệp có SHA-256; biên bản phân loại nguồn A/B/C |
 | M2 — API, ngân hàng giả lập, giao diện | WP3, WP14, WP4 (luồng hóa đơn → RFQ → hồ sơ → giải ngân) | 7–9 tuần | Trọn luồng tài trợ chạy trên `web/` với ngân hàng giả lập tự báo giá, giải ngân; cập nhật tức thời |
-| M3 — Chấm điểm và ESG | WP6, WP7, WP10-A, WP4 (màn hình liên quan) | 6–8 tuần | Điểm chạy ở server, phát hành chính thức, xem xét lại, ESG có trích dẫn; điểm bên mua niêm yết cập nhật định kỳ |
+| M3 — Chấm điểm và ESG | WP6, WP7, WP10-A, WP4 (màn hình liên quan) | 6–8 tuần | Điểm chạy ở server, phát hành chính thức, xem xét lại, ESG có trích dẫn; điểm bên nhập khẩu niêm yết cập nhật định kỳ |
 | M4 — Hóa đơn, thu hồi, dữ liệu công khai | WP5, WP8, WP10-B (bước 2–3), WP11 | 8–11 tuần | Xác thực hóa đơn, gian lận, tài sản bảo đảm, các lớp thu hồi, EWS, email; mục "Dữ liệu công khai" |
 | M5 — Kế toán, doanh thu, vận hành | WP9, WP15, WP12, WP13, WP2 (chữ ký số, eKYC); ngừng `web-legacy/` | 6–8 tuần | Bút toán, dự báo có sao kê, doanh thu 6 nguồn, nhật ký chống sửa, trợ lý AI; sẵn sàng UAT |
 
 **Luồng nghiệm thu cuối phase (chạy hoàn toàn trên `web/`, môi trường `staging`):**
 1. Ba tổ chức tài chính giả lập đăng sản phẩm qua API đối tác; FCC duyệt.
-2. Nhà cung cấp đăng ký (eKYC hoặc đối chiếu giấy tờ), mời thành viên; operator tải hóa đơn ảnh, owner xác nhận trường OCR; hóa đơn được xác thực với cơ quan thuế.
-3. Bên mua (approver, có MFA) xác nhận nghĩa vụ.
-4. Nhà cung cấp khai tài sản bảo đảm, xem phân loại và định giá sơ bộ; ký chia sẻ dữ liệu; gửi RFQ tới 3 sản phẩm; ngân hàng giả lập báo giá; chọn một, quyền của bên còn lại bị thu hồi.
-5. Ngân hàng giả lập thẩm định, cấp hạn mức, ra đề nghị; nhà cung cấp chấp thuận (ký); giải ngân T+1 qua webhook; phí giao dịch phát sinh; bút toán đề xuất hiện ở trang Kế toán.
-6. Bên mua thanh toán hai lần; ngân hàng giả lập ghi nhận tiền về, trừ gốc và phí, hoàn phần còn lại; khoản được tất toán. Chạy lại với kịch bản vỡ nợ: EWS cảnh báo, ngân hàng giả lập xử lý tài sản bảo đảm.
-7. Tổ chức tài chính xem mục "Dữ liệu công khai" của nhà cung cấp; nhà cung cấp khiếu nại một dòng và dòng đó chuyển sang "Đang được xem xét".
+2. Đơn vị xuất khẩu đăng ký (eKYC hoặc đối chiếu giấy tờ), mời thành viên; operator tải hóa đơn ảnh, owner xác nhận trường OCR; hóa đơn được xác thực với cơ quan thuế.
+3. Bên nhập khẩu (approver, có MFA) xác nhận nghĩa vụ.
+4. Đơn vị xuất khẩu khai tài sản bảo đảm, xem phân loại và định giá sơ bộ; ký chia sẻ dữ liệu; gửi RFQ tới 3 sản phẩm; ngân hàng giả lập báo giá; chọn một, quyền của bên còn lại bị thu hồi.
+5. Ngân hàng giả lập thẩm định, cấp hạn mức, ra đề nghị; đơn vị xuất khẩu chấp thuận (ký); giải ngân T+1 qua webhook; phí giao dịch phát sinh; bút toán đề xuất hiện ở trang Kế toán.
+6. Bên nhập khẩu thanh toán hai lần; ngân hàng giả lập ghi nhận tiền về, trừ gốc và phí, hoàn phần còn lại; khoản được tất toán. Chạy lại với kịch bản vỡ nợ: EWS cảnh báo, ngân hàng giả lập xử lý tài sản bảo đảm.
+7. Tổ chức tài chính xem mục "Dữ liệu công khai" của đơn vị xuất khẩu; đơn vị xuất khẩu khiếu nại một dòng và dòng đó chuyển sang "Đang được xem xét".
 8. Trong suốt luồng: điểm tín dụng và ESG đã phát hành không đổi; công cụ kiểm tra nhật ký báo toàn vẹn; Tổng quan ba vai trò và dashboard doanh thu khớp dữ liệu.
