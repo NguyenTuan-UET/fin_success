@@ -20,7 +20,7 @@ export function viewFor(s: State, actorId: string, now = new Date()): State {
     return {
       orgs: s.orgs, products: s.products, sources: s.sources, listed: [], limits: [], profiles: [], esg: s.esg, external: s.external, connections: [], ledger: [],
       // chỉ các khoản có cờ bất thường hoặc đã đối chiếu thuế, đã rút gọn (không mô tả, không chứng từ, không số/ký hiệu hóa đơn)
-      receivables: s.receivables.filter((r) => (r.flags?.length ?? 0) > 0 || r.taxCheck).map((r) => ({ ...r, description: '', files: undefined, fingerprint: '', docs: { xml: false, contract: false, delivery: false }, disputeReason: undefined })),
+      receivables: s.receivables.filter((r) => (r.flags?.length ?? 0) > 0 || r.taxCheck).map((r) => ({ ...r, description: '', files: undefined, customsInfo: undefined, fingerprint: '', docs: { xml: false, contract: false, delivery: false, customs: false }, disputeReason: undefined })),
       rfqs: [], applications: [], earlyOffers: [], consents: [],
       notifications: s.notifications.filter((n) => n.orgId === actorId).slice(0, 200),
       audit: s.audit.slice(0, 300).map((e) => (e.actorOrgId === actorId ? e : { ...e, detail: redactAuditDetail(e.action, e.detail) })),
@@ -37,7 +37,7 @@ export function viewFor(s: State, actorId: string, now = new Date()): State {
   const fullRecv = new Set(s.receivables.filter((r) => r.sellerId === actorId || r.buyerId === actorId || lenderRfqRecv.has(r.id) || lenderAppRecv.has(r.id)).map((r) => r.id))
 
   // Phần còn lại chỉ giữ các trường cần cho lịch sử thanh toán/tỷ trọng khi chấm điểm
-  const strip = (r: Receivable): Receivable => ({ ...r, invoiceSeries: '', invoiceNumber: '', description: '', fingerprint: '', docs: { xml: false, contract: false, delivery: false }, disputeReason: undefined, files: undefined, revisions: undefined })
+  const strip = (r: Receivable): Receivable => ({ ...r, invoiceSeries: '', invoiceNumber: '', description: '', fingerprint: '', docs: { xml: false, contract: false, delivery: false, customs: false }, disputeReason: undefined, files: undefined, customsInfo: undefined, revisions: undefined })
   const receivables = shared.map((r) => (fullRecv.has(r.id) ? r : strip(r)))
 
   const rfqs = s.rfqs

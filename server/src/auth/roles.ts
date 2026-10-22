@@ -29,7 +29,7 @@ export const MFA_ROLES: MemberRole[] = ['owner', 'approver', 'analyst', 'product
 const OPERATOR: string[] = [
   'createReceivable', 'sendToBuyer', 'reviseDisputed', 'reviseReceivable', 'cancelReceivable', 'ensureEsg', 'addEsgDocument', 'updateEsgMetrics',
   'updateIndicator', 'setEsgIndustry', 'upsertFinancialYear', 'updateProfile', 'saveCashProfile', 'importLedger', 'refreshListed',
-  'linkBank', 'attachDocuments',
+  'linkBank', 'attachDocuments', 'attachCustomsDocuments',
 ]
 const ALWAYS: string[] = ['markNotificationsRead']
 

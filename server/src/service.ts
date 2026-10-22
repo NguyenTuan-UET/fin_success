@@ -12,6 +12,8 @@ import { applicationScoreOf, buyerScoreOf, esgOf, supplierScoreOf } from '@fcc/d
 import { matchProduct } from '@fcc/domain/marketplace'
 import { computeEsg } from '@fcc/domain/esg'
 import { invoiceFlags, openFlags } from '@fcc/domain/fraud'
+import { CUSTOMS_FILE_LIMITS, CUSTOMS_GATE, customsFlags, customsGateCheck, hasCustomsDeclaration, isCustomsKind, kindAllowedFor, normalizeDeclarationNo, type CustomsGate } from '@fcc/domain/customs'
+import { CUSTOMS_DOC_KINDS, type CustomsSideInfo, type CustomsInfo, type ReceivableFile } from '@fcc/domain/types'
 import { allocationOf, balanceAt, reconcile, type SettlementEvent } from '@fcc/domain/settlement'
 import { bad, conflict, forbidden, notFound, unprocessable } from './errors'
 import type { State } from './state'
@@ -47,7 +49,7 @@ export interface DomainEvent {
   orgId: string
   type:
     | 'rfq.created' | 'rfq.closed' | 'application.submitted' | 'application.not_selected' | 'offer.accepted'
-    | 'application.withdrawn' | 'receivable.paid' | 'receivable.overdue' | 'application.funded' | 'application.settled'
+    | 'application.withdrawn' | 'receivable.paid' | 'receivable.overdue' | 'application.funded' | 'application.settled' | 'receivable.customs_documents_added'
   data: Record<string, unknown>
   at: string
 }
@@ -155,6 +157,18 @@ function assertEligible(c: Ctx, r: Receivable, productIds: string[]) {
   }
 }
 
+/** Cổng kiểm soát trước RFQ/hồ sơ trực tiếp; đổi bằng setCustomsGate (chỉ dùng trong test) */
+let customsGate: CustomsGate = CUSTOMS_GATE
+export const setCustomsGate = (g: CustomsGate) => { customsGate = g }
+function assertCustomsGate(r: Receivable) {
+  const g = customsGateCheck(r, customsGate)
+  if (g.blocking) throw unprocessable(`Chưa thể gửi yêu cầu tài trợ: còn thiếu ${g.missing.join(', ')}. Bổ sung ở mục Chứng từ hải quan của hóa đơn.`)
+}
+/** Loại chứng từ hải quan không đi qua đường chứng từ thương mại */
+function rejectCustomsKinds(files: unknown) {
+  if (Array.isArray(files) && files.some((f) => isCustomsKind(f?.kind))) throw unprocessable('Chứng từ hải quan: dùng thao tác “Thêm chứng từ hải quan”')
+}
+
 function openApplicationFor(c: Ctx, receivableId: string) {
   return c.s.applications.some((a) => a.receivableId === receivableId && ACTIVE_APP(a))
 }
@@ -187,7 +201,7 @@ export const actions: Record<string, Action> = {
       fingerprint: input.fingerprint, docs: { xml: !!input.docs?.xml, contract: !!input.docs?.contract, delivery: !!input.docs?.delivery },
       source: (['xml', 'ocr', 'manual', 'accounting'] as const).includes(input.source) ? input.source : 'manual',
       files: Array.isArray(input.files)
-        ? input.files.slice(0, 10).filter((f) => /^[0-9a-f]{64}$/.test(f?.key)).map((f) => ({ key: f.key, name: String(f.name ?? '').slice(0, 200), kind: (['invoice', 'contract', 'delivery'] as const).find((k) => k === f.kind) ?? ('other' as const) }))
+        ? (rejectCustomsKinds(input.files), input.files).slice(0, 10).filter((f) => /^[0-9a-f]{64}$/.test(f?.key)).map((f) => ({ key: f.key, name: String(f.name ?? '').slice(0, 200), kind: (['invoice', 'contract', 'delivery'] as const).find((k) => k === f.kind) ?? ('other' as const) }))
         : undefined,
     }
     const flags = invoiceFlags(r, c.s.receivables, c.now)
@@ -265,16 +279,99 @@ export const actions: Record<string, Action> = {
     requireSelf(c, r.sellerId)
     requireState('Khoản phải thu', r.state, ['DRAFT', 'BUYER_PENDING', 'BUYER_DISPUTED', 'BUYER_CONFIRMED'])
     if (openApplicationFor(c, id)) throw conflict('Khoản phải thu đang có hồ sơ tài trợ — bổ sung chứng từ qua hồ sơ')
+    rejectCustomsKinds(files)
     const clean = (Array.isArray(files) ? files : []).slice(0, 10).filter((f) => /^[0-9a-f]{64}$/.test(f?.key)).map((f) => ({ key: f.key, name: String(f.name ?? '').slice(0, 200), kind: (['invoice', 'contract', 'delivery'] as const).find((k) => k === f.kind) ?? ('other' as const) }))
     if (!clean.length) throw bad('Chưa chọn chứng từ')
     const existing = r.files ?? []
-    const merged = [...existing, ...clean.filter((f) => !existing.some((e) => e.key === f.key && e.kind === f.kind))].slice(0, 20)
-    const docs = { xml: r.docs.xml || merged.some((f) => f.kind === 'invoice'), contract: r.docs.contract || merged.some((f) => f.kind === 'contract'), delivery: r.docs.delivery || merged.some((f) => f.kind === 'delivery') }
+    const merged = [...existing, ...clean.filter((f) => !existing.some((e) => e.key === f.key && e.kind === f.kind))].slice(0, CUSTOMS_FILE_LIMITS.perReceivable)
+    const docs = { xml: r.docs.xml || merged.some((f) => f.kind === 'invoice'), contract: r.docs.contract || merged.some((f) => f.kind === 'contract'), delivery: r.docs.delivery || merged.some((f) => f.kind === 'delivery'), customs: r.docs.customs }
     patchRecv(c, id, { files: merged, docs })
     const label = { invoice: 'hóa đơn gốc', contract: 'hợp đồng', delivery: 'biên bản giao nhận', other: 'chứng từ khác' }
     const what = [...new Set(clean.map((f) => label[f.kind]))].join(', ')
     if (r.state !== 'DRAFT') notify(c, r.buyerId, `${r.code}: bổ sung chứng từ`, `${orgName(c, r.sellerId)} đã bổ sung ${what}.`, '/invoices')
     log(c, 'Bổ sung chứng từ', r.code, what)
+  },
+  /** Đơn vị xuất khẩu hoặc bên nhập khẩu của khoản thêm chứng từ hải quan và/hoặc thông tin tờ khai phía mình. Không bị chặn bởi hồ sơ tài trợ. */
+  attachCustomsDocuments(c, id: string, input: { files?: { key: string; name: string; kind: string }[]; info?: Record<string, unknown> }) {
+    const r = recv(c, id)
+    const side: 'export' | 'import' | null = c.actor.id === r.sellerId ? 'export' : c.actor.id === r.buyerId ? 'import' : null
+    if (!side) throw forbidden('Chỉ đơn vị xuất khẩu hoặc bên nhập khẩu của khoản này được thêm chứng từ hải quan')
+    if (side === 'import' && r.state === 'DRAFT') throw conflict('Hóa đơn chưa gửi cho bên nhập khẩu')
+    requireState('Khoản phải thu', r.state, ['DRAFT', 'BUYER_PENDING', 'BUYER_DISPUTED', 'BUYER_CONFIRMED', 'SUBMITTED', 'UNDER_REVIEW', 'OFFERED', 'ACCEPTED', 'FUNDED', 'OVERDUE'])
+    const rawFiles = Array.isArray(input?.files) ? input.files : []
+    if (!rawFiles.length && !input?.info) throw bad('Chưa chọn chứng từ hoặc thông tin tờ khai')
+    if (rawFiles.length > CUSTOMS_FILE_LIMITS.perCall) throw bad(`Tối đa ${CUSTOMS_FILE_LIMITS.perCall} tệp mỗi lần`)
+    const at = c.now.toISOString()
+    const clean: ReceivableFile[] = []
+    for (const f of rawFiles) {
+      if (!/^[0-9a-f]{64}$/.test(String(f?.key))) continue
+      if (!isCustomsKind(f.kind)) throw unprocessable('Loại chứng từ hải quan không hợp lệ')
+      if (!kindAllowedFor(f.kind, side)) throw forbidden(`Loại “${CUSTOMS_DOC_KINDS[f.kind].label}” không thuộc phía ${side === 'export' ? 'đơn vị xuất khẩu' : 'bên nhập khẩu'}`)
+      clean.push({ key: f.key, name: String(f.name ?? '').slice(0, 200), kind: f.kind, by: c.actor.id, at })
+    }
+    if (rawFiles.length && !clean.length) throw bad('Khóa tệp không hợp lệ')
+    const existing = r.files ?? []
+    const fresh = clean.filter((f, i) => !existing.some((e) => e.key === f.key && e.kind === f.kind) && clean.findIndex((x) => x.key === f.key && x.kind === f.kind) === i)
+    if (existing.length + fresh.length > CUSTOMS_FILE_LIMITS.perReceivable) throw conflict(`Khoản phải thu tối đa ${CUSTOMS_FILE_LIMITS.perReceivable} tệp`)
+    const merged = [...existing, ...fresh]
+
+    let customsInfo: CustomsInfo | undefined = r.customsInfo
+    if (input?.info) {
+      const i = input.info
+      const str = (v: unknown, n: number) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, n) : undefined)
+      const date = (v: unknown, label: string) => { if (v === undefined || v === '') return undefined; if (!isDate(v)) throw bad(`${label} phải có dạng YYYY-MM-DD`); return v }
+      const oneOf = <T extends string>(v: unknown, set: readonly T[], label: string) => { if (v === undefined || v === '') return undefined; if (!set.includes(v as T)) throw bad(`${label} không hợp lệ`); return v as T }
+      let declarationNo: string | undefined
+      if (i.declarationNo !== undefined && i.declarationNo !== '') { declarationNo = normalizeDeclarationNo(i.declarationNo) ?? undefined; if (!declarationNo) throw bad('Số tờ khai gồm 5–30 ký tự chữ, số') }
+      const common: CustomsSideInfo = {
+        declarationNo, declarationDate: date(i.declarationDate, 'Ngày tờ khai'), clearance: oneOf(i.clearance, ['cleared', 'pending'] as const, 'Trạng thái thông quan'),
+        channel: oneOf(i.channel, ['green', 'yellow', 'red'] as const, 'Luồng tờ khai'), updatedAt: at, updatedBy: c.userId ?? c.actor.id,
+      }
+      const prev = r.customsInfo?.[side] ?? {}
+      const strip = <T extends object>(o: T) => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined)) as T
+      if (side === 'export') {
+        customsInfo = { ...r.customsInfo, export: { ...prev, ...strip({ ...common,
+          transportMode: oneOf(i.transportMode, ['sea', 'air', 'road', 'rail'] as const, 'Phương thức vận tải'), transportDocNo: str(i.transportDocNo, 40), exporterTaxCode: str(i.exporterTaxCode, 20),
+          shipmentDate: date(i.shipmentDate, 'Ngày giao hàng'), portOfLoading: str(i.portOfLoading, 80), portOfDischarge: str(i.portOfDischarge, 80), incoterms: str(i.incoterms, 10)?.toUpperCase() }) } }
+      } else {
+        customsInfo = { ...r.customsInfo, import: { ...prev, ...strip(common) } }
+      }
+    }
+    const docs = { ...r.docs, customs: hasCustomsDeclaration(merged) }
+    patchRecv(c, id, { files: merged, docs, customsInfo })
+    const next = recv(c, id)
+
+    // cờ rủi ro từ tờ khai: trùng số tờ khai (gắn cả hai khoản), sai MST người xuất khẩu
+    if (side === 'export' && input?.info) {
+      const seller = c.s.orgs.find((o) => o.id === r.sellerId)
+      const { flags, reusedWith } = customsFlags(next, c.s.receivables, seller?.taxCode)
+      const addFlags = (x: Receivable, fs: typeof flags) => {
+        const fresh = fs.filter((f) => !(x.flags ?? []).some((e) => e.code === f.code && !e.resolvedAt && e.detail === f.detail))
+        if (fresh.length) patchRecv(c, x.id, { flags: [...(x.flags ?? []), ...fresh] })
+        return fresh
+      }
+      const mine = addFlags(next, flags)
+      for (const o of reusedWith) addFlags(o, customsFlags(recv(c, o.id), c.s.receivables, undefined).flags.filter((f) => f.code === 'CUSTOMS_DECL_REUSED'))
+      if (mine.length) {
+        log(c, 'Hóa đơn có cờ bất thường', r.code, mine.map((f) => f.detail).join(' '))
+        for (const f of c.s.orgs.filter((x) => x.type === 'fcc')) notify(c, f.id, `Hóa đơn ${r.code} có cờ bất thường`, mine.map((x) => x.detail).join(' '), '/admin')
+      }
+    }
+
+    const kinds = [...new Set(fresh.map((f) => CUSTOMS_DOC_KINDS[f.kind as keyof typeof CUSTOMS_DOC_KINDS].label))]
+    const who = orgName(c, c.actor.id)
+    if (kinds.length) log(c, 'Bổ sung chứng từ hải quan', r.code, fresh.map((f) => `${CUSTOMS_DOC_KINDS[f.kind as keyof typeof CUSTOMS_DOC_KINDS].label}: ${f.name}`).join('; '))
+    if (input?.info) log(c, 'Cập nhật thông tin tờ khai', r.code, `phía ${side === 'export' ? 'xuất khẩu' : 'nhập khẩu'}${customsInfo?.[side]?.declarationNo ? ` · số ${customsInfo[side]!.declarationNo}` : ''}`)
+    if (!kinds.length && !input?.info) return
+    if (r.state !== 'DRAFT') {
+      const counterpart = side === 'export' ? r.buyerId : r.sellerId
+      const what = kinds.length ? kinds.join(', ') : 'thông tin tờ khai'
+      notify(c, counterpart, `${r.code}: bổ sung chứng từ hải quan`, `${who} đã bổ sung ${what}.`, '/invoices')
+      for (const a of c.s.applications.filter((x) => x.receivableId === id && ACTIVE_APP(x))) {
+        notify(c, a.lenderId, `${r.code}: bổ sung chứng từ hải quan`, `${who} đã bổ sung ${what}.`, '/appraisal')
+        emit(c, a.lenderId, 'receivable.customs_documents_added', { applicationId: a.id, receivableId: id, side, kinds: [...new Set(fresh.map((f) => f.kind))] })
+      }
+    }
   },
   /** Vận hành FCC xử lý cờ bất thường (đã xem xét), kèm ghi chú. */
   resolveFlag(c, receivableId: string, code: string, note: string) {
@@ -387,6 +484,7 @@ export const actions: Record<string, Action> = {
     if (r.state !== 'BUYER_CONFIRMED') throw conflict('Chỉ tạo RFQ khi khoản phải thu ở trạng thái “Bên mua đã xác nhận”')
     if (!Array.isArray(productIds) || productIds.length === 0 || productIds.length > 3 || new Set(productIds).size !== productIds.length) throw bad('Chọn 1–3 sản phẩm khác nhau')
     if (c.s.rfqs.some((q) => q.receivableId === receivableId && ['OPEN', 'RESPONDED'].includes(q.state))) throw conflict('Khoản phải thu đã có RFQ đang mở')
+    assertCustomsGate(r)
     assertEligible(c, r, productIds)
     const rfq: Rfq = { id: uid('RFQ'), receivableId, sellerId: r.sellerId, productIds, state: 'OPEN', createdAt: iso(c.now), expiresAt: iso(new Date(c.now.getTime() + 5 * DAY)), responses: [] }
     c.s.rfqs = [rfq, ...c.s.rfqs]
@@ -451,6 +549,7 @@ export const actions: Record<string, Action> = {
     if (r.state !== 'BUYER_CONFIRMED') throw conflict('Chỉ gửi hồ sơ khi khoản phải thu ở trạng thái “Bên mua đã xác nhận”')
     if (openApplicationFor(c, receivableId)) throw conflict('Khoản phải thu đã có hồ sơ tài trợ (đang hoạt động hoặc đã tài trợ)')
     if (c.s.rfqs.some((q) => q.receivableId === receivableId && ['OPEN', 'RESPONDED'].includes(q.state))) throw conflict('Khoản phải thu đang có RFQ mở — hủy RFQ trước khi gửi trực tiếp')
+    assertCustomsGate(r)
     assertEligible(c, r, [productId])
     const p = c.s.products.find((x) => x.id === productId)!
     const a: FundingApplication = { id: uid('APP'), receivableId, lenderId: p.lenderId, productId, state: 'SUBMITTED', submittedAt: iso(c.now) }
