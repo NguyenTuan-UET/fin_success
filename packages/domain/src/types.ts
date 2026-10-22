@@ -7,7 +7,7 @@ export type IndustryGroup = 'manufacturing' | 'trade' | 'agri' | 'tech'
 export type DataStatus = 'self_declared' | 'extracted' | 'verified' | 'public_reference'
 
 export interface InvoiceFlag {
-  code: 'AMOUNT_ANOMALY' | 'NEW_BUYER_LARGE' | 'FUTURE_ISSUE_DATE' | 'BURST_SAME_BUYER' | 'ROUND_LARGE_MANUAL' | 'NO_SOURCE_DOCUMENT'
+  code: 'AMOUNT_ANOMALY' | 'NEW_BUYER_LARGE' | 'FUTURE_ISSUE_DATE' | 'BURST_SAME_BUYER' | 'ROUND_LARGE_MANUAL' | 'NO_SOURCE_DOCUMENT' | 'CUSTOMS_DECL_REUSED' | 'CUSTOMS_EXPORTER_MISMATCH'
   detail: string
   severity: 'high' | 'medium' | 'low'
   resolvedAt?: string
@@ -185,7 +185,7 @@ export interface Receivable {
   state: ReceivableState
   version: number
   fingerprint: string
-  docs: { xml: boolean; contract: boolean; delivery: boolean }
+  docs: { xml: boolean; contract: boolean; delivery: boolean; customs?: boolean }
   source: 'xml' | 'ocr' | 'manual' | 'accounting'
   /** Cờ gian lận/bất thường theo luật; hồ sơ có cờ chưa xử lý vào hàng đợi FCC operations (không tự từ chối) */
   flags?: InvoiceFlag[]
@@ -194,7 +194,9 @@ export interface Receivable {
   /** Hóa đơn điều chỉnh/thay thế: khoản phải thu gốc */
   replacesId?: string
   /** Chứng từ gốc đã tải lên kho tệp (bất biến, định danh theo SHA-256) */
-  files?: { key: string; name: string; kind: 'invoice' | 'contract' | 'delivery' | 'other' }[]
+  files?: ReceivableFile[]
+  /** Thông tin tờ khai hải quan do từng phía khai (xem customs.ts) */
+  customsInfo?: CustomsInfo
   disputeReason?: string
   /** Thời điểm gửi bên mua lần đầu; trước đó (bản nháp) chỉ bên bán thấy */
   sentAt?: string
@@ -205,6 +207,56 @@ export interface Receivable {
   paidAmount?: number
   dilution?: number // tỷ lệ điều chỉnh giảm/hàng trả lại 0..1
   createdAt: string
+}
+
+// ---------------- Chứng từ hải quan ----------------
+
+/** Loại chứng từ hải quan; side = phía được tải (exporter = đơn vị xuất khẩu, importer = bên nhập khẩu, both = cả hai) */
+export const CUSTOMS_DOC_KINDS = {
+  customs_export_declaration: { label: 'Tờ khai hải quan xuất khẩu', side: 'exporter' },
+  transport_document: { label: 'Vận đơn', side: 'exporter' },
+  packing_list: { label: 'Phiếu đóng gói', side: 'exporter' },
+  certificate_of_origin: { label: 'Giấy chứng nhận xuất xứ', side: 'exporter' },
+  inspection_certificate: { label: 'Giấy kiểm dịch / chất lượng', side: 'exporter' },
+  cargo_insurance: { label: 'Bảo hiểm hàng hóa', side: 'exporter' },
+  customs_import_declaration: { label: 'Tờ khai hải quan nhập khẩu', side: 'importer' },
+  import_goods_receipt: { label: 'Xác nhận nhận hàng', side: 'importer' },
+  customs_other: { label: 'Chứng từ hải quan khác', side: 'both' },
+} as const
+export type CustomsDocKind = keyof typeof CUSTOMS_DOC_KINDS
+export type ReceivableFileKind = 'invoice' | 'contract' | 'delivery' | 'other' | CustomsDocKind
+
+export interface ReceivableFile {
+  /** SHA-256 của nội dung */
+  key: string
+  name: string
+  kind: ReceivableFileKind
+  /** Id tổ chức tải lên; thiếu = đơn vị xuất khẩu (dữ liệu cũ) */
+  by?: string
+  /** ISO thời điểm gắn vào khoản phải thu */
+  at?: string
+}
+
+export interface CustomsSideInfo {
+  declarationNo?: string
+  declarationDate?: string
+  clearance?: 'cleared' | 'pending'
+  channel?: 'green' | 'yellow' | 'red'
+  updatedAt?: string
+  updatedBy?: string
+}
+export interface CustomsInfo {
+  export?: CustomsSideInfo & {
+    transportMode?: 'sea' | 'air' | 'road' | 'rail'
+    transportDocNo?: string
+    /** MST người xuất khẩu ghi trên tờ khai, để đối chiếu với Org.taxCode */
+    exporterTaxCode?: string
+    shipmentDate?: string
+    portOfLoading?: string
+    portOfDischarge?: string
+    incoterms?: string
+  }
+  import?: CustomsSideInfo
 }
 
 // ---------------- Marketplace ----------------

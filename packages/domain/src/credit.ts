@@ -2,7 +2,7 @@
 // Scorecard chuyên gia, xác định (cùng đầu vào → cùng kết quả), có phiên bản.
 import type { CreditProfile, FinancialYear, IndustryGroup, ListedSnapshot, Org, Rating, Receivable } from './types'
 
-export const SCORECARD_VERSION = 'supplier-v1.0 · buyer-v1.0 · application-v1.0 (ngưỡng khởi tạo)'
+export const SCORECARD_VERSION = 'supplier-v1.0 · buyer-v1.0 · application-v1.1 (ngưỡng khởi tạo)'
 
 export interface FactorResult {
   code: string
@@ -420,8 +420,8 @@ export function scoreApplication(ctx: ApplicationContext): ScoreResult & { eligi
   const r = ctx.receivable
   const now = ctx.now ?? new Date()
   const T: FactorResult[] = []
-  const docs = [r.docs.xml, r.docs.contract, r.docs.delivery].filter(Boolean).length
-  T.push({ code: 'T1', name: 'Chứng từ đã xác minh', component: 'tx', raw: `${r.docs.xml ? 'XML ✓' : 'XML ✗'} · ${r.docs.contract ? 'Hợp đồng ✓' : 'Hợp đồng ✗'} · ${r.docs.delivery ? 'Biên bản giao nhận ✓' : 'Biên bản ✗'}`, points: [20, 50, 75, 100][docs], source: 'FCC', reason: docs === 3 ? 'Bộ chứng từ đầy đủ' : 'Thiếu chứng từ' })
+  const docs = [r.docs.xml, r.docs.contract, r.docs.delivery, !!r.docs.customs].filter(Boolean).length
+  T.push({ code: 'T1', name: 'Chứng từ đã xác minh', component: 'tx', raw: `${r.docs.xml ? 'Hóa đơn ✓' : 'Hóa đơn ✗'} · ${r.docs.contract ? 'Hợp đồng ✓' : 'Hợp đồng ✗'} · ${r.docs.delivery ? 'Chứng từ giao hàng ✓' : 'Chứng từ giao hàng ✗'} · ${r.docs.customs ? 'Tờ khai hải quan ✓' : 'Tờ khai hải quan ✗'}`, points: [20, 40, 60, 80, 100][docs], source: 'FCC', reason: docs === 4 ? 'Bộ chứng từ đầy đủ' : 'Thiếu chứng từ' })
   if (ctx.pairHistory && ctx.pairHistory.total > 0) {
     const rr = ctx.pairHistory.onTime / ctx.pairHistory.total
     T.push({ code: 'T2', name: 'Lịch sử thanh toán cặp mua–bán', component: 'tx', raw: `${ctx.pairHistory.onTime}/${ctx.pairHistory.total} đúng hạn`, points: band(rr, [[0.95, 100], [0.8, 70], [0.6, 40]], 10), source: 'FCC', reason: rr >= 0.8 ? 'Cặp mua–bán thanh toán tốt' : 'Cặp mua–bán hay trễ' })
