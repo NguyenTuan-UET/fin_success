@@ -9,6 +9,7 @@ import { useScores } from "@/lib/scores";
 import { Term } from "@/components/ui/Term";
 import { DateInput, MoneyInput } from "@/components/ui/Fields";
 import { InvoiceDocuments, missingDocs, RevisionHistory } from "@/components/screens/InvoiceParts";
+import { CustomsDocuments } from "@/components/screens/CustomsDocuments";
 import { useToast } from "@/components/providers/Toast";
 
 const HURDLE = 0.045; // chi phí cơ hội tiền mặt, %/năm (cấu hình mặc định)
@@ -94,6 +95,7 @@ export function BuyerConfirm() {
               <span className="muted">Xếp hạng nhà cung cấp (tham khảo): {(() => { const x = scores.supplier(s.sellerId); return !x.official && x.coverage < 0.5 ? "chưa đủ dữ liệu" : `${x.rating}${x.official ? "" : " · tạm tính"}`; })()}</span>
               <RevisionHistory r={s} />
               <InvoiceDocuments r={s} />
+              <CustomsDocuments r={s} />
               <div className="muted" style={{ fontSize: 12.5 }}>FCC lưu chứng từ nhà cung cấp tải lên nhưng chưa tự đối chiếu nội dung với đơn hàng hay biên bản của bạn — hãy kiểm tra trước khi xác nhận.</div>
               {s.state === "BUYER_PENDING" && <div className="row" style={{ gap: 8 }}><button className="btn bp" disabled={busy} onClick={() => confirm(s)}>Xác nhận phiên bản v{s.version}</button><button className="btn bs" disabled={busy} onClick={() => setDispute({ id: s.id, reason: "" })}>Hỏi lại</button></div>}
               <div style={{ fontSize: 12.5, color: "var(--ink-2)", background: "var(--info-bg)", padding: "10px 12px", borderRadius: 10 }}>

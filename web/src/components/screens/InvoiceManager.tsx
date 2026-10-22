@@ -12,6 +12,7 @@ import { AskButton } from "@/components/assistant/Assistant";
 import { Term } from "@/components/ui/Term";
 import { DateInput, MoneyInput } from "@/components/ui/Fields";
 import { InvoiceDocuments, InvoiceTimeline, RevisionHistory } from "@/components/screens/InvoiceParts";
+import { CustomsDocuments } from "@/components/screens/CustomsDocuments";
 
 export function InvoiceManager() {
   const { data, org, act } = useData();
@@ -119,7 +120,7 @@ export function InvoiceManager() {
                         <div className={cx("muted", r.state === "OVERDUE" && "t-bad strong")}>{d === null ? "đã thanh toán" : d < 0 ? `quá hạn ${-d} ngày` : `còn ${d} ngày`}</div>
                       </td>
                       <td className="num">{(() => { const b = scores.buyer(r.buyerId); return !b.official && b.coverage < 0.5 ? "Chưa đủ dữ liệu" : b.rating; })()}</td>
-                      <td><span className={`chip ${RECEIVABLE_STAGE[r.state].chip}`}>{RECEIVABLE_STAGE[r.state].short}</span></td>
+                      <td><span className={`chip ${RECEIVABLE_STAGE[r.state].chip}`}>{RECEIVABLE_STAGE[r.state].short}</span>{!r.docs.customs && !["CANCELLED", "SETTLED", "EARLY_PAID", "REJECTED"].includes(r.state) && <span className="chip c-warn" style={{ marginLeft: 4 }}>Thiếu chứng từ hải quan</span>}</td>
                     </tr>
                   );
                 })}
@@ -159,6 +160,7 @@ export function InvoiceManager() {
 
               <InvoiceTimeline r={s} app={data.applications.find((a) => a.receivableId === s.id && !["REJECTED", "WITHDRAWN"].includes(a.state))} />
               <InvoiceDocuments r={s} canAttach={["DRAFT", "BUYER_PENDING", "BUYER_DISPUTED", "BUYER_CONFIRMED"].includes(s.state) && !data.applications.some((a) => a.receivableId === s.id && !["REJECTED", "WITHDRAWN"].includes(a.state))} />
+              <CustomsDocuments r={s} />
               <RevisionHistory r={s} />
 
               {s.state === "DRAFT" && (

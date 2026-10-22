@@ -13,6 +13,7 @@ export const SUGGESTIONS: Record<Role, string[]> = {
     "Nên tài trợ hóa đơn nào?",
     "Lãi suất thấp nhất hiện nay?",
     "Làm sao tăng điểm ESG?",
+    "Hóa đơn này thiếu chứng từ hải quan nào?",
     "DSO là gì?",
   ],
   buyer: [
@@ -59,6 +60,11 @@ const ALIASES: [string[], GlossaryKey][] = [
   [["loi suat quy nam"], "annualYield"],
   [["3 chieu", "ba chieu"], "threeWay"],
   [["ocr"], "ocr"],
+  [["to khai hai quan"], "customsDeclaration"],
+  [["thong quan"], "clearance"],
+  [["van don"], "billOfLading"],
+  [["c/o", "xuat xu"], "certificateOfOrigin"],
+  [["incoterms"], "incoterms"],
   [["esg"], "esg"],
 ];
 

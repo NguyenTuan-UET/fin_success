@@ -14,6 +14,7 @@ import { SettlementPanel } from "./SettlementPanel";
 import { Term } from "@/components/ui/Term";
 import { useToast } from "@/components/providers/Toast";
 import { iso } from "@fcc/domain/util";
+import { CustomsDocuments } from "@/components/screens/CustomsDocuments";
 
 const addDays = (n: number) => iso(new Date(Date.now() + n * 86_400_000));
 
@@ -168,6 +169,7 @@ export function LenderAppraisal() {
               {quote && <div><div className="muted">Báo giá đã chọn</div><div className="num">{quote.ratePct}%/năm · ứng {quote.advancePct}%</div></div>}
               <div><div className="muted"><Term k="esg">ESG</Term></div><div>{esg ? `${dec(esg.result.score, 0)}/100 · độ bao phủ ${Math.round(esg.result.coverage * 100)}%${esg.official ? " (chính thức)" : " (tạm tính)"}` : "Chưa được chia sẻ"}</div></div>
             </div>
+            <CustomsDocuments r={r} />
             {r.files?.length ? <div className="muted" style={{ fontSize: 12.5 }}>Chứng từ gốc (SHA-256): {r.files.map((f) => f.name).join(", ")}</div> : <div className="muted">Chưa có chứng từ gốc đính kèm — yêu cầu bổ sung nếu cần.</div>}
             {profile?.collateral?.length ? <div className="muted" style={{ fontSize: 12.5 }}>Tài sản bảo đảm khai báo: {profile.collateral.length} tài sản (giá trị khai báo, chưa thẩm định)</div> : null}
           </div>

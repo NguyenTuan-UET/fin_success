@@ -1,5 +1,6 @@
 "use client";
 
+import { customsGate } from "@/components/screens/CustomsDocuments";
 import Link from "next/link";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
@@ -99,11 +100,12 @@ function Compare() {
           <section className="card flush">
             <div className="ch">
               <div><h2 className="ct">Gói phù hợp</h2><p className="muted">Chi phí ước tính theo biểu giá công bố của tổ chức tài chính — không phải báo giá. Chọn tối đa 3 gói để gửi yêu cầu báo giá.</p></div>
-              <button className="btn bp" disabled={!picked.length || busy || hasRfq} onClick={() => run(async () => { await act("POST", "/v1/rfqs", { receivableId: rid, productIds: picked }); setPicked([]); }, "Đã gửi yêu cầu báo giá")}>
+              <button className="btn bp" disabled={!picked.length || busy || hasRfq || (!!r && customsGate(r).blocking)} title={r && customsGate(r).blocking ? `Thiếu ${customsGate(r).missing.join("; ")}` : undefined} onClick={() => run(async () => { await act("POST", "/v1/rfqs", { receivableId: rid, productIds: picked }); setPicked([]); }, "Đã gửi yêu cầu báo giá")}>
                 <Send size={16} aria-hidden="true" /> Gửi yêu cầu báo giá ({picked.length}/3)
               </button>
             </div>
             {eligible[0] && <div className="muted" style={{ padding: "0 16px 8px" }}>Cơ sở tính: {eligible[0].cost.tenorDays} ngày theo năm 365 ngày, lãi thu cuối kỳ, phí trả trước được trừ vào thực nhận; chưa gồm thuế và phí dịch vụ FCC. Thứ tự chỉ theo tiêu chí “Sắp xếp” bạn chọn — FCC không xếp hạng theo hoa hồng hay quan hệ với tổ chức tài chính.</div>}
+            {r && customsGate(r).missing.length > 0 && <div className={customsGate(r).blocking ? "err" : "muted"} style={{ margin: "0 16px 8px" }} role="status">{customsGate(r).blocking ? `Chưa gửi được yêu cầu báo giá: còn thiếu ${customsGate(r).missing.join("; ")}.` : "Chưa có tờ khai hải quan xuất khẩu đã thông quan: tổ chức tài chính có thể từ chối hoặc báo giá kém hơn."} Bổ sung ở mục Chứng từ hải quan của hóa đơn.</div>}
             {hasRfq && <div className="muted" style={{ padding: "0 16px 8px" }}>Hóa đơn này đã có RFQ đang mở. Hủy hoặc chờ phản hồi ở bên dưới.</div>}
             <div className="tw" tabIndex={0} role="region" aria-label="Bảng dữ liệu, cuộn ngang để xem thêm">
               <table>

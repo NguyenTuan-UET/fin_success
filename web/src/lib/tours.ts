@@ -98,6 +98,7 @@ const supplier: TourStep[] = [
       "Bấm vào một hóa đơn để xem chi tiết và chứng từ.",
       "Gửi hóa đơn cho người mua xác nhận; chỉ hóa đơn đã xác nhận mới được đem đi tài trợ.",
       "Nếu người mua tranh chấp: sửa thông tin rồi gửi lại.",
+      "Mở chi tiết hóa đơn để thêm chứng từ hải quan (tờ khai, vận đơn…) — cần để gửi yêu cầu báo giá.",
     ],
   },
   {
@@ -187,6 +188,7 @@ const buyer: TourStep[] = [
     body: "Nhà cung cấp gửi hóa đơn để bạn xác nhận khoản nợ là đúng. Xác nhận nhanh giúp nhà cung cấp được tài trợ sớm.",
     tips: [
       "Mở hóa đơn, đối chiếu với chứng từ, rồi “Xác nhận” hoặc “Tranh chấp” kèm lý do (cần MFA).",
+      "Bên nhập khẩu cũng có thể thêm tờ khai nhập khẩu và xác nhận nhận hàng ở mục Chứng từ hải quan.",
       "Khi đã trả tiền: “Ghi nhận đã thanh toán” với số tiền, ngày, mã giao dịch.",
       "Lưu ý: hồ sơ chỉ tất toán khi tổ chức tài chính xác nhận tiền về.",
     ],

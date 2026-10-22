@@ -98,6 +98,31 @@ export const GLOSSARY = {
     full: "Nhận dạng ký tự + trí tuệ nhân tạo",
     text: "Tự đọc thông tin trên hóa đơn PDF/ảnh. Trường có độ tin cậy thấp sẽ được tô màu để bạn kiểm tra lại.",
   },
+  customsDeclaration: {
+    term: "Tờ khai hải quan",
+    full: "Tờ khai xuất khẩu / nhập khẩu",
+    text: "Chứng từ khai báo hàng hóa với cơ quan hải quan. Mọi giao dịch xuất khẩu đều có tờ khai; đây là bằng chứng chính cho thấy hóa đơn là thật.",
+  },
+  clearance: {
+    term: "Thông quan",
+    full: "Hàng đã được hải quan cho phép xuất/nhập",
+    text: "Tờ khai đã được cơ quan hải quan chấp nhận và hàng được phép đi. FCC chỉ ghi nhận thông tin bạn khai, chưa tự đối chiếu với hải quan.",
+  },
+  billOfLading: {
+    term: "Vận đơn",
+    full: "B/L, AWB, CMR…",
+    text: "Chứng từ do hãng vận chuyển cấp, xác nhận hàng đã được giao cho họ vận chuyển.",
+  },
+  certificateOfOrigin: {
+    term: "C/O",
+    full: "Giấy chứng nhận xuất xứ",
+    text: "Chứng nhận hàng hóa được sản xuất ở đâu, thường dùng để hưởng ưu đãi thuế quan.",
+  },
+  incoterms: {
+    term: "Incoterms",
+    full: "Điều kiện thương mại quốc tế (FOB, CIF…)",
+    text: "Quy định bên nào chịu chi phí và rủi ro vận chuyển ở từng chặng của lô hàng.",
+  },
 } as const;
 
 export type GlossaryKey = keyof typeof GLOSSARY;

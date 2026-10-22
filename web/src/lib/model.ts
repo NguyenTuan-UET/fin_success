@@ -65,6 +65,8 @@ export const ratingTone = (r?: string) => (!r ? "c-neu" : ["AAA", "AA", "A"].inc
 /** Nhãn tiếng Việt cho mã cờ hóa đơn; mã gốc chỉ hiện ở chi tiết kỹ thuật (title). */
 export const FLAG_LABEL: Record<string, string> = {
   NO_SOURCE_DOCUMENT: "Thiếu chứng từ gốc",
+  CUSTOMS_DECL_REUSED: "Số tờ khai trùng ở khoản khác",
+  CUSTOMS_EXPORTER_MISMATCH: "MST trên tờ khai khác đơn vị xuất khẩu",
   AMOUNT_ANOMALY: "Số tiền bất thường",
   BURST_SAME_BUYER: "Nhiều hóa đơn dồn dập cho cùng bên mua",
   NEW_BUYER_LARGE: "Hóa đơn lớn với bên mua mới",

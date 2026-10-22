@@ -1,5 +1,6 @@
 // Dữ kiện đưa cho trợ lý: chỉ số liệu có trên màn hình của người dùng (đã lọc theo quyền), tính bằng cùng công thức
 // với giao diện. Mô hình AI chỉ được diễn giải các dữ kiện này; không có số nào do mô hình tự suy ra.
+import { customsGateCheck } from "@fcc/domain/customs";
 import { ewsAlerts } from "@fcc/domain/ews";
 import { forecastCash } from "@fcc/domain/cashflow";
 import { applicationScoreOf, buyerScoreOf, supplierScoreOf } from "@fcc/domain/engine";
@@ -60,7 +61,7 @@ export function buildFacts(role: Role, d: FccState, org: Org) {
     const sc = supplierScoreOf(d, org.id);
     return {
       ...base,
-      hoa_don: mine.slice(0, 40).map((r) => { const f = fundingStatus(d, r); return { ma: r.code, nguoi_mua: name(d, r.buyerId), so_tien: r.amount, han: r.dueDate, trang_thai: RECEIVABLE_STAGE[r.state].label, du_dieu_kien_tai_tro: f.ok, ly_do: f.reason }; }),
+      hoa_don: mine.slice(0, 40).map((r) => { const f = fundingStatus(d, r); return { ma: r.code, nguoi_mua: name(d, r.buyerId), so_tien: r.amount, han: r.dueDate, trang_thai: RECEIVABLE_STAGE[r.state].label, du_dieu_kien_tai_tro: f.ok, ly_do: f.reason, thieu_chung_tu_hai_quan: customsGateCheck(r).missing.concat(customsGateCheck(r).warnings) }; }),
       hoa_don_du_dieu_kien_tai_tro: mine.filter((r) => fundingStatus(d, r).ok).map((r) => r.code),
       ho_so_tai_tro: d.applications.filter((a) => mine.some((r) => r.id === a.receivableId)).map((a) => ({ ma: a.id, to_chuc: name(d, a.lenderId), trang_thai: APP_STATE_LABEL[a.state].label, de_nghi: a.offer })),
       rfq: d.rfqs.filter((q) => q.sellerId === org.id).map((q) => ({ ma: q.id, trang_thai: q.state, bao_gia: q.responses.map((x) => ({ to_chuc: name(d, x.lenderId), loai: x.kind, lai: x.ratePct, ung_truoc: x.advancePct })) })),

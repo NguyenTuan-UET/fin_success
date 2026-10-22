@@ -122,7 +122,7 @@ export function InvoiceUpload() {
         description: d.description, fingerprint, source: d.source, files: uploaded, docs: { xml: d.source === "xml", contract: !!extra.contract, delivery: !!extra.delivery },
       });
       if (sendNow) await act("POST", `/v1/receivables/${r.result.id}/buyer-invitation`);
-      toast(sendNow ? `Đã tạo ${r.result.code} và gửi ${buyer.shortName} xác nhận.` : `Đã lưu ${r.result.code} ở trạng thái nháp.`);
+      toast(sendNow ? `Đã tạo ${r.result.code} và gửi ${buyer.shortName} xác nhận.` : `Đã lưu ${r.result.code} ở trạng thái nháp. Bổ sung chứng từ hải quan ở chi tiết hóa đơn.`);
       router.push("/supplier/invoices");
     } catch (e) {
       setErr((e as Error).message);
