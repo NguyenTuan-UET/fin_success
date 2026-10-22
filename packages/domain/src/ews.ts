@@ -50,20 +50,20 @@ export function ewsAlerts(s: S, apps: FundingApplication[], now = new Date()): E
       const d = daysTo(r.dueDate, now)
       const amt = a.fundedAmount ?? a.offer?.advanceVnd ?? 0
       if (r.state === 'OVERDUE' || d < 0) {
-        out.push({ ...base, id: `${a.id}:OVERDUE`, code: 'OVERDUE', severity: -d > 30 ? 'high' : 'medium', amount: amt, title: `${r.code} quá hạn ${-d} ngày`, detail: `Bên mua chưa thanh toán đến hạn ${r.dueDate}; dư nợ ${amt.toLocaleString('vi-VN')} ₫.`, suggestion: 'Đôn đốc bên mua; kích hoạt xử lý tài sản bảo đảm nếu có và theo hợp đồng.' })
+        out.push({ ...base, id: `${a.id}:OVERDUE`, code: 'OVERDUE', severity: -d > 30 ? 'high' : 'medium', amount: amt, title: `${r.code} quá hạn ${-d} ngày`, detail: `Bên nhập khẩu chưa thanh toán đến hạn ${r.dueDate}; dư nợ ${amt.toLocaleString('vi-VN')} ₫.`, suggestion: 'Đôn đốc bên nhập khẩu; kích hoạt xử lý tài sản bảo đảm nếu có và theo hợp đồng.' })
       } else if (d <= EWS_PARAMS.dueSoonDays) {
-        out.push({ ...base, id: `${a.id}:DUE_SOON`, code: 'DUE_SOON', severity: 'low', amount: amt, title: `${r.code} đến hạn sau ${d} ngày`, detail: `Hạn thanh toán ${r.dueDate}.`, suggestion: 'Nhắc bên mua; chuẩn bị đối soát khi tiền về.' })
+        out.push({ ...base, id: `${a.id}:DUE_SOON`, code: 'DUE_SOON', severity: 'low', amount: amt, title: `${r.code} đến hạn sau ${d} ngày`, detail: `Hạn thanh toán ${r.dueDate}.`, suggestion: 'Nhắc bên nhập khẩu; chuẩn bị đối soát khi tiền về.' })
       }
       const h = paymentHistory(s, r.buyerId)
       if (h.total >= 3 && h.avgLateDays > EWS_PARAMS.lateHistoryDays) {
-        out.push({ ...base, id: `${a.id}:BUYER_LATE_HISTORY`, code: 'BUYER_LATE_HISTORY', severity: 'medium', title: `Bên mua thường trả chậm (TB ${h.avgLateDays.toFixed(1)} ngày)`, detail: `${h.total} khoản gần đây, ${h.onTime} đúng hạn.`, suggestion: 'Rà soát hạn mức và điều kiện với bên mua này.' })
+        out.push({ ...base, id: `${a.id}:BUYER_LATE_HISTORY`, code: 'BUYER_LATE_HISTORY', severity: 'medium', title: `Bên nhập khẩu thường trả chậm (TB ${h.avgLateDays.toFixed(1)} ngày)`, detail: `${h.total} khoản gần đây, ${h.onTime} đúng hạn.`, suggestion: 'Rà soát hạn mức và điều kiện với bên nhập khẩu này.' })
       }
       const br = buyerScoreOf(s, r.buyerId).rating
       if (RATING_ORDER.indexOf(br) <= RATING_ORDER.indexOf(EWS_PARAMS.lowRating)) {
-        out.push({ ...base, id: `${a.id}:BUYER_RATING_LOW`, code: 'BUYER_RATING_LOW', severity: 'medium', title: `Bên mua xếp hạng ${br}`, detail: 'Hạng tham khảo thấp hơn ngưỡng theo dõi.', suggestion: 'Cân nhắc giảm hạn mức mới cho bên mua này.' })
+        out.push({ ...base, id: `${a.id}:BUYER_RATING_LOW`, code: 'BUYER_RATING_LOW', severity: 'medium', title: `Bên nhập khẩu xếp hạng ${br}`, detail: 'Hạng tham khảo thấp hơn ngưỡng theo dõi.', suggestion: 'Cân nhắc giảm hạn mức mới cho bên nhập khẩu này.' })
       }
       if (r.state === 'BUYER_DISPUTED') {
-        out.push({ ...base, id: `${a.id}:DISPUTE_ON_FUNDED`, code: 'DISPUTE_ON_FUNDED', severity: 'high', title: `Bên mua tranh chấp ${r.code} sau giải ngân`, detail: r.disputeReason ?? '', suggestion: 'Yêu cầu doanh nghiệp giải trình; tạm dừng giải ngân mới cùng bên mua.' })
+        out.push({ ...base, id: `${a.id}:DISPUTE_ON_FUNDED`, code: 'DISPUTE_ON_FUNDED', severity: 'high', title: `Bên nhập khẩu tranh chấp ${r.code} sau giải ngân`, detail: r.disputeReason ?? '', suggestion: 'Yêu cầu doanh nghiệp giải trình; tạm dừng giải ngân mới cùng bên nhập khẩu.' })
       }
     }
     if (a.state === 'OFFERED' && a.offer) {
@@ -76,7 +76,7 @@ export function ewsAlerts(s: S, apps: FundingApplication[], now = new Date()): E
     for (const [buyerId, v] of byBuyer) {
       if (v / exposure > EWS_PARAMS.concentrationShare && byBuyer.size > 1) {
         const name = s.orgs.find((o) => o.id === buyerId)?.shortName ?? buyerId
-        out.push({ id: `buyer:${buyerId}:CONCENTRATION`, code: 'CONCENTRATION', severity: 'medium', buyerId, amount: v, title: `Tập trung rủi ro vào ${name}`, detail: `${Math.round((v / exposure) * 100)}% dư nợ danh mục (ngưỡng ${EWS_PARAMS.concentrationShare * 100}%).`, suggestion: 'Đa dạng hóa bên mua hoặc đặt hạn mức theo bên mua.' })
+        out.push({ id: `buyer:${buyerId}:CONCENTRATION`, code: 'CONCENTRATION', severity: 'medium', buyerId, amount: v, title: `Tập trung rủi ro vào ${name}`, detail: `${Math.round((v / exposure) * 100)}% dư nợ danh mục (ngưỡng ${EWS_PARAMS.concentrationShare * 100}%).`, suggestion: 'Đa dạng hóa bên nhập khẩu hoặc đặt hạn mức theo bên nhập khẩu.' })
       }
     }
   }

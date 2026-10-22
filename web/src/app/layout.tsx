@@ -29,7 +29,7 @@ export const metadata: Metadata = {
   },
   icons: { icon: "/icon.svg" },
   description:
-    "Nền tảng quản lý vốn lưu động và tài trợ chuỗi cung ứng cho SME: đẩy nhanh thanh toán hóa đơn, kết nối đa tổ chức tài chính, chấm điểm 5C và ESG.",
+    "Nền tảng quản lý vốn lưu động và tài trợ chuỗi cung ứng cho doanh nghiệp xuất khẩu: đẩy nhanh thanh toán hóa đơn, kết nối đa tổ chức tài chính, chấm điểm 5C và ESG.",
 };
 
 export const viewport: Viewport = {

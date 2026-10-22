@@ -11,7 +11,7 @@ export default function SupplierMarketplace() {
       <PageHeader
         eyebrow="Marketplace tài chính"
         title="So sánh gói tài trợ"
-        sub="Các gói do tổ chức tài chính công bố. Chọn hóa đơn đã được người mua xác nhận, FCC tính ngay số tiền thực nhận và tổng chi phí ước tính của từng gói."
+        sub="Các gói do tổ chức tài chính công bố. Chọn hóa đơn đã được bên nhập khẩu xác nhận, FCC tính ngay số tiền thực nhận và tổng chi phí ước tính của từng gói."
         actions={
           <Link className="btn bs" href="/supplier/funding">
             Xem lại hồ sơ tài trợ

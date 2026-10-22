@@ -1,5 +1,5 @@
 // Sao kê tài khoản từ ngân hàng GIẢ LẬP: dựng từ các sự kiện tiền đã ghi nhận trên FCC (giải ngân, thu hồi, hoàn phần dư, thanh toán của
-// bên mua) cộng chi định kỳ doanh nghiệp tự khai. Không có giao dịch ngẫu nhiên. Mọi dòng ghi nguồn để tách khỏi dữ liệu ngân hàng thật về sau.
+// bên nhập khẩu) cộng chi định kỳ doanh nghiệp tự khai. Không có giao dịch ngẫu nhiên. Mọi dòng ghi nguồn để tách khỏi dữ liệu ngân hàng thật về sau.
 import type { AccountingConnection, AppData, Org } from './types'
 import { dayOf } from './util'
 
@@ -48,8 +48,8 @@ export function statementFor(s: S, org: Org, conn: Pick<AccountingConnection, 'o
     if (!r.paidAt || !r.paidAmount) continue
     const financed = s.applications.some((a) => a.receivableId === r.id && ['FUNDED', 'SETTLED'].includes(a.state))
     if (financed) continue
-    if (org.type === 'buyer' && r.buyerId === org.id) raw.push({ date: day(r.paidAt), description: `Thanh toán ${r.code} trực tiếp cho nhà cung cấp`, amount: -r.paidAmount, kind: 'buyer_payment', ref: `direct:${r.id}` })
-    if (org.type === 'supplier' && r.sellerId === org.id) raw.push({ date: day(r.paidAt), description: `Nhận thanh toán ${r.code} từ bên mua`, amount: r.paidAmount, kind: 'collection', ref: `direct:${r.id}` })
+    if (org.type === 'buyer' && r.buyerId === org.id) raw.push({ date: day(r.paidAt), description: `Thanh toán ${r.code} trực tiếp cho đơn vị xuất khẩu`, amount: -r.paidAmount, kind: 'buyer_payment', ref: `direct:${r.id}` })
+    if (org.type === 'supplier' && r.sellerId === org.id) raw.push({ date: day(r.paidAt), description: `Nhận thanh toán ${r.code} từ bên nhập khẩu`, amount: r.paidAmount, kind: 'collection', ref: `direct:${r.id}` })
   }
   // chi định kỳ hằng tháng do doanh nghiệp khai
   const end = new Date(`${to}T00:00:00Z`)

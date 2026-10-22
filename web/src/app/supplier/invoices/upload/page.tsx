@@ -17,7 +17,7 @@ export default function UploadPage() {
           </Link>
         }
         title="Tải hóa đơn & nhận diện OCR/AI"
-        sub="Tải XML, ảnh hoặc PDF hóa đơn: hệ thống đọc các trường để bạn kiểm tra lại, chặn hóa đơn trùng và lưu chứng từ gốc trước khi gửi người mua xác nhận. Đối chiếu tự động với cơ quan thuế chưa bật."
+        sub="Tải XML, ảnh hoặc PDF hóa đơn: hệ thống đọc các trường để bạn kiểm tra lại, chặn hóa đơn trùng và lưu chứng từ gốc trước khi gửi bên nhập khẩu xác nhận. Đối chiếu tự động với cơ quan thuế chưa bật."
       />
       <InvoiceUpload />
     </>

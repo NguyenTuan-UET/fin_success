@@ -21,7 +21,7 @@ async function charge(core: Core, orgId: string, source: FeeSource, amount: numb
   return core.db.addCharge({ id: uid('FEE'), orgId, source, amount, scheduleId: sch.id, ref, description, period: monthOf(at.toISOString()) })
 }
 
-/** Phí phát sinh từ sự kiện nghiệp vụ: giải ngân → phí giao dịch (nhà cung cấp) + hoa hồng giới thiệu (tổ chức tài chính). */
+/** Phí phát sinh từ sự kiện nghiệp vụ: giải ngân → phí giao dịch (đơn vị xuất khẩu) + hoa hồng giới thiệu (tổ chức tài chính). */
 export async function chargeFromEvents(core: Core, events: DomainEvent[]) {
   for (const e of events) {
     if (e.type !== 'application.funded') continue

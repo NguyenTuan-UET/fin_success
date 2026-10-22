@@ -10,7 +10,7 @@ export default function DisbursementPage() {
       <PageHeader
         eyebrow="Marketplace · Giải ngân & thu hồi"
         title="Hồ sơ tài trợ & giải ngân"
-        sub="Theo dõi vòng đời từng khoản tài trợ, chấp thuận đề nghị và xem tiền sẽ được phân bổ thế nào khi người mua thanh toán. Nguồn trả nợ đầu tiên là khoản thanh toán của người mua."
+        sub="Theo dõi vòng đời từng khoản tài trợ, chấp thuận đề nghị và xem tiền sẽ được phân bổ thế nào khi bên nhập khẩu thanh toán. Nguồn trả nợ đầu tiên là khoản thanh toán của bên nhập khẩu."
       />
       <Disbursement />
     </>

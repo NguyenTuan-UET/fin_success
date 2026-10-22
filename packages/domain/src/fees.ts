@@ -3,7 +3,7 @@
 export type FeeSource = 'transaction' | 'saas' | 'scoring' | 'api' | 'report' | 'referral'
 
 export const FEE_SOURCES: Record<FeeSource, { label: string; payer: string }> = {
-  transaction: { label: 'Phí giao dịch tài trợ hóa đơn', payer: 'Nhà cung cấp' },
+  transaction: { label: 'Phí giao dịch tài trợ hóa đơn', payer: 'Đơn vị xuất khẩu' },
   saas: { label: 'Phí thuê nền tảng SaaS', payer: 'Mọi tổ chức theo gói' },
   scoring: { label: 'Phí chấm điểm tín dụng', payer: 'Doanh nghiệp được chấm' },
   api: { label: 'Phí kết nối API', payer: 'Tổ chức tài chính' },
@@ -14,7 +14,7 @@ export const FEE_SOURCES: Record<FeeSource, { label: string; payer: string }> = 
 export interface FeeSchedule {
   id: string
   name: string
-  /** Phí giao dịch: % số tiền ứng, thu của nhà cung cấp khi giải ngân */
+  /** Phí giao dịch: % số tiền ứng, thu của đơn vị xuất khẩu khi giải ngân */
   transactionPct: number
   /** Phí thuê bao tháng theo loại tổ chức (VND) */
   saasMonthly: { supplier: number; buyer: number; lender: number }

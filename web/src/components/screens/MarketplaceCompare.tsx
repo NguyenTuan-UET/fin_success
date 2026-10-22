@@ -59,7 +59,7 @@ function Compare() {
     <>
       {earlyIn.length > 0 && (
         <section className="card stack-sm">
-          <h2 className="ct">Đề nghị thanh toán sớm từ người mua</h2>
+          <h2 className="ct">Đề nghị thanh toán sớm từ bên nhập khẩu</h2>
           {earlyIn.map((o) => {
             const rc = data.receivables.find((x) => x.id === o.receivableId)!;
             return (
@@ -74,8 +74,8 @@ function Compare() {
 
       {!targets.length ? (
         <section className="card empty stack" style={{ alignItems: "center" }}>
-          <strong>Chưa có hóa đơn nào được người mua xác nhận.</strong>
-          <span>Chỉ khoản phải thu đã được bên mua xác nhận mới so sánh và gửi tài trợ được.</span>
+          <strong>Chưa có hóa đơn nào được bên nhập khẩu xác nhận.</strong>
+          <span>Chỉ khoản phải thu đã được bên nhập khẩu xác nhận mới so sánh và gửi tài trợ được.</span>
           <Link className="btn bp" href="/supplier/invoices">Tới Hóa đơn</Link>
         </section>
       ) : (

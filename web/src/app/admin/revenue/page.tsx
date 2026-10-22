@@ -62,7 +62,7 @@ export default function AdminRevenue() {
           <div className="card modal wide">
             <h2 className="ct" id="fee-title">Biểu phí mới</h2>
             <div className="grid-fields">
-              {([["name", "Tên"], ["transactionPct", "Phí giao dịch (% số tiền ứng)"], ["supplier", "SaaS nhà cung cấp (đ/tháng)"], ["buyer", "SaaS bên mua (đ/tháng)"], ["lender", "SaaS tổ chức tài chính (đ/tháng)"], ["scoringFee", "Phí chấm điểm chính thức (đ)"], ["apiMonthlyPerKey", "Phí API (đ/khóa/tháng)"], ["reportFee", "Phí xuất báo cáo (đ/lần)"], ["referralPctOfFees", "Hoa hồng (% phí xử lý)"]] as const).map(([k, label]) => (
+              {([["name", "Tên"], ["transactionPct", "Phí giao dịch (% số tiền ứng)"], ["supplier", "SaaS đơn vị xuất khẩu (đ/tháng)"], ["buyer", "SaaS bên nhập khẩu (đ/tháng)"], ["lender", "SaaS tổ chức tài chính (đ/tháng)"], ["scoringFee", "Phí chấm điểm chính thức (đ)"], ["apiMonthlyPerKey", "Phí API (đ/khóa/tháng)"], ["reportFee", "Phí xuất báo cáo (đ/lần)"], ["referralPctOfFees", "Hoa hồng (% phí xử lý)"]] as const).map(([k, label]) => (
                 <label key={k} className="field"><span>{label}</span><input className="input" value={feeForm[k]} onChange={(e) => setFeeForm({ ...feeForm, [k]: e.target.value })} /></label>
               ))}
               <label className="field"><span>Hiệu lực từ</span><input className="input num" type="date" value={feeForm.effectiveFrom} onChange={(e) => setFeeForm({ ...feeForm, effectiveFrom: e.target.value })} /></label>

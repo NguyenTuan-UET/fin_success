@@ -69,7 +69,7 @@ describe('thu hồi: thanh toán một phần, hai lần, đối soát, thanh l�
     void S
   })
 
-  it('đối soát: bên mua báo khác tiền tổ chức tài chính xác nhận thì hiện lệch', async () => {
+  it('đối soát: bên nhập khẩu báo khác tiền tổ chức tài chính xác nhận thì hiện lệch', async () => {
     const { L, B, appId, rec } = await funded('H2')
     expect((await act(B, 'markBuyerPaid', rec.id, { amount: 2_000_000_000, reference: 'UNC-77' })).status).toBe(200)
     const st = await call('GET', `/v1/funding-applications/${appId}/settlement`, undefined, L)

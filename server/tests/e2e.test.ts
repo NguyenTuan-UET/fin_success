@@ -115,7 +115,7 @@ describe('luồng tài trợ chuỗi cung ứng — không có dữ liệu mẫu
     expect((await getState(S.token)).products.map((p: Json) => p.id).sort()).toEqual([p1, p2].sort())
   })
 
-  it('nhà cung cấp tạo khoản phải thu; trùng bị chặn; sai vai trò bị từ chối', async () => {
+  it('đơn vị xuất khẩu tạo khoản phải thu; trùng bị chặn; sai vai trò bị từ chối', async () => {
     const input = { buyerId: B.orgId, invoiceSeries: 'C26TAA', invoiceNumber: '0009001', issueDate: iso(new Date()), dueDate: due, amount: 1_500_000_000, description: 'Gia công', fingerprint: 'fp-1', docs: { xml: true, contract: true, delivery: true }, source: 'xml' }
     const a = await act(S.token, 'createReceivable', input)
     expect(a.status).toBe(200)
@@ -127,7 +127,7 @@ describe('luồng tài trợ chuỗi cung ứng — không có dữ liệu mẫu
     expect((await act(S.token, 'createReceivable', { ...input, invoiceNumber: '3', buyerId: L1.orgId })).status).toBe(400)
   })
 
-  it('bên mua phải có MFA (bật và xác thực trong 10 phút) mới xác nhận được; người khác không xác nhận hộ', async () => {
+  it('bên nhập khẩu phải có MFA (bật và xác thực trong 10 phút) mới xác nhận được; người khác không xác nhận hộ', async () => {
     expect((await act(S.token, 'sendToBuyer', rec.id)).status).toBe(200)
     expect((await act(S.token, 'buyerDecision', rec.id, true)).status).toBe(403)
     const noMfa = await act(B.token, 'buyerDecision', rec.id, true)
@@ -171,7 +171,7 @@ describe('luồng tài trợ chuỗi cung ứng — không có dữ liệu mẫu
   it('phân quyền dữ liệu', async () => {
     const other = await getState(S2.token)
     const seen = other.receivables.find((r: Receivable) => r.id === rec.id)
-    expect(seen.fingerprint).toBe('') // nhà cung cấp khác chỉ thấy bản rút gọn
+    expect(seen.fingerprint).toBe('') // đơn vị xuất khẩu khác chỉ thấy bản rút gọn
     expect(other.consents).toEqual([])
     const l2 = await getState(L2.token) // đã bị loại khỏi RFQ
     expect(l2.receivables.find((r: Receivable) => r.id === rec.id)?.fingerprint ?? '').toBe('')
@@ -218,11 +218,11 @@ describe('luồng tài trợ chuỗi cung ứng — không có dữ liệu mẫu
     expect(s.notifications.some((n: Json) => n.title.includes('đã giải ngân'))).toBe(true)
   })
 
-  it('bên mua báo thanh toán → tổ chức tài chính xác nhận tiền về → tất toán và hoàn phần dư; nhật ký có dấu vết', async () => {
+  it('bên nhập khẩu báo thanh toán → tổ chức tài chính xác nhận tiền về → tất toán và hoàn phần dư; nhật ký có dấu vết', async () => {
     expect((await act(S.token, 'markBuyerPaid', rec.id)).status).toBe(403)
     const r = await act(B.token, 'markBuyerPaid', rec.id)
     expect(r.status, JSON.stringify(r.body)).toBe(200)
-    // khoản đã tài trợ: bên mua báo chưa đủ để tất toán — chờ tổ chức tài chính xác nhận tiền về
+    // khoản đã tài trợ: bên nhập khẩu báo chưa đủ để tất toán — chờ tổ chức tài chính xác nhận tiền về
     expect(r.body.state.receivables.find((x: Receivable) => x.id === rec.id).state).toBe('FUNDED')
     expect((await act(L2.token, 'confirmPayment', fa.id, { amount: 1 })).status).toBe(403) // không phải tổ chức tài chính của hồ sơ
     expect((await act(L1.token, 'confirmPayment', fa.id, { amount: -5 })).status).toBe(400)
@@ -235,12 +235,12 @@ describe('luồng tài trợ chuỗi cung ứng — không có dữ liệu mẫu
     const done = st.applications.find((a: FundingApplication) => a.id === fa.id)
     expect(done.state).toBe('SETTLED')
     expect(done.refundDue).toBe(paid.body.result.surplus)
-    // hoàn phần dư cho nhà cung cấp
+    // hoàn phần dư cho đơn vị xuất khẩu
     expect((await act(L1.token, 'confirmRefund', fa.id, { amount: done.refundDue + 1 })).status).toBe(400)
     expect((await act(L1.token, 'confirmRefund', fa.id, { amount: done.refundDue })).status).toBe(200)
     expect((await getState(S.token)).applications.find((a: FundingApplication) => a.id === fa.id).refundPaid).toBe(done.refundDue)
     const logged = (await getState(S.token)).audit.map((e: Json) => e.action)
-    for (const a of ['Tạo khoản phải thu', 'Bên mua xác nhận', 'Chọn báo giá & gửi hồ sơ', 'Ghi nhận giải ngân', 'Bên mua báo đã thanh toán', 'Ghi nhận tiền về', 'Ghi nhận hoàn phần dư cho nhà cung cấp']) expect(logged).toContain(a)
+    for (const a of ['Tạo khoản phải thu', 'Bên nhập khẩu xác nhận', 'Chọn báo giá & gửi hồ sơ', 'Ghi nhận giải ngân', 'Bên nhập khẩu báo đã thanh toán', 'Ghi nhận tiền về', 'Ghi nhận hoàn phần dư cho đơn vị xuất khẩu']) expect(logged).toContain(a)
   })
 
   it('ESG: doanh nghiệp tải bằng chứng, chỉ nhân sự FCC xác nhận mức và phát hành chính thức', async () => {

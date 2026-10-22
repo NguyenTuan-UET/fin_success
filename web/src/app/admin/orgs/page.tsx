@@ -6,7 +6,7 @@ import { useData } from "@/lib/session";
 import { PageHeader } from "@/components/ui/basic";
 import { Pager } from "@/components/ui/Pager";
 
-const TYPE_LABEL = { supplier: "Nhà cung cấp", buyer: "Bên mua", lender: "Tổ chức tài chính", fcc: "FCC" } as const;
+const TYPE_LABEL = { supplier: "Đơn vị xuất khẩu", buyer: "Bên nhập khẩu", lender: "Tổ chức tài chính", fcc: "FCC" } as const;
 const SIZE = 20;
 
 export default function AdminOrgs() {

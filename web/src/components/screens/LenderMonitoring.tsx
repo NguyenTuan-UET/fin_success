@@ -42,9 +42,9 @@ export function LenderMonitoring() {
       </section>
 
       <section className="card flush">
-        <div className="ch"><h2 className="ct">Lịch thu hồi</h2><span className="muted">Theo hạn thanh toán của bên mua</span></div>
+        <div className="ch"><h2 className="ct">Lịch thu hồi</h2><span className="muted">Theo hạn thanh toán của bên nhập khẩu</span></div>
         <div className="tw" tabIndex={0} role="region" aria-label="Bảng dữ liệu, cuộn ngang để xem thêm"><table>
-          <thead><tr><th>Hạn</th><th>Hồ sơ</th><th>Doanh nghiệp</th><th>Bên mua</th><th className="r">Dư nợ (đ)</th><th>Tình trạng</th></tr></thead>
+          <thead><tr><th>Hạn</th><th>Hồ sơ</th><th>Doanh nghiệp</th><th>Bên nhập khẩu</th><th className="r">Dư nợ (đ)</th><th>Tình trạng</th></tr></thead>
           <tbody>
             {funded.map(({ a, r }) => {
               const d = daysFromNow(r.dueDate);
@@ -60,7 +60,7 @@ export function LenderMonitoring() {
           </tbody>
         </table></div>
       </section>
-      <Disclaimer>Cảnh báo là gợi ý theo luật cố định (quá hạn, sắp đến hạn, lịch sử thanh toán, xếp hạng bên mua, tập trung, tranh chấp). FCC không thu hồi nợ hay xử lý tài sản thay tổ chức tài chính.</Disclaimer>
+      <Disclaimer>Cảnh báo là gợi ý theo luật cố định (quá hạn, sắp đến hạn, lịch sử thanh toán, xếp hạng bên nhập khẩu, tập trung, tranh chấp). FCC không thu hồi nợ hay xử lý tài sản thay tổ chức tài chính.</Disclaimer>
     </>
   );
 }

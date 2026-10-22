@@ -185,13 +185,13 @@ function aggregate(kind: ScoreResult['kind'], comps: Comp[], factors: FactorResu
   }
 }
 
-// ======================= BÊN BÁN (SME) =======================
+// ======================= ĐƠN VỊ XUẤT KHẨU (doanh nghiệp xuất khẩu) =======================
 
 export interface SupplierContext {
   org: Org
   profile: CreditProfile
-  confirmedArShare?: number // tỷ lệ phải thu đã được bên mua xác nhận (0..1)
-  avgBuyerScore?: number // điểm bình quân bên mua
+  confirmedArShare?: number // tỷ lệ phải thu đã được bên nhập khẩu xác nhận (0..1)
+  avgBuyerScore?: number // điểm bình quân bên nhập khẩu
   topCustomerRating?: Rating
   fccBehavior?: { disputes: number; returned: number; total: number }
   esgE6Level?: number
@@ -285,7 +285,7 @@ export function scoreSupplier(ctx: SupplierContext, now = new Date()): ScoreResu
   // ---- Collateral & credit support 15% ----
   if (ctx.confirmedArShare !== undefined && ctx.avgBuyerScore !== undefined) {
     const v = ctx.confirmedArShare * ctx.avgBuyerScore
-    add({ code: 'B1', name: 'Chất lượng danh mục phải thu', component: 'collateral', raw: `${pct(ctx.confirmedArShare)} đã xác nhận × điểm bên mua ${ctx.avgBuyerScore.toFixed(0)}`, points: Math.round(v), source: 'FCC', reason: v >= 60 ? 'Khoản phải thu chất lượng, bên mua uy tín' : 'Khoản phải thu chưa được xác nhận nhiều' })
+    add({ code: 'B1', name: 'Chất lượng danh mục phải thu', component: 'collateral', raw: `${pct(ctx.confirmedArShare)} đã xác nhận × điểm bên nhập khẩu ${ctx.avgBuyerScore.toFixed(0)}`, points: Math.round(v), source: 'FCC', reason: v >= 60 ? 'Khoản phải thu chất lượng, bên nhập khẩu uy tín' : 'Khoản phải thu chưa được xác nhận nhiều' })
   } else add({ code: 'B1', name: 'Chất lượng danh mục phải thu', component: 'collateral', raw: 'Chưa có khoản phải thu', points: null, source: 'FCC', reason: 'Chưa có khoản phải thu trên FCC' })
 
   if (p.collateral.length && p.capitalNeed) {
@@ -297,7 +297,7 @@ export function scoreSupplier(ctx: SupplierContext, now = new Date()): ScoreResu
 
   if (p.frameworkContractMonths !== undefined) {
     const m = p.frameworkContractMonths
-    add({ code: 'B3', name: 'Hợp đồng khung với bên mua lớn', component: 'collateral', raw: m > 0 ? `Còn hiệu lực ${m} tháng` : 'Không có', points: m >= 12 ? 100 : m > 0 ? 60 : 30, source: 'Hợp đồng tải lên', reason: m >= 12 ? 'Quan hệ dài hạn với bên mua' : 'Quan hệ mua bán ngắn hạn' })
+    add({ code: 'B3', name: 'Hợp đồng khung với bên nhập khẩu lớn', component: 'collateral', raw: m > 0 ? `Còn hiệu lực ${m} tháng` : 'Không có', points: m >= 12 ? 100 : m > 0 ? 60 : 30, source: 'Hợp đồng tải lên', reason: m >= 12 ? 'Quan hệ dài hạn với bên nhập khẩu' : 'Quan hệ mua bán ngắn hạn' })
   } else add({ code: 'B3', name: 'Hợp đồng khung', component: 'collateral', raw: 'Chưa tải hợp đồng', points: null, source: '—', reason: 'Thiếu hợp đồng khung' })
 
   // ---- Conditions 15% ----
@@ -311,7 +311,7 @@ export function scoreSupplier(ctx: SupplierContext, now = new Date()): ScoreResu
     const s = p.topCustomerShare
     let pts = s < 0.4 ? 100 : s <= 0.7 ? 60 : 30
     if (ctx.topCustomerRating && ratingAtLeast(ctx.topCustomerRating, 'A')) pts = Math.min(100, pts + 20)
-    add({ code: 'D2', name: 'Tập trung khách hàng', component: 'conditions', raw: `Bên mua lớn nhất chiếm ${pct(s)}${ctx.topCustomerRating ? ` (xếp hạng ${ctx.topCustomerRating})` : ''}`, points: pts, source: 'Dữ liệu kế toán/hóa đơn', reason: s < 0.4 ? 'Khách hàng đa dạng' : 'Phụ thuộc một bên mua' })
+    add({ code: 'D2', name: 'Tập trung khách hàng', component: 'conditions', raw: `Bên nhập khẩu lớn nhất chiếm ${pct(s)}${ctx.topCustomerRating ? ` (xếp hạng ${ctx.topCustomerRating})` : ''}`, points: pts, source: 'Dữ liệu kế toán/hóa đơn', reason: s < 0.4 ? 'Khách hàng đa dạng' : 'Phụ thuộc một bên nhập khẩu' })
   } else add({ code: 'D2', name: 'Tập trung khách hàng', component: 'conditions', raw: 'Chưa có dữ liệu', points: null, source: '—', reason: 'Thiếu cơ cấu doanh thu theo khách hàng' })
 
   if (ctx.esgE6Level !== undefined) add({ code: 'D3', name: 'Rủi ro khí hậu/địa điểm (ESG E6)', component: 'conditions', raw: `Mức E6 = ${ctx.esgE6Level}`, points: ctx.esgE6Level * 25, source: 'Đánh giá ESG', reason: ctx.esgE6Level >= 2 ? 'Có phương án ứng phó rủi ro khí hậu' : 'Chưa ứng phó rủi ro khí hậu' })
@@ -337,7 +337,7 @@ export function scoreSupplier(ctx: SupplierContext, now = new Date()): ScoreResu
   )
 }
 
-// ======================= BÊN MUA (ANCHOR) =======================
+// ======================= BÊN NHẬP KHẨU (ANCHOR) =======================
 
 export interface BuyerContext {
   org: Org
@@ -367,7 +367,7 @@ export function scoreBuyer(ctx: BuyerContext): ScoreResult {
       const g = (cur.revenue - prev.revenue) / prev.revenue
       add({ code: 'F7', name: 'Xu hướng doanh thu', component: 'fin', raw: pct(g), points: band(g, [[0.05, 100], [-0.05, 70], [-0.15, 40]], 10), source: src, reason: g >= -0.05 ? 'Doanh thu ổn định/tăng' : 'Doanh thu giảm mạnh' })
     }
-  } else add({ code: 'F1', name: 'BCTC', component: 'fin', raw: 'Thiếu BCTC', points: null, source: '—', reason: 'Thiếu BCTC bên mua' })
+  } else add({ code: 'F1', name: 'BCTC', component: 'fin', raw: 'Thiếu BCTC', points: null, source: '—', reason: 'Thiếu BCTC bên nhập khẩu' })
 
   if (ctx.listed) {
     const L = ctx.listed
@@ -400,7 +400,7 @@ export function scoreBuyer(ctx: BuyerContext): ScoreResult {
   // nếu chưa có lịch sử thanh toán: chuẩn hóa trong phạm vi thành phần áp dụng (pay là N/A toàn phần)
   const payNA = F.filter((f) => f.component === 'pay').every((f) => f.na)
   const used = payNA ? comps.filter((c) => c.key !== 'pay').map((c, _i, arr) => ({ ...c, weight: c.weight / arr.reduce((a, b) => a + b.weight, 0) })) : comps
-  return aggregate('buyer', used, F, [{ label: 'BCTC bên mua', ok: !!cur }], 0.75)
+  return aggregate('buyer', used, F, [{ label: 'BCTC bên nhập khẩu', ok: !!cur }], 0.75)
 }
 
 // ======================= HỒ SƠ TÀI TRỢ =======================
@@ -410,7 +410,7 @@ export interface ApplicationContext {
   buyerScore: ScoreResult
   supplierScore: ScoreResult
   pairHistory?: { total: number; onTime: number }
-  concentration?: number // tỷ trọng khoản phải thu vào bên mua này trong tổng phải thu
+  concentration?: number // tỷ trọng khoản phải thu vào bên nhập khẩu này trong tổng phải thu
   now?: Date
 }
 
@@ -430,7 +430,7 @@ export function scoreApplication(ctx: ApplicationContext): ScoreResult & { eligi
   T.push({ code: 'T3', name: 'Kỳ hạn còn lại', component: 'tx', raw: `${days} ngày`, points: days <= 0 ? 0 : days <= 90 ? 100 : days <= 120 ? 70 : days <= 180 ? 40 : 20, source: 'Hóa đơn', reason: days <= 90 ? 'Kỳ hạn ngắn' : 'Kỳ hạn dài' })
   const dil = r.dilution ?? 0
   T.push({ code: 'T4', name: 'Tỷ lệ pha loãng', component: 'tx', raw: pct(dil), points: band(-dil, [[-0.02, 100], [-0.05, 70], [-0.1, 40]], 10), source: 'FCC/kế toán', reason: dil <= 0.02 ? 'Ít điều chỉnh giảm/trả hàng' : 'Pha loãng cao' })
-  if (ctx.concentration !== undefined) T.push({ code: 'T5', name: 'Tập trung vào bên mua', component: 'tx', raw: pct(ctx.concentration), points: ctx.concentration < 0.4 ? 100 : ctx.concentration <= 0.7 ? 60 : 30, source: 'FCC', reason: 'Mức tập trung khoản phải thu' })
+  if (ctx.concentration !== undefined) T.push({ code: 'T5', name: 'Tập trung vào bên nhập khẩu', component: 'tx', raw: pct(ctx.concentration), points: ctx.concentration < 0.4 ? 100 : ctx.concentration <= 0.7 ? 60 : 30, source: 'FCC', reason: 'Mức tập trung khoản phải thu' })
 
   const tx = aggregate('application', [{ key: 'tx', label: 'Giao dịch', weight: 1 }], T, [], 0)
   const W = APPLICATION_WEIGHTS
@@ -441,10 +441,10 @@ export function scoreApplication(ctx: ApplicationContext): ScoreResult & { eligi
   const hasCollateral = ctx.supplierScore.factors.some((f) => f.code === 'B2' && !f.na && (f.points ?? 0) >= 60)
   const strong = score >= 60 && ctx.buyerScore.score >= 65
   const segment: 'i' | 'ii' | 'iii' = hasCollateral && strong ? 'i' : strong ? 'ii' : 'iii'
-  const flags = [...ctx.buyerScore.flags.map((f) => `Bên mua: ${f}`), ...ctx.supplierScore.flags.map((f) => `Bên bán: ${f}`), ...tx.flags]
+  const flags = [...ctx.buyerScore.flags.map((f) => `Bên nhập khẩu: ${f}`), ...ctx.supplierScore.flags.map((f) => `Đơn vị xuất khẩu: ${f}`), ...tx.flags]
   const components: ComponentResult[] = [
-    { key: 'buyer', label: 'Bên mua', weight: W.buyer, score: ctx.buyerScore.score, min: ctx.buyerScore.min, max: ctx.buyerScore.max },
-    { key: 'supplier', label: 'Bên bán', weight: W.supplier, score: ctx.supplierScore.score, min: ctx.supplierScore.min, max: ctx.supplierScore.max },
+    { key: 'buyer', label: 'Bên nhập khẩu', weight: W.buyer, score: ctx.buyerScore.score, min: ctx.buyerScore.min, max: ctx.buyerScore.max },
+    { key: 'supplier', label: 'Đơn vị xuất khẩu', weight: W.supplier, score: ctx.supplierScore.score, min: ctx.supplierScore.min, max: ctx.supplierScore.max },
     { key: 'tx', label: 'Chất lượng giao dịch', weight: W.transaction, score: tx.score, min: tx.min, max: tx.max },
   ]
   return {
@@ -466,7 +466,7 @@ export function scoreApplication(ctx: ApplicationContext): ScoreResult & { eligi
 
 export const SEGMENT_LABEL = {
   i: '(i) Có TSBĐ và khoản phải thu tốt',
-  ii: '(ii) Không cần TSBĐ — khoản phải thu chất lượng, bên mua uy tín',
+  ii: '(ii) Không cần TSBĐ — khoản phải thu chất lượng, bên nhập khẩu uy tín',
   iii: '(iii) Khoản phải thu yếu / điểm thấp — cần thẩm định tăng cường',
 }
 
@@ -481,7 +481,7 @@ export function detectAnomalies(receivables: Receivable[], sellerId: string): st
   if (mine.length >= 4 && round / mine.length > 0.5) out.push('Hơn 50% hóa đơn có giá trị tròn trăm triệu')
   const sameDay = new Map<string, number>()
   for (const r of mine) sameDay.set(r.issueDate + r.buyerId, (sameDay.get(r.issueDate + r.buyerId) ?? 0) + 1)
-  if ([...sameDay.values()].some((n) => n >= 4)) out.push('Nhiều hóa đơn cùng ngày cho cùng một bên mua')
+  if ([...sameDay.values()].some((n) => n >= 4)) out.push('Nhiều hóa đơn cùng ngày cho cùng một bên nhập khẩu')
   return [...new Set(out)]
 }
 

@@ -33,17 +33,17 @@ export default function BuyerOverview() {
     ...(pending.length ? [{ icon: Clock, bg: "var(--warn-bg)", fg: "var(--warn)", title: `${pending.length} hóa đơn chờ bạn xác nhận`, note: `Tổng ${money(sumAmount(pending))} đ`, href: "/buyer/invoices", cta: "Xác nhận" }] : []),
     ...(overdue.length ? [{ icon: AlertTriangle, bg: "var(--bad-bg)", fg: "var(--bad)", title: `${overdue.length} khoản quá hạn thanh toán`, note: `${money(sumAmount(overdue))} đ`, href: "/buyer/invoices", cta: "Xử lý" }] : []),
     ...(dueSoon.length ? [{ icon: Clock, bg: "var(--info-bg)", fg: "var(--info)", title: `${dueSoon.length} khoản đến hạn trong 7 ngày`, note: `${money(sumAmount(dueSoon))} đ`, href: "/buyer/invoices", cta: "Xem" }] : []),
-    ...(earlyOpen.length ? [{ icon: Sparkles, bg: "var(--ok-bg)", fg: "var(--ok)", title: `${earlyOpen.length} đề nghị trả sớm đang mở`, note: "Theo dõi phản hồi nhà cung cấp", href: "/buyer/invoices", cta: "Xem" }] : []),
+    ...(earlyOpen.length ? [{ icon: Sparkles, bg: "var(--ok-bg)", fg: "var(--ok)", title: `${earlyOpen.length} đề nghị trả sớm đang mở`, note: "Theo dõi phản hồi đơn vị xuất khẩu", href: "/buyer/invoices", cta: "Xem" }] : []),
   ];
 
   return (
     <>
-      <PageHeader eyebrow="Tổng quan · Người mua" title={`Xin chào, ${me.name}`} sub="Xác nhận hóa đơn, lên lịch thanh toán và theo dõi nhà cung cấp của bạn." />
-      {todos.length > 0 ? <TodoTiles items={todos} /> : <section className="card empty">Chưa có việc cần làm. Hóa đơn nhà cung cấp gửi tới sẽ xuất hiện ở đây.</section>}
+      <PageHeader eyebrow="Tổng quan · Bên nhập khẩu" title={`Xin chào, ${me.name}`} sub="Xác nhận hóa đơn, lên lịch thanh toán và theo dõi đơn vị xuất khẩu của bạn." />
+      {todos.length > 0 ? <TodoTiles items={todos} /> : <section className="card empty">Chưa có việc cần làm. Hóa đơn đơn vị xuất khẩu gửi tới sẽ xuất hiện ở đây.</section>}
       <section className="grid-kpi">
         <Kpi label="Phải trả (đã xác nhận)" value={money(sumAmount(payable))} note={`${payable.length} hóa đơn`} />
         <Kpi label="Chờ xác nhận" value={String(pending.length)} note={money(sumAmount(pending)) + " đ"} />
-        <Kpi label="Nhà cung cấp" value={String(suppliers.length)} note="đã gửi hóa đơn cho bạn" />
+        <Kpi label="Đơn vị xuất khẩu" value={String(suppliers.length)} note="đã gửi hóa đơn cho bạn" />
         <Kpi label="Xếp hạng của bạn (tham khảo)" value={rating.rating} note={rating.official ? "Điểm chính thức" : `Tạm tính · bao phủ ${Math.round(rating.coverage * 100)}%`} />
       </section>
       <section className="row top">
@@ -61,7 +61,7 @@ export default function BuyerOverview() {
         <div className="card flush grow-2">
           <div className="ch"><h2 className="ct">Sắp đến hạn</h2><Link className="btn bs sm" href="/buyer/invoices">Tất cả</Link></div>
           <div className="tw" tabIndex={0} role="region" aria-label="Bảng dữ liệu, cuộn ngang để xem thêm"><table>
-            <thead><tr><th>Mã</th><th>Nhà cung cấp</th><th className="r">Số tiền (đ)</th><th>Hạn</th><th>Trạng thái</th></tr></thead>
+            <thead><tr><th>Mã</th><th>Đơn vị xuất khẩu</th><th className="r">Số tiền (đ)</th><th>Hạn</th><th>Trạng thái</th></tr></thead>
             <tbody>
               {payable.slice(0, 6).map((r) => <tr key={r.id}><td className="num strong">{r.code}</td><td>{orgName(data.orgs, r.sellerId)}</td><td className="r num">{vnd(r.amount)}</td><td className="num">{date(r.dueDate)}</td><td><span className={`chip ${RECEIVABLE_STAGE[r.state].chip}`}>{RECEIVABLE_STAGE[r.state].short}</span></td></tr>)}
               {payable.length === 0 && <tr><td colSpan={5} className="empty">Không có khoản phải trả.</td></tr>}

@@ -1,5 +1,5 @@
-// Phản hồi người dùng thử (document/test): bản nháp không lộ cho bên mua, kiểm phiên bản khi xác nhận, lịch sử điều chỉnh,
-// bổ sung chứng từ, bên mua xem chứng từ của khoản đã gửi.
+// Phản hồi người dùng thử (document/test): bản nháp không lộ cho bên nhập khẩu, kiểm phiên bản khi xác nhận, lịch sử điều chỉnh,
+// bổ sung chứng từ, bên nhập khẩu xem chứng từ của khoản đã gửi.
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { dropSchema, newSchema, startApp } from './helpers'
 import { iso } from '@fcc/domain/util' // ngày VN, như giao diện gửi lên
@@ -28,8 +28,8 @@ beforeAll(async () => {
 const draft = async (n: string, amount = 12_345_678) =>
   (await act(S, 'createReceivable', { buyerId, invoiceSeries: 'F', invoiceNumber: n, issueDate: iso(new Date()), dueDate: iso(new Date(Date.now() + 30 * 86_400_000)), amount, description: '', fingerprint: `fp-f-${n}`, docs: {}, source: 'manual' })).body.result as { id: string; code: string }
 
-describe('bản nháp chỉ bên bán thấy (F02, F03)', () => {
-  it('trước khi gửi: bên mua không thấy khoản, nhật ký hay số tiền; sau khi gửi mới thấy', async () => {
+describe('bản nháp chỉ đơn vị xuất khẩu thấy (F02, F03)', () => {
+  it('trước khi gửi: bên nhập khẩu không thấy khoản, nhật ký hay số tiền; sau khi gửi mới thấy', async () => {
     const r = await draft('D1')
     const b1 = await stateOf(B)
     expect(b1.receivables.find((x: Json) => x.id === r.id)).toBeUndefined()
@@ -51,7 +51,7 @@ describe('bản nháp chỉ bên bán thấy (F02, F03)', () => {
 })
 
 describe('điều chỉnh sau khi gửi (F01, F16)', () => {
-  it('bên mua xác nhận phiên bản cũ bị từ chối 409; lịch sử ghi trước/sau và lý do', async () => {
+  it('bên nhập khẩu xác nhận phiên bản cũ bị từ chối 409; lịch sử ghi trước/sau và lý do', async () => {
     const r = await draft('V1', 10_000_000)
     await act(S, 'sendToBuyer', r.id)
     expect((await act(S, 'reviseReceivable', r.id, { amount: 12_000_000, note: 'Sai đơn giá' })).status).toBe(200)
@@ -69,14 +69,14 @@ describe('điều chỉnh sau khi gửi (F01, F16)', () => {
 })
 
 describe('bổ sung và xem chứng từ (F14, F15)', () => {
-  it('bên bán bổ sung chứng từ cho khoản đang chờ; bên mua xem được tệp của khoản đã gửi, không xem được của bản nháp', async () => {
+  it('đơn vị xuất khẩu bổ sung chứng từ cho khoản đang chờ; bên nhập khẩu xem được tệp của khoản đã gửi, không xem được của bản nháp', async () => {
     const up = async (name: string) => (await post('/api/files', { name, mime: 'application/pdf', dataBase64: Buffer.from(`%PDF ${name}`).toString('base64'), kind: 'contract' }, S)).body.key as string
     const sent = await draft('A1')
     await act(S, 'sendToBuyer', sent.id)
     const k1 = await up('hop-dong.pdf')
     expect((await post(`/v1/receivables/${sent.id}/documents`, { files: [{ key: k1, name: 'hop-dong.pdf', kind: 'contract' }] }, S)).status).toBe(200)
     expect((await post(`/v1/receivables/${sent.id}/documents`, { files: [{ key: 'f'.repeat(64), name: 'x', kind: 'contract' }] }, S)).status).toBeGreaterThanOrEqual(400) // tệp không thuộc tổ chức
-    expect((await post(`/v1/receivables/${sent.id}/documents`, { files: [{ key: k1, name: 'x', kind: 'contract' }] }, B)).status).toBeGreaterThanOrEqual(400) // bên mua không gắn chứng từ cho khoản của bên bán
+    expect((await post(`/v1/receivables/${sent.id}/documents`, { files: [{ key: k1, name: 'x', kind: 'contract' }] }, B)).status).toBeGreaterThanOrEqual(400) // bên nhập khẩu không gắn chứng từ cho khoản của đơn vị xuất khẩu
     const rec = app.getState().receivables.find((x) => x.id === sent.id)!
     expect(rec.docs.contract).toBe(true)
     expect(rec.files?.map((f) => f.kind)).toEqual(['contract'])

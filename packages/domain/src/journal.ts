@@ -1,4 +1,4 @@
-// Bút toán đề xuất từ sự kiện tiền trên FCC (giải ngân, thu hồi, thanh toán của bên mua), theo chế độ kế toán doanh nghiệp.
+// Bút toán đề xuất từ sự kiện tiền trên FCC (giải ngân, thu hồi, thanh toán của bên nhập khẩu), theo chế độ kế toán doanh nghiệp.
 // Chỉ là ĐỀ XUẤT có độ tin cậy; kế toán duyệt/sửa từng dòng rồi xuất file nhập vào phần mềm kế toán. FCC không ghi vào sổ của doanh nghiệp.
 import type { AppData, Org, Receivable } from './types'
 import { dayOf } from './util'
@@ -28,7 +28,7 @@ type S = Pick<AppData, 'orgs' | 'receivables' | 'applications' | 'products' | 'e
 const A = (regime: Regime) => ({
   cash: { account: '112', accountName: 'Tiền gửi ngân hàng' },
   recv: { account: '131', accountName: 'Phải thu của khách hàng' },
-  pay: { account: '331', accountName: 'Phải trả cho người bán' },
+  pay: { account: '331', accountName: 'Phải trả cho đơn vị xuất khẩu' },
   loan: { account: regime === 'TT133' ? '341' : '3411', accountName: 'Vay và nợ thuê tài chính' },
   finCost: { account: '635', accountName: 'Chi phí tài chính' },
   finIncome: { account: '515', accountName: 'Doanh thu hoạt động tài chính' },
@@ -64,7 +64,7 @@ export function suggestEntries(s: S, org: Org, regime: Regime = 'TT133'): Journa
       const received = ev.filter((e) => e.type === 'payment_received' || e.type === 'collateral_liquidated')
       if (ap.state === 'SETTLED' && received.length) {
         const alloc = received.reduce((t, e) => ({ fees: t.fees + (e.allocation?.fees ?? 0), interest: t.interest + (e.allocation?.interest ?? 0), principal: t.principal + (e.allocation?.principal ?? 0), surplus: t.surplus + (e.allocation?.surplus ?? 0) }), { fees: 0, interest: 0, principal: 0, surplus: 0 })
-        // bên mua trả cho tổ chức tài chính: tất toán khoản tài trợ, ghi giảm phải thu; phần dư hoàn về tài khoản
+        // bên nhập khẩu trả cho tổ chức tài chính: tất toán khoản tài trợ, ghi giảm phải thu; phần dư hoàn về tài khoản
         const lines: JournalLine[] = [
           nonRecourse ? L(a.loan, 0, 0) : L(a.loan, alloc.principal, 0),
           L(a.finCost, alloc.interest + (alloc.fees - fee > 0 ? alloc.fees - fee : 0), 0),

@@ -12,7 +12,7 @@ import { useToast } from "@/components/providers/Toast";
 
 const STEPS = [
   "Hồ sơ đã gửi", "Tổ chức tài chính thẩm định", "Đề nghị chính thức", "Doanh nghiệp chấp thuận", "Giải ngân", "Giám sát & cảnh báo sớm",
-  "Người mua thanh toán", "Thu hồi gốc & phí", "Tất toán, hoàn phần dư",
+  "Bên nhập khẩu thanh toán", "Thu hồi gốc & phí", "Tất toán, hoàn phần dư",
 ];
 const stepOf = (a: FundingApplication, r?: Receivable) => ({ SUBMITTED: 1, UNDER_REVIEW: 1, OFFERED: 2, ACCEPTED: 3, FUNDED: r?.state === "OVERDUE" ? 5 : 5, SETTLED: 8, REJECTED: -1, WITHDRAWN: -1 })[a.state];
 
@@ -103,7 +103,7 @@ export function Disbursement() {
                     <div style={{ flex: Math.max(back, 0), background: "var(--brand-fill)", color: "#fff", display: "grid", placeItems: "center", fontSize: 12 }}>Hoàn trả</div>
                   </div>
                   <div className="muted" style={{ fontSize: 12.5 }}>
-                    Khi người mua thanh toán {vnd(r.amount)} đ ngày {date(r.dueDate)}: tổ chức tài chính thu {vnd(o.advanceVnd)} đ gốc + ước tính {vnd(interest)} đ lãi + {vnd(o.feesVnd)} đ phí; phần còn lại khoảng <strong className="num">{vnd(back)} đ</strong> hoàn cho bạn. Số cuối cùng theo hợp đồng của tổ chức tài chính.
+                    Khi bên nhập khẩu thanh toán {vnd(r.amount)} đ ngày {date(r.dueDate)}: tổ chức tài chính thu {vnd(o.advanceVnd)} đ gốc + ước tính {vnd(interest)} đ lãi + {vnd(o.feesVnd)} đ phí; phần còn lại khoảng <strong className="num">{vnd(back)} đ</strong> hoàn cho bạn. Số cuối cùng theo hợp đồng của tổ chức tài chính.
                   </div>
                 </>
               )}
@@ -120,9 +120,9 @@ export function Disbursement() {
               <div className="card stack-sm">
                 <h2 className="ct">Các lớp bảo vệ thu hồi</h2>
                 {[
-                  ["Thu hồi từ khoản phải thu", "Người mua thanh toán, tổ chức tài chính thu gốc và phí; phần dư hoàn bạn"],
+                  ["Thu hồi từ khoản phải thu", "Bên nhập khẩu thanh toán, tổ chức tài chính thu gốc và phí; phần dư hoàn bạn"],
                   ["Xử lý tài sản bảo đảm", "Chỉ khi thiếu hụt; do tổ chức tài chính thực hiện theo hợp đồng"],
-                  ["Không có tài sản bảo đảm", "Dựa trên uy tín người mua và dòng tiền chuỗi cung ứng"],
+                  ["Không có tài sản bảo đảm", "Dựa trên uy tín bên nhập khẩu và dòng tiền chuỗi cung ứng"],
                   ["Cảnh báo sớm", <Term key="ews" k="ews">EWS</Term>],
                 ].map(([t, n], i) => <div key={i} className="soft"><strong style={{ fontSize: 13 }}>{t}</strong><div className="muted">{n}</div></div>)}
               </div>

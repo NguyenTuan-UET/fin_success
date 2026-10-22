@@ -101,7 +101,7 @@ export function SettingsPanel() {
       {org.type !== "fcc" && (
         <section className="card stack">
           <div className="between"><h2 className="ct">Xác minh người đại diện (KYC)</h2>{org.kyc && <span className={`chip ${KYC_LABEL[org.kyc.status][1]}`}>{KYC_LABEL[org.kyc.status][0]}</span>}</div>
-          {org.kyc ? <div className="muted">Người đại diện: {org.kyc.representativeName} · nộp {date(org.kyc.submittedAt)}{org.kyc.note ? ` · ${org.kyc.note}` : ""}. Hiện FCC đối chiếu giấy tờ tải lên; eKYC qua nhà cung cấp sẽ bật khi có hợp đồng.</div> : <div className="muted">Tải CCCD/hộ chiếu của người đại diện và giấy đăng ký kinh doanh để FCC đối chiếu.</div>}
+          {org.kyc ? <div className="muted">Người đại diện: {org.kyc.representativeName} · nộp {date(org.kyc.submittedAt)}{org.kyc.note ? ` · ${org.kyc.note}` : ""}. Hiện FCC đối chiếu giấy tờ tải lên; eKYC qua đơn vị xuất khẩu sẽ bật khi có hợp đồng.</div> : <div className="muted">Tải CCCD/hộ chiếu của người đại diện và giấy đăng ký kinh doanh để FCC đối chiếu.</div>}
           {isOwner && org.kyc?.status !== "verified" && (
             <div className="stack-sm">
               <label className="field"><span>Họ tên người đại diện theo pháp luật</span><input className="input" value={kycName || org.kyc?.representativeName || ""} onChange={(e) => setKycName(e.target.value)} /></label>

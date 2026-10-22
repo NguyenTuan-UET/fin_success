@@ -10,7 +10,7 @@ export default function AppraisalPage() {
       <PageHeader
         eyebrow="Hóa đơn & thẩm định · Tổ chức tài chính"
         title="Thẩm định hồ sơ tài trợ"
-        sub="Hồ sơ tín dụng số: điểm 5C, chất lượng khoản phải thu, uy tín người mua và điểm ESG. Mỗi điểm đều có lý do và độ bao phủ dữ liệu để bạn quyết định nhanh hơn."
+        sub="Hồ sơ tín dụng số: điểm 5C, chất lượng khoản phải thu, uy tín bên nhập khẩu và điểm ESG. Mỗi điểm đều có lý do và độ bao phủ dữ liệu để bạn quyết định nhanh hơn."
       />
       <LenderAppraisal />
     </>

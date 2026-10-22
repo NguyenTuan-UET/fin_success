@@ -93,19 +93,19 @@ export const ENDPOINTS: Endpoint[] = [
     run: (s, core) => view(core, s.a!.activeOrgId).receivables.find((r) => r.id === P(s, 'id')) ?? (() => { throw notFound('Không tìm thấy khoản phải thu') })() },
   { method: 'POST', path: '/v1/receivables', tag: 'Khoản phải thu', summary: 'Tạo khoản phải thu từ hóa đơn (files: khóa tệp đã tải lên /api/files)', auth: 'user', action: 'createReceivable', args: (s) => [B(s)], check: 'receivableFiles',
     body: { buyerId: 'string', invoiceSeries: 'string', invoiceNumber: 'string', issueDate: 'YYYY-MM-DD', dueDate: 'YYYY-MM-DD', amount: 'integer VND', fingerprint: 'string', source: 'xml|ocr|manual|accounting' } },
-  { method: 'POST', path: '/v1/receivables/{id}/buyer-invitation', tag: 'Khoản phải thu', summary: 'Gửi bên mua xác nhận', auth: 'user', action: 'sendToBuyer', args: (s) => [P(s, 'id')] },
-  { method: 'POST', path: '/v1/receivables/{id}/buyer-decision', tag: 'Bên mua', summary: 'Bên mua xác nhận nghĩa vụ hoặc nêu tranh chấp (cần MFA)', auth: 'user', action: 'buyerDecision',
-    args: (s) => [P(s, 'id'), B(s).confirm === true, B(s).reason, B(s).version], body: { confirm: 'boolean', reason: 'string (khi tranh chấp)', version: 'integer — phiên bản bên mua đang xem; lệch thì trả 409' } },
-  { method: 'POST', path: '/v1/receivables/{id}/documents', tag: 'Khoản phải thu', summary: 'Bổ sung chứng từ (hóa đơn gốc, hợp đồng, biên bản giao nhận) cho khoản chưa tài trợ', auth: 'user', action: 'attachDocuments', args: (s) => [P(s, 'id'), B(s).files], check: 'receivableFiles', body: { files: '[{ key, name, kind: invoice|contract|delivery|other }]' } },
+  { method: 'POST', path: '/v1/receivables/{id}/buyer-invitation', tag: 'Khoản phải thu', summary: 'Gửi bên nhập khẩu xác nhận', auth: 'user', action: 'sendToBuyer', args: (s) => [P(s, 'id')] },
+  { method: 'POST', path: '/v1/receivables/{id}/buyer-decision', tag: 'Bên nhập khẩu', summary: 'Bên nhập khẩu xác nhận nghĩa vụ hoặc nêu tranh chấp (cần MFA)', auth: 'user', action: 'buyerDecision',
+    args: (s) => [P(s, 'id'), B(s).confirm === true, B(s).reason, B(s).version], body: { confirm: 'boolean', reason: 'string (khi tranh chấp)', version: 'integer — phiên bản bên nhập khẩu đang xem; lệch thì trả 409' } },
+  { method: 'POST', path: '/v1/receivables/{id}/documents', tag: 'Khoản phải thu', summary: 'Bổ sung chứng từ (hóa đơn gốc, hợp đồng, chứng từ giao hàng) cho khoản chưa tài trợ', auth: 'user', action: 'attachDocuments', args: (s) => [P(s, 'id'), B(s).files], check: 'receivableFiles', body: { files: '[{ key, name, kind: invoice|contract|delivery|other }]' } },
   { method: 'POST', path: '/v1/receivables/{id}/customs-documents', tag: 'Chứng từ hải quan', summary: 'Đơn vị xuất khẩu hoặc bên nhập khẩu thêm chứng từ hải quan và/hoặc thông tin tờ khai của phía mình. Khóa tích hợp /v1/partner/* chưa nhận điểm cuối này', auth: 'user', action: 'attachCustomsDocuments', check: 'receivableFiles',
     args: (s) => [P(s, 'id'), { files: B(s).files, info: B(s).info }],
     body: { files: 'array {key, name, kind} — key là khóa tệp đã tải lên /api/files', info: 'object — thông tin tờ khai của phía đang thao tác (declarationNo, declarationDate, clearance, channel; phía xuất thêm transportMode, transportDocNo, exporterTaxCode, shipmentDate, portOfLoading, portOfDischarge, incoterms)' } },
   { method: 'POST', path: '/v1/receivables/{id}/revise', tag: 'Khoản phải thu', summary: 'Điều chỉnh khoản bị tranh chấp', auth: 'user', action: 'reviseDisputed', args: (s) => [P(s, 'id'), B(s).amount, B(s).note], body: { amount: 'integer', note: 'string' } },
-  { method: 'POST', path: '/v1/receivables/{id}/amendment', tag: 'Khoản phải thu', summary: 'Hóa đơn điều chỉnh/thay thế: đổi số tiền hoặc hạn; xác nhận cũ mất hiệu lực, bên mua xác nhận lại', auth: 'user', action: 'reviseReceivable', args: (s) => [P(s, 'id'), B(s)], body: { amount: 'integer (tùy chọn)', dueDate: 'YYYY-MM-DD (tùy chọn)', note: 'string' } },
+  { method: 'POST', path: '/v1/receivables/{id}/amendment', tag: 'Khoản phải thu', summary: 'Hóa đơn điều chỉnh/thay thế: đổi số tiền hoặc hạn; xác nhận cũ mất hiệu lực, bên nhập khẩu xác nhận lại', auth: 'user', action: 'reviseReceivable', args: (s) => [P(s, 'id'), B(s)], body: { amount: 'integer (tùy chọn)', dueDate: 'YYYY-MM-DD (tùy chọn)', note: 'string' } },
   { method: 'POST', path: '/v1/receivables/{id}/flags/{code}/resolve', tag: 'Vận hành FCC', summary: 'FCC xử lý cờ bất thường của hóa đơn', auth: 'user', action: 'resolveFlag', args: (s) => [P(s, 'id'), P(s, 'code'), B(s).note], body: { note: 'string' } },
   { method: 'POST', path: '/v1/receivables/{id}/tax-check', tag: 'Vận hành FCC', summary: 'Ghi nhận kết quả đối chiếu hóa đơn với cơ quan thuế', auth: 'user', action: 'recordTaxCheck', args: (s) => [P(s, 'id'), B(s)], body: { status: 'verified|mismatch|cancelled', note: 'string', evidenceKey: 'khóa tệp ảnh chụp (tùy chọn)' } },
   { method: 'POST', path: '/v1/receivables/{id}/cancel', tag: 'Khoản phải thu', summary: 'Hủy khoản phải thu', auth: 'user', action: 'cancelReceivable', args: (s) => [P(s, 'id')] },
-  { method: 'POST', path: '/v1/receivables/{id}/buyer-payment', tag: 'Bên mua', summary: 'Bên mua ghi nhận đã thanh toán, một phần hoặc đủ (cần MFA). Khoản đã tài trợ: chờ tổ chức tài chính xác nhận tiền về', auth: 'user', action: 'markBuyerPaid', args: (s) => [P(s, 'id'), B(s)], body: { amount: 'integer (mặc định: phần chưa báo)', paidAt: 'YYYY-MM-DD', reference: 'string' } },
+  { method: 'POST', path: '/v1/receivables/{id}/buyer-payment', tag: 'Bên nhập khẩu', summary: 'Bên nhập khẩu ghi nhận đã thanh toán, một phần hoặc đủ (cần MFA). Khoản đã tài trợ: chờ tổ chức tài chính xác nhận tiền về', auth: 'user', action: 'markBuyerPaid', args: (s) => [P(s, 'id'), B(s)], body: { amount: 'integer (mặc định: phần chưa báo)', paidAt: 'YYYY-MM-DD', reference: 'string' } },
   { method: 'GET', path: '/v1/receivables/{id}/matches', tag: 'Marketplace', summary: 'Sản phẩm phù hợp/chưa phù hợp kèm chi phí ước tính (theo biểu giá công bố)', auth: 'user',
     run: (s, core) => {
       const st = core.getState()
@@ -140,8 +140,8 @@ export const ENDPOINTS: Endpoint[] = [
     body: { advanceVnd: 'integer', ratePct: 'number', feesVnd: 'integer', tenorDays: 'integer', conditions: 'string', expiresAt: 'YYYY-MM-DD' } },
   { method: 'POST', path: '/v1/funding-applications/{id}/reject', tag: 'Hồ sơ tài trợ', summary: 'Từ chối hồ sơ', auth: 'user', action: 'rejectApp', args: (s) => [P(s, 'id'), B(s).reason], body: { reason: 'string' } },
   { method: 'POST', path: '/v1/funding-applications/{id}/accept', tag: 'Hồ sơ tài trợ', summary: 'Doanh nghiệp chấp thuận đề nghị (cần MFA)', auth: 'user', action: 'acceptOffer', args: (s) => [P(s, 'id')] },
-  { method: 'POST', path: '/v1/funding-applications/{id}/payments', tag: 'Hồ sơ tài trợ', summary: 'Tổ chức tài chính xác nhận tiền về (thanh toán hoặc thanh lý tài sản): thu theo phí → lãi → gốc, đủ thì tất toán, phần dư hoàn cho nhà cung cấp', auth: 'user', action: 'confirmPayment', args: (s) => [P(s, 'id'), B(s)], body: { amount: 'integer', paidAt: 'YYYY-MM-DD', kind: 'payment|collateral', reference: 'string' } },
-  { method: 'POST', path: '/v1/funding-applications/{id}/refunds', tag: 'Hồ sơ tài trợ', summary: 'Tổ chức tài chính xác nhận đã hoàn phần dư cho nhà cung cấp', auth: 'user', action: 'confirmRefund', args: (s) => [P(s, 'id'), B(s)], body: { amount: 'integer', reference: 'string' } },
+  { method: 'POST', path: '/v1/funding-applications/{id}/payments', tag: 'Hồ sơ tài trợ', summary: 'Tổ chức tài chính xác nhận tiền về (thanh toán hoặc thanh lý tài sản): thu theo phí → lãi → gốc, đủ thì tất toán, phần dư hoàn cho đơn vị xuất khẩu', auth: 'user', action: 'confirmPayment', args: (s) => [P(s, 'id'), B(s)], body: { amount: 'integer', paidAt: 'YYYY-MM-DD', kind: 'payment|collateral', reference: 'string' } },
+  { method: 'POST', path: '/v1/funding-applications/{id}/refunds', tag: 'Hồ sơ tài trợ', summary: 'Tổ chức tài chính xác nhận đã hoàn phần dư cho đơn vị xuất khẩu', auth: 'user', action: 'confirmRefund', args: (s) => [P(s, 'id'), B(s)], body: { amount: 'integer', reference: 'string' } },
   { method: 'GET', path: '/v1/funding-applications/{id}/settlement', tag: 'Hồ sơ tài trợ', summary: 'Sự kiện tiền, dư nợ, phần dư phải hoàn và trạng thái đối soát', auth: 'user',
     run: (s, core) => {
       const a = view(core, s.a!.activeOrgId).applications.find((x) => x.id === P(s, 'id'))
@@ -166,11 +166,11 @@ export const ENDPOINTS: Endpoint[] = [
       return [...byType].map(([type, xs]) => ({ type, products: xs.length, rateMin: Math.min(...xs.map((x) => x[0])), rateMax: Math.max(...xs.map((x) => x[1])), advanceAvgPct: xs.reduce((a, x) => a + x[2], 0) / xs.length }))
     } },
 
-  { method: 'GET', path: '/v1/ews-alerts', tag: 'Giám sát', summary: 'Cảnh báo sớm theo luật cho danh mục hồ sơ (tổ chức tài chính: hồ sơ của mình; nhà cung cấp: hồ sơ trên hóa đơn của mình)', auth: 'user',
+  { method: 'GET', path: '/v1/ews-alerts', tag: 'Giám sát', summary: 'Cảnh báo sớm theo luật cho danh mục hồ sơ (tổ chức tài chính: hồ sơ của mình; đơn vị xuất khẩu: hồ sơ trên hóa đơn của mình)', auth: 'user',
     run: (s, core) => {
       const v = view(core, s.a!.activeOrgId)
       const type = orgOf(core, s.a!.activeOrgId)?.type
-      if (type !== 'lender' && type !== 'supplier') throw forbidden('Chỉ tổ chức tài chính và nhà cung cấp')
+      if (type !== 'lender' && type !== 'supplier') throw forbidden('Chỉ tổ chức tài chính và đơn vị xuất khẩu')
       const apps = v.applications.filter((a) => (type === 'lender' ? a.lenderId === s.a!.activeOrgId : v.receivables.find((r) => r.id === a.receivableId)?.sellerId === s.a!.activeOrgId))
       return page(ewsAlerts(core.getState(), apps, core.clock()), s.query)
     } },
@@ -193,21 +193,21 @@ export const ENDPOINTS: Endpoint[] = [
       return { credit, esg: e ? { score: e.result.score, level: e.result.level, coverage: e.result.coverage, status: e.assessment.status } : null, note: 'Xếp hạng tham khảo FCC — không phải quyết định tín dụng' }
     } },
   // ---- chấm điểm tín dụng tham khảo (chạy ở máy chủ, lưu bất biến) ----
-  { method: 'POST', path: '/v1/organizations/{id}/credit-assessments', tag: 'Chấm điểm', summary: 'Chấm điểm nhà cung cấp/bên mua (5C hoặc bên mua). Cùng đầu vào + phiên bản trả lại bản ghi cũ (cùng input_hash); khác thì tạo bản ghi mới', auth: 'user',
+  { method: 'POST', path: '/v1/organizations/{id}/credit-assessments', tag: 'Chấm điểm', summary: 'Chấm điểm đơn vị xuất khẩu/bên nhập khẩu (5C hoặc bên nhập khẩu). Cùng đầu vào + phiên bản trả lại bản ghi cũ (cùng input_hash); khác thì tạo bản ghi mới', auth: 'user',
     run: async (s, core) => {
       const id = P(s, 'id')
       const o = orgOf(core, id)
-      if (!o || !['supplier', 'buyer'].includes(o.type)) throw notFound('Chỉ chấm điểm nhà cung cấp hoặc bên mua')
+      if (!o || !['supplier', 'buyer'].includes(o.type)) throw notFound('Chỉ chấm điểm đơn vị xuất khẩu hoặc bên nhập khẩu')
       assertCanAssess(core, s.a!.activeOrgId, o.type as Kind, id, s.a!.role)
       const { row, reused } = await assess(core, o.type as Kind, id, s.a!.id)
       if (!reused) await core.audit(s.a!.activeOrgId, s.a!.id, 'Chấm điểm tín dụng tham khảo', row.id, `${o.shortName}: ${row.rating} ${Math.round(Number(row.score))} (bao phủ ${Math.round(Number(row.coverage) * 100)}%)`, s.req.id)
       return { ...shape(row), reused }
     } },
-  { method: 'POST', path: '/v1/receivables/{id}/application-assessments', tag: 'Chấm điểm', summary: 'Chấm điểm hồ sơ tài trợ của khoản phải thu (chỉ khi bên mua đã xác nhận)', auth: 'user',
+  { method: 'POST', path: '/v1/receivables/{id}/application-assessments', tag: 'Chấm điểm', summary: 'Chấm điểm hồ sơ tài trợ của khoản phải thu (chỉ khi bên nhập khẩu đã xác nhận)', auth: 'user',
     run: async (s, core) => {
       const r = core.getState().receivables.find((x) => x.id === P(s, 'id'))
       if (!r || r.sellerId !== s.a!.activeOrgId) throw notFound('Không tìm thấy khoản phải thu')
-      if (!['BUYER_CONFIRMED', 'SUBMITTED', 'UNDER_REVIEW', 'OFFERED', 'ACCEPTED', 'FUNDED', 'SETTLED'].includes(r.state)) throw new HttpError(409, 'Chỉ chấm điểm hồ sơ khi bên mua đã xác nhận')
+      if (!['BUYER_CONFIRMED', 'SUBMITTED', 'UNDER_REVIEW', 'OFFERED', 'ACCEPTED', 'FUNDED', 'SETTLED'].includes(r.state)) throw new HttpError(409, 'Chỉ chấm điểm hồ sơ khi bên nhập khẩu đã xác nhận')
       const { row, reused } = await assess(core, 'application', r.id, s.a!.id)
       if (!reused) await core.audit(s.a!.activeOrgId, s.a!.id, 'Chấm điểm hồ sơ tài trợ', row.id, `${r.code}: ${row.rating}`, s.req.id)
       return { ...shape(row), reused }
@@ -313,9 +313,9 @@ export const ENDPOINTS: Endpoint[] = [
   { method: 'POST', path: '/v1/listed/{symbol}/refresh', tag: 'Chấm điểm', summary: 'Nạp dữ liệu niêm yết của mã đã khai', auth: 'user', action: 'refreshListed', args: (s) => [P(s, 'symbol')] },
 
   // ---- thanh toán sớm ----
-  { method: 'POST', path: '/v1/early-payment-offers', tag: 'Bên mua', summary: 'Bên mua đề nghị thanh toán sớm có chiết khấu', auth: 'user', action: 'createEarlyOffer', args: (s) => [B(s)], body: { receivableId: 'string', discountPct: 'number', payBy: 'YYYY-MM-DD' } },
-  { method: 'POST', path: '/v1/early-payment-offers/{id}/accept', tag: 'Bên mua', summary: 'Nhà cung cấp đồng ý thanh toán sớm', auth: 'user', action: 'acceptEarlyOffer', args: (s) => [P(s, 'id')] },
-  { method: 'POST', path: '/v1/early-payment-offers/{id}/paid', tag: 'Bên mua', summary: 'Bên mua ghi nhận đã trả sớm (cần MFA)', auth: 'user', action: 'payEarlyOffer', args: (s) => [P(s, 'id')] },
+  { method: 'POST', path: '/v1/early-payment-offers', tag: 'Bên nhập khẩu', summary: 'Bên nhập khẩu đề nghị thanh toán sớm có chiết khấu', auth: 'user', action: 'createEarlyOffer', args: (s) => [B(s)], body: { receivableId: 'string', discountPct: 'number', payBy: 'YYYY-MM-DD' } },
+  { method: 'POST', path: '/v1/early-payment-offers/{id}/accept', tag: 'Bên nhập khẩu', summary: 'Đơn vị xuất khẩu đồng ý thanh toán sớm', auth: 'user', action: 'acceptEarlyOffer', args: (s) => [P(s, 'id')] },
+  { method: 'POST', path: '/v1/early-payment-offers/{id}/paid', tag: 'Bên nhập khẩu', summary: 'Bên nhập khẩu ghi nhận đã trả sớm (cần MFA)', auth: 'user', action: 'payEarlyOffer', args: (s) => [P(s, 'id')] },
 
   // ---- ESG ----
   { method: 'POST', path: '/v1/esg-assessments', tag: 'ESG', summary: 'Mở hồ sơ ESG của tổ chức', auth: 'user', action: 'ensureEsg', args: (s) => [B(s).orgId], body: { orgId: 'string' } },
@@ -393,13 +393,13 @@ export const ENDPOINTS: Endpoint[] = [
       const v = view(core, s.a!.activeOrgId)
       return v.external.filter((e) => e.orgId === id).map((e) => ({ ...e, source: core.getState().sources.find((x) => x.id === e.sourceId)?.name, label: 'Nguồn công khai – tham khảo', status: e.disputed ? 'Đang được xem xét' : e.resolution ? `Đã xử lý khiếu nại: ${e.resolution.outcome === 'upheld' ? 'chấp nhận' : 'giữ nguyên'}` : undefined }))
     } },
-  { method: 'POST', path: '/v1/organizations/{id}/listed-verification', tag: 'Dữ liệu công khai', summary: 'FCC xác minh ánh xạ MST ↔ mã chứng khoán của bên mua (điều kiện để nạp dữ liệu niêm yết)', auth: 'user', action: 'verifyListed', args: (s) => [P(s, 'id'), B(s).note], body: { note: 'string' } },
+  { method: 'POST', path: '/v1/organizations/{id}/listed-verification', tag: 'Dữ liệu công khai', summary: 'FCC xác minh ánh xạ MST ↔ mã chứng khoán của bên nhập khẩu (điều kiện để nạp dữ liệu niêm yết)', auth: 'user', action: 'verifyListed', args: (s) => [P(s, 'id'), B(s).note], body: { note: 'string' } },
   { method: 'GET', path: '/v1/operations/listed-sync', tag: 'Dữ liệu công khai', summary: 'Trạng thái tự động lấy dữ liệu niêm yết từ vnstock theo mã: lần chạy gần nhất, lỗi (FCC)', auth: 'user',
     run: (s, core) => {
       if (orgOf(core, s.a!.activeOrgId)?.type !== 'fcc') throw forbidden('Chỉ nhân sự FCC')
       return { enabled: !!core.opt.listedFetch, symbols: Object.fromEntries(syncStatus) }
     } },
-  { method: 'POST', path: '/v1/operations/listed-sync', tag: 'Dữ liệu công khai', summary: 'Chạy ngay việc lấy dữ liệu vnstock cho mọi bên mua niêm yết đã xác minh (vận hành FCC)', auth: 'user',
+  { method: 'POST', path: '/v1/operations/listed-sync', tag: 'Dữ liệu công khai', summary: 'Chạy ngay việc lấy dữ liệu vnstock cho mọi bên nhập khẩu niêm yết đã xác minh (vận hành FCC)', auth: 'user',
     run: async (s, core) => {
       if (orgOf(core, s.a!.activeOrgId)?.type !== 'fcc' || !['fcc_admin', 'fcc_operations'].includes(s.a!.role)) throw forbidden('Chỉ vận hành FCC')
       if (!core.opt.listedFetch) throw bad('Chưa bật tự động lấy dữ liệu vnstock trên máy chủ (VNSTOCK_AUTO)')
@@ -512,7 +512,7 @@ export const ENDPOINTS: Endpoint[] = [
     run: async (s, core) => {
       const v = view(core, s.a!.activeOrgId)
       const type = orgOf(core, s.a!.activeOrgId)?.type
-      if (type !== 'supplier' && type !== 'buyer') throw forbidden('Chỉ nhà cung cấp và bên mua')
+      if (type !== 'supplier' && type !== 'buyer') throw forbidden('Chỉ đơn vị xuất khẩu và bên nhập khẩu')
       const mine = v.receivables.filter((r) => (type === 'supplier' ? r.sellerId : r.buyerId) === s.a!.activeOrgId)
       await chargeReport(core, s.a!.activeOrgId, 'khoản phải thu', `${s.a!.id}:${core.clock().getTime()}`)
       s.reply.type('text/csv; charset=utf-8').header('content-disposition', 'attachment; filename="khoan-phai-thu.csv"')

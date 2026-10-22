@@ -19,7 +19,7 @@ export const SUGGESTIONS: Record<Role, string[]> = {
   buyer: [
     "Hóa đơn nào chờ tôi xác nhận?",
     "Có nên thanh toán sớm không?",
-    "Nhà cung cấp nào ESG yếu?",
+    "Đơn vị xuất khẩu nào ESG yếu?",
     "Đối chiếu 3 chiều là gì?",
   ],
   lender: [

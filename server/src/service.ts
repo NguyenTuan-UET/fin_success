@@ -15,6 +15,7 @@ import { invoiceFlags, openFlags } from '@fcc/domain/fraud'
 import { CUSTOMS_FILE_LIMITS, CUSTOMS_GATE, customsFlags, customsGateCheck, hasCustomsDeclaration, isCustomsKind, kindAllowedFor, normalizeDeclarationNo, type CustomsGate } from '@fcc/domain/customs'
 import { CUSTOMS_DOC_KINDS, type CustomsSideInfo, type CustomsInfo, type ReceivableFile } from '@fcc/domain/types'
 import { allocationOf, balanceAt, reconcile, type SettlementEvent } from '@fcc/domain/settlement'
+import { orgTypeInSentence } from '@fcc/domain/labels'
 import { bad, conflict, forbidden, notFound, unprocessable } from './errors'
 import type { State } from './state'
 import type { MemberRole } from './auth/roles'
@@ -117,7 +118,7 @@ function rfqOf(c: Ctx, id: string) {
   return q
 }
 function requireType(c: Ctx, t: Org['type']) {
-  if (c.actor.type !== t) throw forbidden(`Chỉ ${{ supplier: 'nhà cung cấp', buyer: 'bên mua', lender: 'tổ chức tài chính', fcc: 'nhân sự FCC' }[t]} mới được thực hiện thao tác này`)
+  if (c.actor.type !== t) throw forbidden(`Chỉ ${orgTypeInSentence(t)} mới được thực hiện thao tác này`)
 }
 function requireSelf(c: Ctx, orgId: string) {
   if (orgId !== c.actor.id) throw forbidden('Chỉ được thao tác trên dữ liệu của tổ chức mình')
@@ -182,7 +183,7 @@ export const actions: Record<string, Action> = {
     requireType(c, 'supplier')
     if (!input || typeof input !== 'object') throw bad('Thiếu dữ liệu khoản phải thu')
     const buyer = c.s.orgs.find((o) => o.id === input.buyerId)
-    if (!buyer || buyer.type !== 'buyer') throw bad('Bên mua không hợp lệ')
+    if (!buyer || buyer.type !== 'buyer') throw bad('Bên nhập khẩu không hợp lệ')
     positiveInt(input.amount, 'Số tiền')
     if (!isDate(input.issueDate) || !isDate(input.dueDate)) throw bad('Ngày phát hành/hạn thanh toán không hợp lệ (YYYY-MM-DD)')
     if (input.dueDate <= input.issueDate) throw bad('Hạn thanh toán phải sau ngày phát hành')
@@ -226,13 +227,13 @@ export const actions: Record<string, Action> = {
     const r = recv(c, id)
     requireSelf(c, r.buyerId)
     requireState('Khoản phải thu', r.state, ['BUYER_PENDING'])
-    // bên mua quyết định trên đúng phiên bản đang xem; hóa đơn vừa được điều chỉnh thì phải xem lại
+    // bên nhập khẩu quyết định trên đúng phiên bản đang xem; hóa đơn vừa được điều chỉnh thì phải xem lại
     if (expectedVersion !== undefined && expectedVersion !== null && Number(expectedVersion) !== r.version)
       throw conflict(`${r.code} vừa được điều chỉnh lên phiên bản v${r.version} (${vnd(r.amount)} ₫, hạn ${r.dueDate}). Xem lại trước khi quyết định.`)
     if (!confirm && !reason?.trim()) throw bad('Cần nêu lý do tranh chấp')
     patchRecv(c, id, confirm ? { state: 'BUYER_CONFIRMED', confirmedAt: iso(c.now), disputeReason: undefined } : { state: 'BUYER_DISPUTED', disputeReason: reason!.trim().slice(0, 500) })
     notify(c, r.sellerId, confirm ? `${r.code} đã được xác nhận` : `${r.code} bị tranh chấp`, confirm ? `${orgName(c, r.buyerId)} xác nhận nghĩa vụ thanh toán phiên bản v${r.version}. Có thể đưa lên Marketplace.` : `Lý do: ${reason}`, '/invoices')
-    log(c, confirm ? 'Bên mua xác nhận' : 'Bên mua nêu tranh chấp', r.code, confirm ? `Phiên bản v${r.version}, ${authNote(c)}` : reason!)
+    log(c, confirm ? 'Bên nhập khẩu xác nhận' : 'Bên nhập khẩu nêu tranh chấp', r.code, confirm ? `Phiên bản v${r.version}, ${authNote(c)}` : reason!)
   },
   reviseDisputed(c, id: string, amount: number, note: string) {
     const r = recv(c, id)
@@ -246,7 +247,7 @@ export const actions: Record<string, Action> = {
   },
   /**
    * Điều chỉnh số tiền/hạn thanh toán sau khi đã gửi hoặc được xác nhận (hóa đơn điều chỉnh/thay thế).
-   * Tăng phiên bản; xác nhận cũ mất hiệu lực và bên mua phải xác nhận lại. Không điều chỉnh khi đã có hồ sơ tài trợ.
+   * Tăng phiên bản; xác nhận cũ mất hiệu lực và bên nhập khẩu phải xác nhận lại. Không điều chỉnh khi đã có hồ sơ tài trợ.
    */
   reviseReceivable(c, id: string, patch: { amount?: number; dueDate?: string; note: string }) {
     const r = recv(c, id)
@@ -271,8 +272,8 @@ export const actions: Record<string, Action> = {
     log(c, 'Điều chỉnh hóa đơn (xác nhận cũ mất hiệu lực)', r.code, `v${r.version + 1}: ${patch.note.trim()}`)
   },
   /**
-   * Bổ sung chứng từ (hợp đồng, biên bản giao nhận, hóa đơn gốc) cho khoản chưa tài trợ. Không đổi số tiền/hạn nên
-   * không làm mất xác nhận; bên mua được báo khi khoản đã gửi.
+   * Bổ sung chứng từ (hợp đồng, chứng từ giao hàng, hóa đơn gốc) cho khoản chưa tài trợ. Không đổi số tiền/hạn nên
+   * không làm mất xác nhận; bên nhập khẩu được báo khi khoản đã gửi.
    */
   attachDocuments(c, id: string, files: { key: string; name: string; kind: 'invoice' | 'contract' | 'delivery' | 'other' }[]) {
     const r = recv(c, id)
@@ -286,7 +287,7 @@ export const actions: Record<string, Action> = {
     const merged = [...existing, ...clean.filter((f) => !existing.some((e) => e.key === f.key && e.kind === f.kind))].slice(0, CUSTOMS_FILE_LIMITS.perReceivable)
     const docs = { xml: r.docs.xml || merged.some((f) => f.kind === 'invoice'), contract: r.docs.contract || merged.some((f) => f.kind === 'contract'), delivery: r.docs.delivery || merged.some((f) => f.kind === 'delivery'), customs: r.docs.customs }
     patchRecv(c, id, { files: merged, docs })
-    const label = { invoice: 'hóa đơn gốc', contract: 'hợp đồng', delivery: 'biên bản giao nhận', other: 'chứng từ khác' }
+    const label = { invoice: 'hóa đơn gốc', contract: 'hợp đồng', delivery: 'chứng từ giao hàng', other: 'chứng từ khác' }
     const what = [...new Set(clean.map((f) => label[f.kind]))].join(', ')
     if (r.state !== 'DRAFT') notify(c, r.buyerId, `${r.code}: bổ sung chứng từ`, `${orgName(c, r.sellerId)} đã bổ sung ${what}.`, '/invoices')
     log(c, 'Bổ sung chứng từ', r.code, what)
@@ -401,7 +402,7 @@ export const actions: Record<string, Action> = {
     log(c, 'Hủy khoản phải thu', r.code, '')
   },
   /**
-   * Bên mua ghi nhận đã thanh toán (một phần hoặc đủ). Khoản đã được tài trợ: tiền đi vào tài khoản của tổ chức tài chính nên
+   * Bên nhập khẩu ghi nhận đã thanh toán (một phần hoặc đủ). Khoản đã được tài trợ: tiền đi vào tài khoản của tổ chức tài chính nên
    * chỉ khi tổ chức tài chính xác nhận (confirmPayment) mới tất toán; hai số được đối soát. Khoản chưa tài trợ: tất toán ngay.
    */
   markBuyerPaid(c, id: string, input?: { amount?: number; paidAt?: string; reference?: string }) {
@@ -412,7 +413,7 @@ export const actions: Record<string, Action> = {
     if (!a) {
       patchRecv(c, id, { state: 'SETTLED', paidAt: iso(c.now), paidAmount: r.amount })
       notify(c, r.sellerId, `${r.code} đã được thanh toán`, 'Khoản phải thu đã tất toán.')
-      log(c, 'Ghi nhận thanh toán của bên mua', r.code, 'Thanh toán trực tiếp cho nhà cung cấp')
+      log(c, 'Ghi nhận thanh toán của bên nhập khẩu', r.code, 'Thanh toán trực tiếp cho đơn vị xuất khẩu')
       return
     }
     const amount = input?.amount === undefined ? r.amount - (a.settlements ?? []).filter((e) => e.type === 'buyer_reported').reduce((t, e) => t + e.amount, 0) : input.amount
@@ -421,11 +422,11 @@ export const actions: Record<string, Action> = {
     const ev: SettlementEvent = { id: uid('SE'), type: 'buyer_reported', amount, at, source: 'buyer', reference: input?.reference?.slice(0, 100) }
     const settlements = [...(a.settlements ?? []), ev]
     patchApp(c, a.id, { settlements })
-    notify(c, a.lenderId, `${r.code}: bên mua báo đã thanh toán ${vnd(amount)} ₫`, 'Đối chiếu tài khoản và xác nhận tiền về để tất toán.', '/invoices')
+    notify(c, a.lenderId, `${r.code}: bên nhập khẩu báo đã thanh toán ${vnd(amount)} ₫`, 'Đối chiếu tài khoản và xác nhận tiền về để tất toán.', '/invoices')
     emit(c, a.lenderId, 'receivable.paid', { applicationId: a.id, receivableId: r.id, amount, paidAt: at, reference: ev.reference })
-    log(c, 'Bên mua báo đã thanh toán', r.code, `${vnd(amount)} ₫ — chờ ${orgName(c, a.lenderId)} xác nhận tiền về`)
+    log(c, 'Bên nhập khẩu báo đã thanh toán', r.code, `${vnd(amount)} ₫ — chờ ${orgName(c, a.lenderId)} xác nhận tiền về`)
   },
-  /** Tổ chức tài chính xác nhận tiền về (thanh toán của bên mua hoặc thanh lý tài sản bảo đảm). Tính dư nợ theo phí → lãi → gốc; đủ thì tất toán và có phần dư hoàn cho nhà cung cấp. */
+  /** Tổ chức tài chính xác nhận tiền về (thanh toán của bên nhập khẩu hoặc thanh lý tài sản bảo đảm). Tính dư nợ theo phí → lãi → gốc; đủ thì tất toán và có phần dư hoàn cho đơn vị xuất khẩu. */
   confirmPayment(c, appId: string, input: { amount: number; paidAt?: string; kind?: 'payment' | 'collateral'; reference?: string; externalEventId?: string }) {
     const a = app(c, appId)
     requireSelf(c, a.lenderId)
@@ -447,7 +448,7 @@ export const actions: Record<string, Action> = {
       patch.state = 'SETTLED'
       patch.settledAt = iso(c.now)
       patch.refundDue = bal.surplus
-      patch.settlements = bal.surplus > 0 ? [...settlements, { id: uid('SE'), type: 'refund_due', amount: bal.surplus, at: c.now.toISOString(), source: 'system', note: 'Phần thu vượt dư nợ, hoàn cho nhà cung cấp' }] : settlements
+      patch.settlements = bal.surplus > 0 ? [...settlements, { id: uid('SE'), type: 'refund_due', amount: bal.surplus, at: c.now.toISOString(), source: 'system', note: 'Phần thu vượt dư nợ, hoàn cho đơn vị xuất khẩu' }] : settlements
       patchRecv(c, r.id, { state: 'SETTLED', paidAt: iso(c.now), paidAmount: bal.received })
       notify(c, r.sellerId, `${r.code} đã tất toán`, bal.surplus > 0 ? `Phần còn lại ${vnd(bal.surplus)} ₫ sẽ được ${orgName(c, a.lenderId)} hoàn cho bạn.` : 'Khoản tài trợ đã tất toán.', '/invoices')
       emit(c, a.lenderId, 'application.settled', { applicationId: a.id, surplus: bal.surplus })
@@ -458,7 +459,7 @@ export const actions: Record<string, Action> = {
     log(c, ev.type === 'collateral_liquidated' ? 'Ghi nhận thanh lý tài sản bảo đảm' : 'Ghi nhận tiền về', a.id, `${vnd(input.amount)} ₫ — phí ${vnd(ev.allocation.fees)}, lãi ${vnd(ev.allocation.interest)}, gốc ${vnd(ev.allocation.principal)}${bal.settled ? ' · tất toán' : ` · còn ${vnd(bal.outstanding)} ₫`}`)
     return { settled: bal.settled, outstanding: bal.outstanding, surplus: bal.surplus }
   },
-  /** Tổ chức tài chính xác nhận đã hoàn phần dư cho nhà cung cấp. */
+  /** Tổ chức tài chính xác nhận đã hoàn phần dư cho đơn vị xuất khẩu. */
   confirmRefund(c, appId: string, input: { amount: number; reference?: string; externalEventId?: string }) {
     const a = app(c, appId)
     requireSelf(c, a.lenderId)
@@ -473,7 +474,7 @@ export const actions: Record<string, Action> = {
     patchApp(c, a.id, { settlements: [...(a.settlements ?? []), ev], refundPaid: paid + input.amount })
     const r = recv(c, a.receivableId)
     notify(c, r.sellerId, `${r.code}: đã hoàn ${vnd(input.amount)} ₫`, `${orgName(c, a.lenderId)} đã hoàn phần còn lại.`, '/invoices')
-    log(c, 'Ghi nhận hoàn phần dư cho nhà cung cấp', a.id, `${vnd(input.amount)} ₫ (còn ${vnd(due - paid - input.amount)} ₫)`)
+    log(c, 'Ghi nhận hoàn phần dư cho đơn vị xuất khẩu', a.id, `${vnd(input.amount)} ₫ (còn ${vnd(due - paid - input.amount)} ₫)`)
     return { remaining: due - paid - input.amount }
   },
 
@@ -481,7 +482,7 @@ export const actions: Record<string, Action> = {
   createRfq(c, receivableId: string, productIds: string[]) {
     const r = recv(c, receivableId)
     requireSelf(c, r.sellerId)
-    if (r.state !== 'BUYER_CONFIRMED') throw conflict('Chỉ tạo RFQ khi khoản phải thu ở trạng thái “Bên mua đã xác nhận”')
+    if (r.state !== 'BUYER_CONFIRMED') throw conflict('Chỉ tạo RFQ khi khoản phải thu ở trạng thái “Bên nhập khẩu đã xác nhận”')
     if (!Array.isArray(productIds) || productIds.length === 0 || productIds.length > 3 || new Set(productIds).size !== productIds.length) throw bad('Chọn 1–3 sản phẩm khác nhau')
     if (c.s.rfqs.some((q) => q.receivableId === receivableId && ['OPEN', 'RESPONDED'].includes(q.state))) throw conflict('Khoản phải thu đã có RFQ đang mở')
     assertCustomsGate(r)
@@ -491,7 +492,7 @@ export const actions: Record<string, Action> = {
     const lenders = [...new Set(productIds.map((p) => c.s.products.find((x) => x.id === p)!.lenderId))]
     for (const l of lenders) {
       grantConsent(c, { ownerId: r.sellerId, recipientId: l, purpose: `Gói tóm tắt RFQ ${rfq.id}`, scopes: ['credit_score', 'esg'], expiresAt: rfq.expiresAt })
-      notify(c, l, `Yêu cầu báo giá ${rfq.id}`, `${orgName(c, r.sellerId)} — ${r.code}, ${vnd(r.amount)} ₫, bên mua ${orgName(c, r.buyerId)}.`, '/marketplace?tab=rfq')
+      notify(c, l, `Yêu cầu báo giá ${rfq.id}`, `${orgName(c, r.sellerId)} — ${r.code}, ${vnd(r.amount)} ₫, bên nhập khẩu ${orgName(c, r.buyerId)}.`, '/marketplace?tab=rfq')
       emit(c, l, 'rfq.created', { rfqId: rfq.id, receivableId: r.id, amount: r.amount, dueDate: r.dueDate, sellerId: r.sellerId, buyerId: r.buyerId, productIds: productIds.filter((p) => c.s.products.find((x) => x.id === p)?.lenderId === l), expiresAt: rfq.expiresAt })
     }
     log(c, 'Tạo yêu cầu báo giá', rfq.id, `${r.code} → ${lenders.map((l) => orgName(c, l)).join(', ')} (chia sẻ gói tóm tắt)`)
@@ -546,7 +547,7 @@ export const actions: Record<string, Action> = {
   submitDirect(c, receivableId: string, productId: string) {
     const r = recv(c, receivableId)
     requireSelf(c, r.sellerId)
-    if (r.state !== 'BUYER_CONFIRMED') throw conflict('Chỉ gửi hồ sơ khi khoản phải thu ở trạng thái “Bên mua đã xác nhận”')
+    if (r.state !== 'BUYER_CONFIRMED') throw conflict('Chỉ gửi hồ sơ khi khoản phải thu ở trạng thái “Bên nhập khẩu đã xác nhận”')
     if (openApplicationFor(c, receivableId)) throw conflict('Khoản phải thu đã có hồ sơ tài trợ (đang hoạt động hoặc đã tài trợ)')
     if (c.s.rfqs.some((q) => q.receivableId === receivableId && ['OPEN', 'RESPONDED'].includes(q.state))) throw conflict('Khoản phải thu đang có RFQ mở — hủy RFQ trước khi gửi trực tiếp')
     assertCustomsGate(r)
@@ -790,7 +791,7 @@ export const actions: Record<string, Action> = {
     const offer: EarlyPaymentOffer = { id: uid('EP'), buyerId: c.actor.id, receivableId: r.id, discountPct: o.discountPct, payBy: o.payBy, createdAt: iso(c.now), state: 'OPEN' }
     c.s.earlyOffers = [offer, ...c.s.earlyOffers]
     notify(c, r.sellerId, `Đề nghị thanh toán sớm ${r.code}`, `${orgName(c, offer.buyerId)} trả sớm trước ${offer.payBy}, chiết khấu ${offer.discountPct}%.`, '/marketplace?tab=early')
-    log(c, 'Bên mua tạo đề nghị thanh toán sớm', offer.id, `${r.code}, chiết khấu ${offer.discountPct}%`)
+    log(c, 'Bên nhập khẩu tạo đề nghị thanh toán sớm', offer.id, `${r.code}, chiết khấu ${offer.discountPct}%`)
     return offer
   },
   acceptEarlyOffer(c, id: string) {
@@ -801,8 +802,8 @@ export const actions: Record<string, Action> = {
     requireState('Đề nghị', o.state, ['OPEN'])
     if (r.state !== 'BUYER_CONFIRMED') throw conflict('Khoản phải thu không còn ở trạng thái có thể thanh toán sớm')
     c.s.earlyOffers = c.s.earlyOffers.map((x) => (x.id === id ? { ...x, state: 'ACCEPTED' } : x))
-    notify(c, o.buyerId, `Nhà cung cấp đồng ý thanh toán sớm ${id}`, 'Bên mua chuyển khoản trực tiếp cho nhà cung cấp; FCC chỉ ghi nhận.', '/marketplace?tab=early')
-    log(c, 'Nhà cung cấp chấp nhận thanh toán sớm', id, '')
+    notify(c, o.buyerId, `Đơn vị xuất khẩu đồng ý thanh toán sớm ${id}`, 'Bên nhập khẩu chuyển khoản trực tiếp cho đơn vị xuất khẩu; FCC chỉ ghi nhận.', '/marketplace?tab=early')
+    log(c, 'Đơn vị xuất khẩu chấp nhận thanh toán sớm', id, '')
   },
   payEarlyOffer(c, id: string) {
     const o = c.s.earlyOffers.find((x) => x.id === id)
@@ -814,7 +815,7 @@ export const actions: Record<string, Action> = {
     c.s.earlyOffers = c.s.earlyOffers.map((x) => (x.id === id ? { ...x, state: 'PAID' } : x))
     patchRecv(c, r.id, { state: 'EARLY_PAID', paidAt: iso(c.now), paidAmount: paid })
     notify(c, r.sellerId, `${r.code} đã được thanh toán sớm`, `${vnd(paid)} ₫ (sau chiết khấu ${o.discountPct}%).`)
-    log(c, 'Ghi nhận thanh toán sớm', id, `${vnd(paid)} ₫ — bên mua xác nhận đã chuyển khoản trực tiếp`)
+    log(c, 'Ghi nhận thanh toán sớm', id, `${vnd(paid)} ₫ — bên nhập khẩu xác nhận đã chuyển khoản trực tiếp`)
   },
 
   // ===== ESG =====
@@ -898,7 +899,7 @@ export const actions: Record<string, Action> = {
   // ===== Hồ sơ chấm điểm =====
   /** Nạp dữ liệu niêm yết từ file JSON do scripts/fetch_listed.py (vnstock) sinh ra; máy chủ tự đọc, không nhận dữ liệu từ trình duyệt. */
   refreshListed(c, symbol: string) {
-    if (c.actor.type !== 'buyer' || !c.actor.listedSymbol) throw forbidden('Chỉ bên mua có mã chứng khoán đã khai báo mới nạp dữ liệu niêm yết')
+    if (c.actor.type !== 'buyer' || !c.actor.listedSymbol) throw forbidden('Chỉ bên nhập khẩu có mã chứng khoán đã khai báo mới nạp dữ liệu niêm yết')
     const sym = String(symbol ?? '').trim().toUpperCase()
     if (!/^[A-Z0-9]{2,6}$/.test(sym)) throw bad('Mã chứng khoán không hợp lệ')
     if (sym !== c.actor.listedSymbol.toUpperCase()) throw forbidden(`Tổ chức chỉ được nạp dữ liệu của mã ${c.actor.listedSymbol}`)
@@ -915,7 +916,7 @@ export const actions: Record<string, Action> = {
     const financials = j.financials.map((f) => ({ ...f, status: 'public_reference' as const }))
     c.s.listed = [snap, ...c.s.listed.filter((l) => l.orgId !== snap.orgId)]
     if (financials.length) {
-      // bên mua chưa có hồ sơ tín dụng thì tạo mới, nếu không BCTC vừa nạp bị bỏ và điểm báo "Thiếu BCTC"
+      // bên nhập khẩu chưa có hồ sơ tín dụng thì tạo mới, nếu không BCTC vừa nạp bị bỏ và điểm báo "Thiếu BCTC"
       c.s.profiles = c.s.profiles.some((p) => p.orgId === snap.orgId)
         ? c.s.profiles.map((p) => (p.orgId === snap.orgId ? { ...p, financials } : p))
         : [...c.s.profiles, { orgId: snap.orgId, financials, collateral: [] }]
@@ -923,11 +924,11 @@ export const actions: Record<string, Action> = {
     log(c, 'Cập nhật dữ liệu niêm yết', snap.symbol, `${snap.provider} · ${financials.length} năm BCTC`)
     return snap
   },
-  /** FCC xác minh bên mua đúng là chủ sở hữu mã chứng khoán đã khai (đối chiếu MST với công bố của sở giao dịch) trước khi nạp dữ liệu niêm yết. */
+  /** FCC xác minh bên nhập khẩu đúng là chủ sở hữu mã chứng khoán đã khai (đối chiếu MST với công bố của sở giao dịch) trước khi nạp dữ liệu niêm yết. */
   verifyListed(c, orgId: string, note: string) {
     if (c.actor.type !== 'fcc') throw forbidden('Chỉ FCC xác minh mã chứng khoán')
     const o = c.s.orgs.find((x) => x.id === orgId)
-    if (!o || o.type !== 'buyer' || !o.listedSymbol) throw notFound('Tổ chức không phải bên mua có mã chứng khoán')
+    if (!o || o.type !== 'buyer' || !o.listedSymbol) throw notFound('Tổ chức không phải bên nhập khẩu có mã chứng khoán')
     if (String(note ?? '').trim().length < 10) throw bad('Cần ghi căn cứ đối chiếu MST ↔ mã chứng khoán (≥ 10 ký tự)')
     c.s.orgs = c.s.orgs.map((x) => (x.id === orgId ? { ...x, listedVerified: { symbol: x.listedSymbol!, by: c.userId ?? c.actor.shortName, at: c.now.toISOString(), note: note.trim() } } : x))
     log(c, 'Xác minh mã chứng khoán', orgId, `${o.listedSymbol} — ${note.trim()}`)
@@ -1020,7 +1021,7 @@ function putResponse(c: Ctx, q: Rfq, resp: RfqResponse) {
 }
 
 /** Ghi nhận giải ngân — idempotent: gọi lại khi đã FUNDED không đổi gì. */
-/** Đối soát bên mua ↔ tổ chức tài chính của một hồ sơ. */
+/** Đối soát bên nhập khẩu ↔ tổ chức tài chính của một hồ sơ. */
 export const reconciliationOf = (a: FundingApplication) => reconcile(a.settlements ?? [])
 
 export function fundApplication(c: Ctx, a: FundingApplication, source = 'thao tác của tổ chức tài chính') {
@@ -1066,7 +1067,7 @@ export function runSweep(c: Ctx): number {
   for (const r of c.s.receivables.filter((x) => (['FUNDED', 'BUYER_CONFIRMED'] as ReceivableState[]).includes(x.state) && x.dueDate < today)) {
     patchRecv(c, r.id, { state: 'OVERDUE' })
     notify(c, r.buyerId, `${r.code} quá hạn thanh toán`, `Hạn thanh toán ${r.dueDate}.`, '/invoices')
-    notify(c, r.sellerId, `${r.code} quá hạn thanh toán`, `Bên mua chưa thanh toán đến hạn ${r.dueDate}.`, '/invoices')
+    notify(c, r.sellerId, `${r.code} quá hạn thanh toán`, `Bên nhập khẩu chưa thanh toán đến hạn ${r.dueDate}.`, '/invoices')
     const fa = c.s.applications.find((x) => x.receivableId === r.id && x.state === 'FUNDED')
     if (fa) emit(c, fa.lenderId, 'receivable.overdue', { applicationId: fa.id, receivableId: r.id, dueDate: r.dueDate })
     log(c, 'Khoản phải thu quá hạn', r.code, 'Tự động')

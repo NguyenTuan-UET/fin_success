@@ -36,7 +36,7 @@ let S: string, B: string, L1: string, F: string
 let L2: { token: string; orgId: string }
 let p1: string, p2: string, buyerId: string, l1Id: string
 
-/** Khoản phải thu 2 tỷ đã được bên mua xác nhận. */
+/** Khoản phải thu 2 tỷ đã được bên nhập khẩu xác nhận. */
 async function confirmed(n: string) {
   const due = iso(new Date(Date.now() + 90 * 86_400_000))
   const rec = (await act(S, 'createReceivable', { buyerId, invoiceSeries: 'C', invoiceNumber: n, issueDate: iso(new Date()), dueDate: due, amount: 2_000_000_000, description: '', fingerprint: `fp-c-${n}`, docs: { xml: true }, source: 'xml' })).body.result
@@ -59,7 +59,7 @@ beforeAll(async () => {
 })
 
 describe('T02 — truy cập chéo giữa các tổ chức', () => {
-  it('nhà cung cấp khác không đọc đầy đủ, không sửa, không hủy, không gửi tài trợ hóa đơn của mình dù biết mã', async () => {
+  it('đơn vị xuất khẩu khác không đọc đầy đủ, không sửa, không hủy, không gửi tài trợ hóa đơn của mình dù biết mã', async () => {
     const rec = await confirmed('X1')
     const other = await register('supplier', 'supplier-two')
     const seen = await call('GET', `/v1/receivables/${rec.id}`, undefined, other.token)
@@ -173,7 +173,7 @@ describe('T09 — sự kiện tiền lặp, sai thứ tự, tiền chưa về đ
     expect(pays).toHaveLength(2)
   })
 
-  it('bên mua báo đã trả nhưng tiền không về tổ chức tài chính: không tất toán, đối soát báo lệch', async () => {
+  it('bên nhập khẩu báo đã trả nhưng tiền không về tổ chức tài chính: không tất toán, đối soát báo lệch', async () => {
     expect((await act(B, 'markBuyerPaid', recId, { amount: 1_200_000_000, reference: 'UNC-sai-tk' })).status).toBe(200)
     const a = st().applications.find((x) => x.id === appId)!
     expect(a.state).toBe('FUNDED')

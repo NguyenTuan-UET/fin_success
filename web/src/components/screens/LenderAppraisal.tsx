@@ -164,7 +164,7 @@ export function LenderAppraisal() {
             <div className="grid-fields" style={{ fontSize: 13 }}>
               <div><div className="muted">Hóa đơn</div><div className="num">{r.code} · {r.invoiceSeries}-{r.invoiceNumber}</div></div>
               <div><div className="muted">Giá trị</div><div className="num strong">{vnd(r.amount)} đ</div></div>
-              <div><div className="muted">Người mua</div><div>{orgName(data.orgs, r.buyerId)} · {buyer.rating}</div></div>
+              <div><div className="muted">Bên nhập khẩu</div><div>{orgName(data.orgs, r.buyerId)} · {buyer.rating}</div></div>
               <div><div className="muted">Hạn thanh toán</div><div className="num">{date(r.dueDate)}</div></div>
               {quote && <div><div className="muted">Báo giá đã chọn</div><div className="num">{quote.ratePct}%/năm · ứng {quote.advancePct}%</div></div>}
               <div><div className="muted"><Term k="esg">ESG</Term></div><div>{esg ? `${dec(esg.result.score, 0)}/100 · độ bao phủ ${Math.round(esg.result.coverage * 100)}%${esg.official ? " (chính thức)" : " (tạm tính)"}` : "Chưa được chia sẻ"}</div></div>
@@ -176,14 +176,14 @@ export function LenderAppraisal() {
 
           <div className="row top" style={{ gap: 12 }}>
             <div className="grow-1"><ScoreBlock title="Điểm hồ sơ tài trợ" s={appScore} term={<Term k="riskScore">Điểm hồ sơ tài trợ</Term>} /></div>
-            <div className="grow-1"><ScoreBlock title="Điểm nhà cung cấp (5C)" s={seller} term={<Term k="fiveC">Điểm nhà cung cấp (5C)</Term>} /></div>
-            <div className="grow-1"><ScoreBlock title="Điểm bên mua" s={buyer} /></div>
+            <div className="grow-1"><ScoreBlock title="Điểm đơn vị xuất khẩu (5C)" s={seller} term={<Term k="fiveC">Điểm đơn vị xuất khẩu (5C)</Term>} /></div>
+            <div className="grow-1"><ScoreBlock title="Điểm bên nhập khẩu" s={buyer} /></div>
           </div>
 
           <Disclaimer>Xếp hạng tham khảo FCC — không phải quyết định tín dụng. Bạn tự thẩm định, ra quyết định, ký hợp đồng và giải ngân.</Disclaimer>
 
           <div className="card stack">
-            <h2 className="ct">Dữ liệu công khai về người bán</h2>
+            <h2 className="ct">Dữ liệu công khai về đơn vị xuất khẩu</h2>
             <PublicData orgId={r.sellerId} empty="Chưa có dữ liệu công khai được chia sẻ cho bạn." />
           </div>
 

@@ -93,11 +93,11 @@ const supplier: TourStep[] = [
     path: "/supplier/invoices",
     target: HEADER,
     title: "Bước 2 · Quản lý hóa đơn",
-    body: "Theo dõi vòng đời từng hóa đơn: nháp → chờ người mua xác nhận → đã xác nhận → tài trợ → thanh toán.",
+    body: "Theo dõi vòng đời từng hóa đơn: nháp → chờ bên nhập khẩu xác nhận → đã xác nhận → tài trợ → thanh toán.",
     tips: [
       "Bấm vào một hóa đơn để xem chi tiết và chứng từ.",
-      "Gửi hóa đơn cho người mua xác nhận; chỉ hóa đơn đã xác nhận mới được đem đi tài trợ.",
-      "Nếu người mua tranh chấp: sửa thông tin rồi gửi lại.",
+      "Gửi hóa đơn cho bên nhập khẩu xác nhận; chỉ hóa đơn đã xác nhận mới được đem đi tài trợ.",
+      "Nếu bên nhập khẩu tranh chấp: sửa thông tin rồi gửi lại.",
       "Mở chi tiết hóa đơn để thêm chứng từ hải quan (tờ khai, vận đơn…) — cần để gửi yêu cầu báo giá.",
     ],
   },
@@ -109,7 +109,7 @@ const supplier: TourStep[] = [
     tips: [
       "Chọn file XML, ảnh hoặc PDF hóa đơn.",
       "Kiểm tra lại số liệu AI đọc được, sửa nếu sai, rồi mới lưu.",
-      "Đính kèm chứng từ gốc: hợp đồng, biên bản giao hàng. Hệ thống tự chặn hóa đơn trùng.",
+      "Đính kèm chứng từ gốc: hợp đồng ngoại thương, chứng từ giao hàng. Hệ thống tự chặn hóa đơn trùng.",
     ],
   },
   {
@@ -118,7 +118,7 @@ const supplier: TourStep[] = [
     title: "Bước 3 · Marketplace: chọn gói tài trợ",
     body: "So sánh các gói do tổ chức tài chính công bố. FCC tính sẵn số tiền thực nhận và tổng chi phí của từng gói.",
     tips: [
-      "Chọn một hóa đơn đã được người mua xác nhận.",
+      "Chọn một hóa đơn đã được bên nhập khẩu xác nhận.",
       "Chọn tối đa 3 gói phù hợp và gửi yêu cầu báo giá (RFQ).",
       "Khi báo giá về, so sánh và bấm “Chọn báo giá” (cần MFA).",
     ],
@@ -138,8 +138,8 @@ const supplier: TourStep[] = [
     path: "/supplier/disbursement",
     target: HEADER,
     title: "Bước 5 · Giải ngân & thu hồi",
-    body: "Theo dõi vòng đời từng khoản tài trợ và xem tiền sẽ được phân bổ thế nào khi người mua thanh toán.",
-    tips: ["Chấp thuận đề nghị chính thức ngay tại đây nếu chưa làm ở Hồ sơ tài trợ.", "Khi người mua trả tiền: thu theo thứ tự phí → lãi → gốc, phần dư được hoàn lại cho bạn."],
+    body: "Theo dõi vòng đời từng khoản tài trợ và xem tiền sẽ được phân bổ thế nào khi bên nhập khẩu thanh toán.",
+    tips: ["Chấp thuận đề nghị chính thức ngay tại đây nếu chưa làm ở Hồ sơ tài trợ.", "Khi bên nhập khẩu trả tiền: thu theo thứ tự phí → lãi → gốc, phần dư được hoàn lại cho bạn."],
   },
   {
     path: "/supplier/esg",
@@ -159,11 +159,11 @@ const supplier: TourStep[] = [
 ];
 
 const buyer: TourStep[] = [
-  { path: "/buyer", ...nav("Việc chính của bên mua: xác nhận hóa đơn nhà cung cấp gửi và ghi nhận thanh toán.") },
+  { path: "/buyer", ...nav("Việc chính của bên nhập khẩu: xác nhận hóa đơn đơn vị xuất khẩu gửi và ghi nhận thanh toán.") },
   {
     target: KPI,
     title: "Chỉ tiêu thanh toán",
-    body: "Tóm tắt: khoản phải trả đã xác nhận, hóa đơn chờ bạn xác nhận, số nhà cung cấp và xếp hạng thanh toán của bạn (tham khảo).",
+    body: "Tóm tắt: khoản phải trả đã xác nhận, hóa đơn chờ bạn xác nhận, số đơn vị xuất khẩu và xếp hạng thanh toán của bạn (tham khảo).",
   },
   {
     target: TODO,
@@ -185,7 +185,7 @@ const buyer: TourStep[] = [
     path: "/buyer/invoices",
     target: HEADER,
     title: "Bước 2 · Xác nhận hóa đơn",
-    body: "Nhà cung cấp gửi hóa đơn để bạn xác nhận khoản nợ là đúng. Xác nhận nhanh giúp nhà cung cấp được tài trợ sớm.",
+    body: "Đơn vị xuất khẩu gửi hóa đơn để bạn xác nhận khoản nợ là đúng. Xác nhận nhanh giúp đơn vị xuất khẩu được tài trợ sớm.",
     tips: [
       "Mở hóa đơn, đối chiếu với chứng từ, rồi “Xác nhận” hoặc “Tranh chấp” kèm lý do (cần MFA).",
       "Bên nhập khẩu cũng có thể thêm tờ khai nhập khẩu và xác nhận nhận hàng ở mục Chứng từ hải quan.",
@@ -197,14 +197,14 @@ const buyer: TourStep[] = [
     path: "/buyer/marketplace",
     target: HEADER,
     title: "Bước 3 · Chương trình thanh toán sớm",
-    body: "Hỗ trợ chuỗi cung ứng: đề nghị thanh toán sớm cho nhà cung cấp để đổi lấy chiết khấu.",
-    tips: ["Tạo đề nghị thanh toán sớm cho nhà cung cấp.", "Khi nhà cung cấp chấp nhận và bạn đã trả, ghi nhận đã thanh toán."],
+    body: "Hỗ trợ chuỗi cung ứng: đề nghị thanh toán sớm cho đơn vị xuất khẩu để đổi lấy chiết khấu.",
+    tips: ["Tạo đề nghị thanh toán sớm cho đơn vị xuất khẩu.", "Khi đơn vị xuất khẩu chấp nhận và bạn đã trả, ghi nhận đã thanh toán."],
   },
   {
     path: "/buyer/esg",
     target: HEADER,
     title: "ESG chuỗi cung ứng",
-    body: "Xem mức độ bền vững của các nhà cung cấp đã đồng ý chia sẻ ESG. Nhà cung cấp xanh = ESG chính thức ≥ 65, còn hiệu lực, không có cờ trọng yếu.",
+    body: "Xem mức độ bền vững của các đơn vị xuất khẩu đã đồng ý chia sẻ ESG. Đơn vị xuất khẩu xanh = ESG chính thức ≥ 65, còn hiệu lực, không có cờ trọng yếu.",
   },
   {
     path: "/buyer/accounting",
@@ -266,7 +266,7 @@ const lender: TourStep[] = [
     path: "/lender/monitoring",
     target: HEADER,
     title: "Giám sát & cảnh báo sớm (EWS)",
-    body: "Sau giải ngân, hệ thống theo dõi tình trạng hóa đơn, lịch sử thanh toán của bên mua và mức tập trung rủi ro; cảnh báo kèm giải thích và đề xuất, bạn quyết định biện pháp.",
+    body: "Sau giải ngân, hệ thống theo dõi tình trạng hóa đơn, lịch sử thanh toán của bên nhập khẩu và mức tập trung rủi ro; cảnh báo kèm giải thích và đề xuất, bạn quyết định biện pháp.",
   },
   {
     path: "/lender/esg",
@@ -320,7 +320,7 @@ const admin: TourStep[] = [
     tips: [
       "Duyệt hoặc chặn từng nguồn (cần MFA và ghi căn cứ).",
       "Ghi kết quả tra cứu thủ công kèm URL; xử lý khiếu nại của doanh nghiệp.",
-      "Xác minh mã chứng khoán bên mua khai báo.",
+      "Xác minh mã chứng khoán bên nhập khẩu khai báo.",
     ],
   },
   {
@@ -347,8 +347,8 @@ const admin: TourStep[] = [
 const withWelcome = (who: string, steps: TourStep[]): TourStep[] => [{ path: steps[0].path, ...welcome(who, steps.length + 1) }, ...steps];
 
 export const TOURS: Record<Role, TourStep[]> = {
-  supplier: withWelcome("Nhà cung cấp", supplier),
-  buyer: withWelcome("Người mua", buyer),
+  supplier: withWelcome("Đơn vị xuất khẩu", supplier),
+  buyer: withWelcome("Bên nhập khẩu", buyer),
   lender: withWelcome("Tổ chức tài chính", lender),
   admin: withWelcome("Quản trị FCC", admin),
 };

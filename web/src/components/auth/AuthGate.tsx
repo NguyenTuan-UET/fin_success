@@ -13,8 +13,8 @@ const INDUSTRY: Record<string, string> = {
   tech: "Công nghệ",
 };
 const TYPES: Record<string, string> = {
-  supplier: "Nhà cung cấp (bán hàng, cần vốn)",
-  buyer: "Bên mua (doanh nghiệp lớn)",
+  supplier: "Đơn vị xuất khẩu (bán hàng, cần vốn)",
+  buyer: "Bên nhập khẩu (doanh nghiệp lớn)",
   lender: "Tổ chức tài chính",
 };
 

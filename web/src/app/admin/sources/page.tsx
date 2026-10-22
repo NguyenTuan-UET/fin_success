@@ -126,13 +126,13 @@ export default function SourcesPage() {
 
       <section className="card stack">
         <div className="between">
-          <h2 className="ct">Bên mua niêm yết (vnstock)</h2>
+          <h2 className="ct">Bên nhập khẩu niêm yết (vnstock)</h2>
           {sync?.enabled && <button className="btn bs sm" onClick={() => run(() => api("POST", "/v1/operations/listed-sync", {}), "Đã lấy dữ liệu mới từ vnstock")}>Lấy dữ liệu ngay</button>}
         </div>
         <div className="muted">Chỉ nạp dữ liệu niêm yết sau khi FCC xác minh ánh xạ MST ↔ mã chứng khoán. {sync?.enabled ? "Máy chủ tự lấy lại dữ liệu mỗi 15 phút trong giờ giao dịch, 6 giờ ngoài giờ." : "Máy chủ chưa bật tự động lấy dữ liệu (VNSTOCK_AUTO)."} Ý kiến kiểm toán và diện cảnh báo không có trong vnstock: FCC đối chiếu công bố thông tin của sở giao dịch rồi xác nhận bên dưới, trước đó hai chỉ tiêu này không được chấm.</div>
-        {!listedBuyers.length ? <div className="muted">Chưa có bên mua nào khai mã chứng khoán.</div> : (
+        {!listedBuyers.length ? <div className="muted">Chưa có bên nhập khẩu nào khai mã chứng khoán.</div> : (
           <div className="tw" tabIndex={0} role="region" aria-label="Bảng dữ liệu, cuộn ngang để xem thêm"><table>
-            <thead><tr><th>Bên mua</th><th>Mã</th><th>Xác minh</th><th>Dữ liệu</th></tr></thead>
+            <thead><tr><th>Bên nhập khẩu</th><th>Mã</th><th>Xác minh</th><th>Dữ liệu</th></tr></thead>
             <tbody>{listedBuyers.map((o) => {
               const l = data.listed.find((x) => x.orgId === o.id);
               const ok = o.listedVerified?.symbol === o.listedSymbol;
@@ -150,7 +150,7 @@ export default function SourcesPage() {
           <div className="stack-sm">
             <b>Nhập ý kiến kiểm toán / diện giao dịch</b>
             <div className="grid-fields">
-              <label className="field"><span>Bên mua</span><select className="select" value={flags.orgId} onChange={(e) => setFlags({ ...flags, orgId: e.target.value })}><option value="">—</option>{data.listed.map((l) => <option key={l.orgId} value={l.orgId}>{l.symbol} · {orgName(data.orgs, l.orgId)}</option>)}</select></label>
+              <label className="field"><span>Bên nhập khẩu</span><select className="select" value={flags.orgId} onChange={(e) => setFlags({ ...flags, orgId: e.target.value })}><option value="">—</option>{data.listed.map((l) => <option key={l.orgId} value={l.orgId}>{l.symbol} · {orgName(data.orgs, l.orgId)}</option>)}</select></label>
               <label className="field"><span>Ý kiến kiểm toán</span><select className="select" value={flags.auditOpinion} onChange={(e) => setFlags({ ...flags, auditOpinion: e.target.value })}><option value="">Giữ nguyên (xác nhận đúng)</option><option value="unqualified">Chấp nhận toàn phần</option><option value="qualified">Ngoại trừ</option><option value="adverse">Trái ngược</option><option value="disclaimer">Từ chối đưa ý kiến</option></select></label>
               <label className="field"><span>Diện giao dịch</span><select className="select" value={flags.tradingStatus} onChange={(e) => setFlags({ ...flags, tradingStatus: e.target.value })}><option value="">Giữ nguyên (xác nhận đúng)</option><option value="normal">Bình thường</option><option value="warning">Cảnh báo</option><option value="controlled">Kiểm soát</option><option value="restricted">Hạn chế giao dịch</option></select></label>
               <label className="field"><span>Nguồn công bố</span><input className="input" value={flags.note} onChange={(e) => setFlags({ ...flags, note: e.target.value })} /></label>

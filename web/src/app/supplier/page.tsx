@@ -37,16 +37,16 @@ export default function SupplierOverview() {
     ...(short ? [{ icon: AlertTriangle, bg: "var(--warn-bg)", fg: "var(--warn)", title: `Dự báo thiếu hụt ${money(-short.value)} từ ${date(short.date)}`, note: "Xem gói tài trợ để bù thiếu hụt", href: "/supplier/marketplace", cta: "Xem phương án" }] : []),
     ...(offers.length ? [{ icon: FileSignature, bg: "var(--ok-bg)", fg: "var(--ok)", title: `${offers.length} đề nghị tài trợ chờ bạn chấp thuận`, note: "Có hạn chấp thuận", href: "/supplier/disbursement", cta: "Xem đề nghị" }] : []),
     ...(quotes.length ? [{ icon: Sparkles, bg: "var(--info-bg)", fg: "var(--info)", title: `${quotes.length} RFQ đã có báo giá`, note: "Chọn báo giá tốt nhất", href: "/supplier/marketplace", cta: "So sánh" }] : []),
-    ...(disputed.length ? [{ icon: CircleAlert, bg: "var(--bad-bg)", fg: "var(--bad)", title: `${disputed.length} hóa đơn bị người mua hỏi lại`, note: disputed[0].disputeReason ?? "Cần giải trình hoặc điều chỉnh", href: "/supplier/invoices", cta: "Xử lý" }] : []),
-    ...(pending.length ? [{ icon: Clock, bg: "var(--info-bg)", fg: "var(--info)", title: `${pending.length} hóa đơn chờ người mua xác nhận`, note: "Theo dõi ở Hóa đơn", href: "/supplier/invoices", cta: "Theo dõi" }] : []),
-    ...(drafts.length ? [{ icon: Upload, bg: "var(--warn-bg)", fg: "var(--warn)", title: `${drafts.length} hóa đơn nháp chưa gửi`, note: "Gửi người mua để xác nhận", href: "/supplier/invoices", cta: "Hoàn tất" }] : []),
+    ...(disputed.length ? [{ icon: CircleAlert, bg: "var(--bad-bg)", fg: "var(--bad)", title: `${disputed.length} hóa đơn bị bên nhập khẩu hỏi lại`, note: disputed[0].disputeReason ?? "Cần giải trình hoặc điều chỉnh", href: "/supplier/invoices", cta: "Xử lý" }] : []),
+    ...(pending.length ? [{ icon: Clock, bg: "var(--info-bg)", fg: "var(--info)", title: `${pending.length} hóa đơn chờ bên nhập khẩu xác nhận`, note: "Theo dõi ở Hóa đơn", href: "/supplier/invoices", cta: "Theo dõi" }] : []),
+    ...(drafts.length ? [{ icon: Upload, bg: "var(--warn-bg)", fg: "var(--warn)", title: `${drafts.length} hóa đơn nháp chưa gửi`, note: "Gửi bên nhập khẩu để xác nhận", href: "/supplier/invoices", cta: "Hoàn tất" }] : []),
     ...(overdue.length ? [{ icon: AlertTriangle, bg: "var(--bad-bg)", fg: "var(--bad)", title: `${overdue.length} hóa đơn quá hạn`, note: `${money(sumAmount(overdue))} đ chưa thu`, href: "/supplier/invoices", cta: "Xem" }] : []),
   ];
 
   return (
     <>
       <PageHeader
-        eyebrow="Tổng quan · Nhà cung cấp"
+        eyebrow="Tổng quan · Đơn vị xuất khẩu"
         title={`Xin chào, ${me.name}`}
         sub={short ? `Dự báo thiếu hụt ${money(-short.value)} ngày ${date(short.date)}. Xem các gói tài trợ để bù thiếu hụt.` : "Theo dõi vốn lưu động, hóa đơn và tài trợ của bạn."}
         actions={<Link className="btn bp" href="/supplier/invoices/upload"><Upload size={16} aria-hidden="true" /> Tải hóa đơn</Link>}
@@ -77,15 +77,15 @@ export default function SupplierOverview() {
           <span className="d-title"><Sparkles size={18} color="#DDF1C4" aria-hidden="true" />Gợi ý tài trợ</span>
           {best ? (
             <>
-              <p>Hóa đơn có người mua xếp hạng cao nhất trong các khoản đã xác nhận:</p>
+              <p>Hóa đơn có bên nhập khẩu xếp hạng cao nhất trong các khoản đã xác nhận:</p>
               <div className="d-box">
                 <div className="between"><strong className="num" style={{ color: "#fff" }}>{best.code}</strong><span className="chip c-lime">Gợi ý</span></div>
                 <div>{orgName(data.orgs, best.buyerId)} · {money(best.amount)} đ · hạn {date(best.dueDate)} (còn {daysFromNow(best.dueDate)} ngày)</div>
-                <div className="muted" style={{ color: "var(--on-forest-2)" }}>Xếp hạng người mua {scores.buyer(best.buyerId).rating}</div>
+                <div className="muted" style={{ color: "var(--on-forest-2)" }}>Xếp hạng bên nhập khẩu {scores.buyer(best.buyerId).rating}</div>
               </div>
               <Link className="btn bl" href={`/supplier/marketplace?r=${best.id}`}>So sánh gói cho hóa đơn này</Link>
             </>
-          ) : <p>Chưa có hóa đơn nào được người mua xác nhận. Sau khi được xác nhận, FCC gợi ý hóa đơn nên tài trợ.</p>}
+          ) : <p>Chưa có hóa đơn nào được bên nhập khẩu xác nhận. Sau khi được xác nhận, FCC gợi ý hóa đơn nên tài trợ.</p>}
           <AskButton className="btn bl">Hỏi trợ lý (chọn câu hỏi)</AskButton>
         </div>
       </section>
@@ -95,7 +95,7 @@ export default function SupplierOverview() {
           <div className="ch"><h2 className="ct">Hóa đơn gần đây</h2><Link className="btn bs sm" href="/supplier/invoices">Xem tất cả</Link></div>
           <div className="tw" tabIndex={0} role="region" aria-label="Bảng dữ liệu, cuộn ngang để xem thêm">
             <table>
-              <thead><tr><th>Mã</th><th>Người mua</th><th className="r">Số tiền (đ)</th><th>Hạn</th><th>Trạng thái</th></tr></thead>
+              <thead><tr><th>Mã</th><th>Bên nhập khẩu</th><th className="r">Số tiền (đ)</th><th>Hạn</th><th>Trạng thái</th></tr></thead>
               <tbody>
                 {[...mine].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1)).slice(0, 6).map((r) => (
                   <tr key={r.id}><td className="num strong">{r.code}</td><td>{orgName(data.orgs, r.buyerId)}</td><td className="r num">{vnd(r.amount)}</td><td className="num">{date(r.dueDate)}</td><td><span className={`chip ${RECEIVABLE_STAGE[r.state].chip}`}>{RECEIVABLE_STAGE[r.state].short}</span></td></tr>

@@ -29,7 +29,7 @@ const rank = (r: Rating) => RATING_ORDER.indexOf(r) // RATING_ORDER: CCC thấp 
 const GOOD: Rating = 'BBB'
 
 /**
- * (i) có tài sản bảo đảm và khoản phải thu tốt; (ii) không tài sản bảo đảm nhưng khoản phải thu chất lượng, bên mua uy tín;
+ * (i) có tài sản bảo đảm và khoản phải thu tốt; (ii) không tài sản bảo đảm nhưng khoản phải thu chất lượng, bên nhập khẩu uy tín;
  * (iii) khoản phải thu yếu hoặc điểm thấp — không gợi ý sản phẩm. Ngưỡng là tham số khởi tạo (scorecard_versions).
  */
 export function classifyFunding(i: { applicationRating: Rating; buyerRating: Rating; collateralValue: number; amount: number }): Classification {
@@ -37,9 +37,9 @@ export function classifyFunding(i: { applicationRating: Rating; buyerRating: Rat
   const reasons: string[] = []
   if (!goodReceivable) {
     if (rank(i.applicationRating) < rank(GOOD)) reasons.push(`Điểm hồ sơ ${i.applicationRating} thấp hơn ngưỡng ${GOOD}`)
-    if (rank(i.buyerRating) < rank(GOOD)) reasons.push(`Bên mua xếp hạng ${i.buyerRating} thấp hơn ngưỡng ${GOOD}`)
+    if (rank(i.buyerRating) < rank(GOOD)) reasons.push(`Bên nhập khẩu xếp hạng ${i.buyerRating} thấp hơn ngưỡng ${GOOD}`)
     return { case: 3, label: '(iii) Không đủ điều kiện', suggestProducts: false, reasons }
   }
   if (i.collateralValue > 0) return { case: 1, label: '(i) Có tài sản bảo đảm và khoản phải thu tốt', suggestProducts: true, reasons: [`Cơ sở bảo đảm tham khảo ${Math.round(i.collateralValue).toLocaleString('vi-VN')} ₫`] }
-  return { case: 2, label: '(ii) Không tài sản bảo đảm, dựa trên khoản phải thu', suggestProducts: true, reasons: ['Khoản phải thu chất lượng, bên mua uy tín'] }
+  return { case: 2, label: '(ii) Không tài sản bảo đảm, dựa trên khoản phải thu', suggestProducts: true, reasons: ['Khoản phải thu chất lượng, bên nhập khẩu uy tín'] }
 }

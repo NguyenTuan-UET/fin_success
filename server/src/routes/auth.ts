@@ -1,3 +1,4 @@
+import { orgTypeInSentence } from '@fcc/domain/labels'
 import type { FastifyInstance } from 'fastify'
 import { randomBytes } from 'node:crypto'
 import type { IndustryGroup, Org, OrgType } from '@fcc/domain/types'
@@ -74,7 +75,7 @@ export function authRoutes(app: FastifyInstance, core: Core) {
     const password = strongPassword(b.password)
     const o = b.org ?? {}
     const type = o.type as OrgType
-    if (!['buyer', 'supplier', 'lender'].includes(type)) throw bad('Loại tổ chức phải là bên mua, nhà cung cấp hoặc tổ chức tài chính')
+    if (!['buyer', 'supplier', 'lender'].includes(type)) throw bad(`Loại tổ chức phải là ${orgTypeInSentence('buyer')}, ${orgTypeInSentence('supplier')} hoặc ${orgTypeInSentence('lender')}`)
     const taxCode = str(o.taxCode, 'mã số thuế', 20).replace(/[\s.]/g, '')
     if (!/^\d{10}(-?\d{3})?$/.test(taxCode)) throw bad('Mã số thuế phải gồm 10 hoặc 13 chữ số')
     const industryGroup = o.industryGroup as IndustryGroup
@@ -243,8 +244,8 @@ export function authRoutes(app: FastifyInstance, core: Core) {
 
   // ---- chế độ dev: mỗi vai trò một tài khoản trống ----
   const DEV_ORGS: Record<string, { type: OrgType; name: string; tax: string; user: string; role: MemberRole }> = {
-    supplier: { type: 'supplier', name: 'Nhà cung cấp (tài khoản dev)', tax: '1000000001', user: 'Nhà cung cấp', role: 'owner' },
-    buyer: { type: 'buyer', name: 'Bên mua (tài khoản dev)', tax: '1000000002', user: 'Bên mua', role: 'owner' },
+    supplier: { type: 'supplier', name: 'Đơn vị xuất khẩu (tài khoản dev)', tax: '1000000001', user: 'Đơn vị xuất khẩu', role: 'owner' },
+    buyer: { type: 'buyer', name: 'Bên nhập khẩu (tài khoản dev)', tax: '1000000002', user: 'Bên nhập khẩu', role: 'owner' },
     lender: { type: 'lender', name: 'Tổ chức tài chính (tài khoản dev)', tax: '1000000003', user: 'Tổ chức tài chính', role: 'owner' },
     fcc: { type: 'fcc', name: 'Vận hành nền tảng FCC (dev)', tax: 'FCC-OPS-DEV', user: 'Nhân sự FCC', role: 'fcc_admin' },
   }

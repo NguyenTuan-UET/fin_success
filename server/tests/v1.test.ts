@@ -133,7 +133,7 @@ describe('luồng tài trợ qua /v1, tổ chức tài chính dùng khóa tích 
     expect((await call('GET', '/v1/receivables?cursor=khong-co', undefined, S.token)).status).toBe(422)
   })
 
-  it('SSE: bên mua nhận sự kiện thay đổi trong ≤ 2 giây khi nhà cung cấp gửi lời mời xác nhận', async () => {
+  it('SSE: bên nhập khẩu nhận sự kiện thay đổi trong ≤ 2 giây khi đơn vị xuất khẩu gửi lời mời xác nhận', async () => {
     await app.listen({ port: 0, host: '127.0.0.1' })
     const base = `http://127.0.0.1:${(app.server.address() as AddressInfo).port}`
     const t = await call('POST', '/v1/events/ticket', {}, B.token)
@@ -161,7 +161,7 @@ describe('luồng tài trợ qua /v1, tổ chức tài chính dùng khóa tích 
     expect((await fetch(`${base}${t.body.url}`)).status).toBe(401) // vé chỉ dùng một lần
   })
 
-  it('bên mua xác nhận; RFQ; đối tác thấy RFQ qua API và nhận webhook rfq.created (có thử lại, có chữ ký)', async () => {
+  it('bên nhập khẩu xác nhận; RFQ; đối tác thấy RFQ qua API và nhận webhook rfq.created (có thử lại, có chữ ký)', async () => {
     expect((await call('POST', `/v1/receivables/${recId}/buyer-decision`, { confirm: true }, B.token)).status).toBe(200)
     const m = await call('GET', `/v1/receivables/${recId}/matches`, undefined, S.token)
     expect(m.body.eligible.map((x: Json) => x.product.id)).toContain(productId)

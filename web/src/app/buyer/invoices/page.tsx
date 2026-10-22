@@ -8,9 +8,9 @@ export default function BuyerInvoices() {
   return (
     <>
       <PageHeader
-        eyebrow="Hóa đơn · Người mua"
+        eyebrow="Hóa đơn · Bên nhập khẩu"
         title="Xác nhận hóa đơn & thanh toán sớm"
-        sub="Xác nhận khoản phải thu giúp nhà cung cấp tiếp cận vốn với chi phí thấp hơn dựa trên uy tín của bạn. Mỗi hóa đơn hiển thị chứng từ nhà cung cấp đã tải lên để bạn đối chiếu với đơn mua hàng và biên bản giao nhận của mình."
+        sub="Xác nhận khoản phải thu giúp đơn vị xuất khẩu tiếp cận vốn với chi phí thấp hơn dựa trên uy tín của bạn. Mỗi hóa đơn hiển thị chứng từ đơn vị xuất khẩu đã tải lên để bạn đối chiếu với đơn đặt hàng và chứng từ giao hàng của mình."
       />
       <BuyerConfirm />
     </>

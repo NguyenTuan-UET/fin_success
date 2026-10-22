@@ -79,7 +79,7 @@ export function InvoiceUpload() {
       if (/\.xml$/i.test(f.name) || f.type.includes("xml")) {
         setReading("Đang đọc XML hóa đơn điện tử…");
         const p = parseEInvoiceXml(await f.text());
-        if (p.sellerTaxCode && p.sellerTaxCode !== org.taxCode) throw new Error(`MST người bán trên hóa đơn (${p.sellerTaxCode}) không khớp MST tổ chức (${org.taxCode}).`);
+        if (p.sellerTaxCode && p.sellerTaxCode !== org.taxCode) throw new Error(`MST đơn vị xuất khẩu trên hóa đơn (${p.sellerTaxCode}) không khớp MST tổ chức (${org.taxCode}).`);
         // XML hóa đơn không có hạn thanh toán: để trống, người dùng nhập hoặc chọn đề xuất
         setD(fromDoc({ series: p.series, number: p.number, issueDate: p.issueDate, buyerTaxCode: p.buyerTaxCode, buyerName: p.buyerName, total: p.total, description: p.description, lookupCode: p.lookupCode ?? "", dueDate: "", source: "xml", sellerTaxCode: p.sellerTaxCode }));
       } else if (/^image\/|pdf$/.test(f.type)) {
@@ -158,7 +158,7 @@ export function InvoiceUpload() {
               <span className="chip c-neu">{d.source === "xml" ? "Từ XML hóa đơn điện tử" : d.source === "ocr" ? "OCR/AI · chưa kiểm chứng" : "Nhập tay"}</span>
             </div>
             {d.source === "ocr" && <div className="muted">AI đọc ảnh có thể sai từng chữ số. Mỗi trường có nhãn nguồn: <em>AI đọc — đối chiếu</em>, <em>AI không chắc</em> hoặc <em>Đề xuất</em> (không có trên chứng từ). Đối chiếu với hóa đơn gốc rồi tích xác nhận bên dưới.</div>}
-            {d.sellerTaxCode && normalizeTaxCode(d.sellerTaxCode) !== normalizeTaxCode(org.taxCode) && <div className="err" role="alert">MST người bán đọc được ({d.sellerTaxCode}) khác MST tổ chức của bạn ({org.taxCode}). Kiểm tra lại chứng từ.</div>}
+            {d.sellerTaxCode && normalizeTaxCode(d.sellerTaxCode) !== normalizeTaxCode(org.taxCode) && <div className="err" role="alert">MST đơn vị xuất khẩu đọc được ({d.sellerTaxCode}) khác MST tổ chức của bạn ({org.taxCode}). Kiểm tra lại chứng từ.</div>}
             <div className="grid-fields">
               <label className="field"><span>Ký hiệu{tag("series")}</span><input className="input num" value={d.series} onChange={(e) => set("series", e.target.value)} /></label>
               <label className="field"><span>Số hóa đơn{tag("number")}</span><input className="input num" value={d.number} onChange={(e) => set("number", e.target.value)} /></label>
@@ -167,7 +167,7 @@ export function InvoiceUpload() {
                 <DateInput label={<>Hạn thanh toán{d.origin.dueDate === "suggested" ? null : tag("dueDate")}</>} value={d.dueDate} min={d.issueDate} suggested={d.origin.dueDate === "suggested"} onChange={(v) => set("dueDate", v)} note={d.source === "manual" ? "Theo hợp đồng/điều khoản thanh toán" : "Không có trên chứng từ — nhập theo hợp đồng"} />
                 {!d.dueDate && d.issueDate && <span className="row" style={{ gap: 6, flexWrap: "wrap" }}>{[30, 45, 60, 90].map((n) => <button key={n} type="button" className="btn bs sm" onClick={() => setD((x) => (x ? { ...x, dueDate: addDays(x.issueDate, n), origin: { ...x.origin, dueDate: "suggested" } } : x))}>+{n} ngày</button>)}</span>}
               </div>
-              <label className="field"><span>MST người mua{tag("buyerTaxCode")}</span>
+              <label className="field"><span>MST bên nhập khẩu{tag("buyerTaxCode")}</span>
                 <input className={`input num${taxProblem ? " invalid" : ""}`} value={d.buyerTaxCode} aria-invalid={!!taxProblem} aria-describedby="mst-note" onChange={(e) => set("buyerTaxCode", e.target.value)} />
                 <span id="mst-note" className={taxProblem ? "field-err" : "field-note"}>{taxProblem ?? (d.buyerName ? `Tên trên chứng từ: ${d.buyerName}` : "10 chữ số (hoặc 10-3)")}</span>
               </label>
@@ -176,10 +176,10 @@ export function InvoiceUpload() {
               <label className="field"><span>Mã tra cứu của cơ quan thuế (nếu có){tag("lookupCode")}</span><input className="input num" value={d.lookupCode} onChange={(e) => set("lookupCode", e.target.value)} /><span className="field-note">Lưu kèm hóa đơn; chưa tự đối chiếu với cơ quan thuế</span></label>
             </div>
             {buyer ? (
-              <div className="okmsg"><CircleCheck size={14} aria-hidden="true" /> Người mua trên FCC: <strong>{buyer.name}</strong></div>
+              <div className="okmsg"><CircleCheck size={14} aria-hidden="true" /> Bên nhập khẩu trên FCC: <strong>{buyer.name}</strong></div>
             ) : (
               <div className="err">
-                {d.buyerTaxCode ? `Không có người mua nào trên FCC với MST ${d.buyerTaxCode}${d.buyerName ? ` (${d.buyerName})` : ""}.` : "Cần MST người mua."} Chỉ gửi xác nhận được cho người mua đã đăng ký.
+                {d.buyerTaxCode ? `Không có bên nhập khẩu nào trên FCC với MST ${d.buyerTaxCode}${d.buyerName ? ` (${d.buyerName})` : ""}.` : "Cần MST bên nhập khẩu."} Chỉ gửi xác nhận được cho bên nhập khẩu đã đăng ký.
                 {match.suggestions.length > 0 && (
                   <div className="stack-sm" style={{ marginTop: 6 }}>
                     <span>Có phải một trong các doanh nghiệp sau? Kiểm tra lại trên chứng từ trước khi chọn:</span>
@@ -188,20 +188,20 @@ export function InvoiceUpload() {
                 )}
                 {buyers.length > 0 && (
                   <select className="select" style={{ marginTop: 6 }} value="" onChange={(e) => set("buyerTaxCode", buyers.find((b) => b.id === e.target.value)?.taxCode ?? "")}>
-                    <option value="">Chọn người mua đã đăng ký…</option>
+                    <option value="">Chọn bên nhập khẩu đã đăng ký…</option>
                     {buyers.map((b) => <option key={b.id} value={b.id}>{b.name} · MST {b.taxCode}</option>)}
                   </select>
                 )}
               </div>
             )}
             <div className="grid-fields">
-              <FileInput label="Hợp đồng mua bán (tùy chọn)" accept="application/pdf,image/*" fileName={extra.contract?.name} onFile={(f) => setExtra((x) => ({ ...x, contract: f ?? undefined }))} hint="PDF hoặc ảnh · tối đa 15 MB · bổ sung sau cũng được" />
-              <FileInput label="Biên bản giao nhận (tùy chọn)" accept="application/pdf,image/*" fileName={extra.delivery?.name} onFile={(f) => setExtra((x) => ({ ...x, delivery: f ?? undefined }))} hint="PDF hoặc ảnh · tối đa 15 MB · bổ sung sau cũng được" />
+              <FileInput label="Hợp đồng ngoại thương (tùy chọn)" accept="application/pdf,image/*" fileName={extra.contract?.name} onFile={(f) => setExtra((x) => ({ ...x, contract: f ?? undefined }))} hint="PDF hoặc ảnh · tối đa 15 MB · bổ sung sau cũng được" />
+              <FileInput label="Chứng từ giao hàng / vận chuyển (tùy chọn)" accept="application/pdf,image/*" fileName={extra.delivery?.name} onFile={(f) => setExtra((x) => ({ ...x, delivery: f ?? undefined }))} hint="PDF hoặc ảnh · tối đa 15 MB · bổ sung sau cũng được" />
             </div>
             {d.source === "ocr" && (
               <label style={{ display: "flex", gap: 8, alignItems: "center" }}><input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} /> Tôi đã đối chiếu các trường trên với hóa đơn gốc</label>
             )}
-            <label style={{ display: "flex", gap: 8, alignItems: "center" }}><input type="checkbox" checked={sendNow} onChange={(e) => setSendNow(e.target.checked)} /> Gửi người mua xác nhận ngay</label>
+            <label style={{ display: "flex", gap: 8, alignItems: "center" }}><input type="checkbox" checked={sendNow} onChange={(e) => setSendNow(e.target.checked)} /> Gửi bên nhập khẩu xác nhận ngay</label>
             <div className="row" style={{ justifyContent: "flex-end", gap: 8 }}>
               <Link className="btn bs" href="/supplier/invoices">Hủy</Link>
               <button className="btn bp" disabled={!valid || busy || (d.source === "ocr" && !confirmed)} onClick={submit}>{busy ? "Đang lưu…" : "Lưu khoản phải thu"}</button>
@@ -216,7 +216,7 @@ export function InvoiceUpload() {
           {[
             ["Không trùng lặp", "Máy chủ chặn cùng MST bán + ký hiệu + số + ngày"],
             ["Chứng từ gốc lưu bất biến", "Lưu mã hóa, định danh theo SHA-256; xem lại được ở chi tiết hóa đơn"],
-            ["Người mua phải xác nhận", "Chỉ khoản đã được xác nhận mới gửi tài trợ được"],
+            ["Bên nhập khẩu phải xác nhận", "Chỉ khoản đã được xác nhận mới gửi tài trợ được"],
           ].map(([t, n]) => (
             <div key={t} style={{ display: "flex", gap: 8 }}><CircleCheck size={16} color="var(--brand-fill)" aria-hidden="true" /><span><strong>{t}</strong><br /><span className="muted">{n}</span></span></div>
           ))}

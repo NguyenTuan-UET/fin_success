@@ -21,8 +21,8 @@ const ROLE_CARDS = [
     icon: Factory,
     bg: "var(--ok-bg)",
     fg: "var(--ok)",
-    who: "Tôi là nhà cung cấp",
-    sub: "SME bán chịu, chờ tiền 30–90 ngày",
+    who: "Tôi là đơn vị xuất khẩu",
+    sub: "Doanh nghiệp xuất khẩu bán chịu, chờ tiền 30–90 ngày",
     points: ["Biết trước ngày nào thiếu tiền", "Rút ngắn thời gian nhận tiền (mục tiêu T+1, tùy bên tài trợ)", "So sánh chi phí giữa các tổ chức tài trợ tham gia"],
   },
   {
@@ -30,9 +30,9 @@ const ROLE_CARDS = [
     icon: Building2,
     bg: "var(--info-bg)",
     fg: "var(--info)",
-    who: "Tôi là người mua",
+    who: "Tôi là bên nhập khẩu",
     sub: "Doanh nghiệp đầu chuỗi, CFO",
-    points: ["Xác nhận hóa đơn ngay trên nền tảng", "Trả sớm khi có lợi hơn gửi tiết kiệm", "Theo dõi ESG nhà cung cấp"],
+    points: ["Xác nhận hóa đơn ngay trên nền tảng", "Trả sớm khi có lợi hơn gửi tiết kiệm", "Theo dõi ESG đơn vị xuất khẩu"],
   },
   {
     href: "/lender",
@@ -56,11 +56,11 @@ const ROLE_CARDS = [
 
 const FLOW = [
   ["01", "Tải hóa đơn", "OCR/AI đọc và kiểm tra trùng lặp"],
-  ["02", "Người mua xác nhận", "Đối chiếu hóa đơn, hợp đồng và giao nhận"],
+  ["02", "Bên nhập khẩu xác nhận", "Đối chiếu hóa đơn, hợp đồng và giao nhận"],
   ["03", "Chấm điểm 5C + ESG", "Điểm tham khảo có lý do; bên tài trợ quyết định"],
   ["04", "So sánh & chọn gói", "Nhiều tổ chức, chi phí minh bạch"],
   ["05", "Giải ngân theo bên tài trợ", "Mục tiêu T+1/T+2; tổ chức tài chính quyết định và chuyển trực tiếp"],
-  ["06", "Thu hồi & tất toán", "Người mua trả, phần dư hoàn lại"],
+  ["06", "Thu hồi & tất toán", "Bên nhập khẩu trả, phần dư hoàn lại"],
 ];
 
 export default function Landing() {
@@ -88,7 +88,7 @@ export default function Landing() {
               Hóa đơn đã giao hàng, <em>tiền không cần chờ</em> 60 ngày.
             </h1>
             <p className="hero-lead">
-              FCC giúp doanh nghiệp vừa và nhỏ biến khoản phải thu đã được người mua xác nhận thành tiền mặt sớm, với chi phí so sánh
+              FCC giúp doanh nghiệp vừa và nhỏ biến khoản phải thu đã được bên nhập khẩu xác nhận thành tiền mặt sớm, với chi phí so sánh
               minh bạch giữa các tổ chức tài trợ tham gia. Điểm tín dụng và ESG là điểm tham khảo, đi kèm lời giải thích; quyết định cấp vốn thuộc về tổ chức tài chính.
             </p>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
@@ -105,7 +105,7 @@ export default function Landing() {
                 <strong className="num" style={{ color: "var(--ink)" }}>
                   77,1%
                 </strong>{" "}
-                SME quan tâm nhận tiền sớm (khảo sát 180 phiếu của nhóm)
+                Doanh nghiệp quan tâm nhận tiền sớm (khảo sát 180 phiếu của nhóm)
               </span>
               <span>
                 <strong className="num" style={{ color: "var(--ink)" }}>
@@ -128,7 +128,7 @@ export default function Landing() {
                 <FileCheck2 size={18} color="#DDF1C4" aria-hidden="true" />
                 HD-0418 · Xây dựng Đông Á
               </span>
-              <span className="chip c-lime">Người mua đã xác nhận</span>
+              <span className="chip c-lime">Bên nhập khẩu đã xác nhận</span>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
               <div style={{ background: "var(--forest-2)", borderRadius: 12, padding: 14 }}>
@@ -154,7 +154,7 @@ export default function Landing() {
             <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 16px", fontSize: 12.5, color: "var(--on-forest)" }}>
               <span>■ Ứng trước 1,60 tỷ</span>
               <span>■ Lãi 90 ngày 23,3 tr</span>
-              <span>■ Hoàn lại khi người mua trả 376,7 tr</span>
+              <span>■ Hoàn lại khi bên nhập khẩu trả 376,7 tr</span>
             </div>
             <div style={{ fontSize: 12, color: "var(--on-forest-2)" }}>
               Ví dụ minh họa, không phải cam kết hay báo giá. Giả định: tính 365 ngày, lãi thu cuối kỳ, chưa gồm phí FCC, phí bên tài trợ và thuế; việc tài trợ do tổ chức tài chính quyết định.

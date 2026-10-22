@@ -19,10 +19,10 @@ export function InvoiceTimeline({ r, app }: { r: Receivable; app?: FundingApplic
   const paid = ["SETTLED", "EARLY_PAID"].includes(r.state);
   const steps: Step[] = [
     { label: "Chuẩn bị chứng từ", at: r.createdAt, done: true, note: `Tạo ngày ${date(r.createdAt)}` },
-    { label: "Gửi người mua xác nhận", at: r.sentAt, done: sent, note: sent ? `Đã gửi${r.sentAt ? ` ${dateTime(r.sentAt)}` : ""}` : "Bản nháp — người mua chưa thấy hóa đơn" },
-    { label: "Người mua xác nhận", at: r.confirmedAt, done: confirmed, note: confirmed ? `Xác nhận phiên bản v${r.version} ngày ${date(r.confirmedAt)}` : r.state === "BUYER_DISPUTED" ? "Người mua hỏi lại / tranh chấp" : "Xác nhận khoản phải thu" },
+    { label: "Gửi bên nhập khẩu xác nhận", at: r.sentAt, done: sent, note: sent ? `Đã gửi${r.sentAt ? ` ${dateTime(r.sentAt)}` : ""}` : "Bản nháp — bên nhập khẩu chưa thấy hóa đơn" },
+    { label: "Bên nhập khẩu xác nhận", at: r.confirmedAt, done: confirmed, note: confirmed ? `Xác nhận phiên bản v${r.version} ngày ${date(r.confirmedAt)}` : r.state === "BUYER_DISPUTED" ? "Bên nhập khẩu hỏi lại / tranh chấp" : "Xác nhận khoản phải thu" },
     { label: "Tổ chức tài chính giải ngân", at: app?.fundedAt, done: funded, note: funded ? `Giải ngân ${date(app?.fundedAt)}` : "Sau khi chọn gói và được duyệt" },
-    { label: "Người mua thanh toán & tất toán", at: r.paidAt, done: paid, note: paid ? `Ngày ${date(r.paidAt)}` : `Đến hạn ${date(r.dueDate)}` },
+    { label: "Bên nhập khẩu thanh toán & tất toán", at: r.paidAt, done: paid, note: paid ? `Ngày ${date(r.paidAt)}` : `Đến hạn ${date(r.dueDate)}` },
   ];
   const cur = r.state === "CANCELLED" ? -1 : steps.findIndex((s) => !s.done);
   return (
@@ -41,7 +41,7 @@ export function InvoiceTimeline({ r, app }: { r: Receivable; app?: FundingApplic
               <span style={{ fontSize: 13, fontWeight: 600, color: st.done || now ? "var(--ink)" : "var(--ink-3)" }}>
                 {st.label} <span className={`chip ${st.done ? "c-ok" : now ? "c-warn" : "c-neu"}`} style={{ marginLeft: 4, height: 20, fontSize: 11 }}>{st.done ? "Hoàn tất" : now ? "Đang ở bước này" : "Chưa bắt đầu"}</span>
               </span>
-              <span className="muted">{r.state === "OVERDUE" && now ? "Bên mua chậm thanh toán" : st.note}</span>
+              <span className="muted">{r.state === "OVERDUE" && now ? "Bên nhập khẩu chậm thanh toán" : st.note}</span>
             </div>
           </li>
         );
@@ -52,15 +52,15 @@ export function InvoiceTimeline({ r, app }: { r: Receivable; app?: FundingApplic
 
 const DOC_KINDS = [
   { kind: "invoice", label: "Hóa đơn gốc (XML/PDF/ảnh)", has: (r: Receivable) => r.docs.xml || !!r.files?.some((f) => f.kind === "invoice") },
-  { kind: "contract", label: "Hợp đồng / đơn đặt hàng", has: (r: Receivable) => r.docs.contract },
-  { kind: "delivery", label: "Biên bản giao nhận / nghiệm thu", has: (r: Receivable) => r.docs.delivery },
+  { kind: "contract", label: "Hợp đồng ngoại thương / đơn đặt hàng", has: (r: Receivable) => r.docs.contract },
+  { kind: "delivery", label: "Chứng từ giao hàng / vận chuyển", has: (r: Receivable) => r.docs.delivery },
 ] as const;
 
 export const missingDocs = (r: Receivable) => DOC_KINDS.filter((d) => !d.has(r)).length;
 
 /**
  * Chứng từ của khoản phải thu: trạng thái từng loại (chưa có / đã tải lên — chưa đối chiếu nội dung), xem bản gốc qua URL có hạn,
- * và (bên bán) bổ sung chứng từ khi còn chưa tài trợ. FCC không tự khẳng định đã đối chiếu nội dung chứng từ.
+ * và (đơn vị xuất khẩu) bổ sung chứng từ khi còn chưa tài trợ. FCC không tự khẳng định đã đối chiếu nội dung chứng từ.
  */
 export function InvoiceDocuments({ r, canAttach }: { r: Receivable; canAttach?: boolean }) {
   const { act } = useData();
@@ -80,7 +80,7 @@ export function InvoiceDocuments({ r, canAttach }: { r: Receivable; canAttach?: 
     try {
       const stored = await api<{ key: string }>("POST", "/api/files", { name: f.name, mime: f.type || "application/octet-stream", dataBase64: await fileToBase64(f), kind });
       await act("POST", `/v1/receivables/${r.id}/documents`, { files: [{ key: stored.key, name: f.name, kind }] });
-      toast(`Đã bổ sung ${f.name}${r.state !== "DRAFT" ? " — đã báo người mua" : ""}`);
+      toast(`Đã bổ sung ${f.name}${r.state !== "DRAFT" ? " — đã báo bên nhập khẩu" : ""}`);
     } catch (e) {
       toast((e as Error).message);
     }

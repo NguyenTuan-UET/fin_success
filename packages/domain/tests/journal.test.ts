@@ -18,7 +18,7 @@ const ap = {
 const state = { orgs: [org('s', 'supplier'), org('b', 'buyer'), org('l', 'lender')], receivables: [r], applications: [ap], products: [{ id: 'p', type: 'factoring_recourse' }] as never, earlyOffers: [] }
 
 describe('bút toán đề xuất', () => {
-  it('nhà cung cấp: nhận tiền ứng và tất toán — mọi bút toán cân Nợ/Có, có độ tin cậy', () => {
+  it('đơn vị xuất khẩu: nhận tiền ứng và tất toán — mọi bút toán cân Nợ/Có, có độ tin cậy', () => {
     const es = suggestEntries(state, state.orgs[0])
     expect(es.map((e) => e.ref).sort()).toEqual(['funded:a1', 'settled:a1'])
     expect(es.every(balanced)).toBe(true)
@@ -35,7 +35,7 @@ describe('bút toán đề xuất', () => {
     expect(suggestEntries(state, state.orgs[0], 'TT200').find((e) => e.ref === 'funded:a1')!.lines.map((l) => l.account)).toContain('3411')
   })
 
-  it('bên mua: thanh toán hóa đơn trực tiếp và trả sớm có chiết khấu ghi doanh thu tài chính', () => {
+  it('bên nhập khẩu: thanh toán hóa đơn trực tiếp và trả sớm có chiết khấu ghi doanh thu tài chính', () => {
     const direct = suggestEntries({ ...state, applications: [] }, state.orgs[1])
     expect(direct).toHaveLength(1)
     expect(direct[0].lines.map((l) => [l.account, l.debit, l.credit])).toEqual([['331', 2_000_000_000, 0], ['112', 0, 2_000_000_000]])
@@ -56,7 +56,7 @@ describe('bút toán đề xuất', () => {
 
 describe('sao kê ngân hàng giả lập', () => {
   const conn = { openingCash: 500_000_000, recurringMonthlyOut: [{ name: 'Lương', amount: 100_000_000, day: 5 }], lastSyncedAt: '2026-10-01T00:00:00Z', bankLinkedAt: '2026-10-01T00:00:00Z' }
-  it('nhà cung cấp: số dư chạy từ số dư khai báo + giải ngân + hoàn dư − chi định kỳ, có nguồn', () => {
+  it('đơn vị xuất khẩu: số dư chạy từ số dư khai báo + giải ngân + hoàn dư − chi định kỳ, có nguồn', () => {
     const st = statementFor(state, state.orgs[0], conn, '2026-10-01', '2027-01-31')
     expect(st.source).toContain('giả lập')
     expect(st.opening).toBe(500_000_000)
@@ -68,7 +68,7 @@ describe('sao kê ngân hàng giả lập', () => {
     expect(st.closing).toBe(500_000_000 + 1_596_800_000 + 373_128_767 - recurring.length * 100_000_000)
     expect(st.lines.at(-1)!.balance).toBe(st.closing)
   })
-  it('tổ chức tài chính: giải ngân ra, tiền về vào, hoàn dư ra; bên mua: thanh toán ra', () => {
+  it('tổ chức tài chính: giải ngân ra, tiền về vào, hoàn dư ra; bên nhập khẩu: thanh toán ra', () => {
     const l = statementFor(state, state.orgs[2], { ...conn, openingCash: 0, recurringMonthlyOut: [] }, '2026-10-01', '2027-02-01')
     expect(l.lines.map((x) => [x.kind, x.amount])).toEqual([['payout', -1_600_000_000], ['collection', 2_000_000_000], ['refund', -373_128_767]])
     const b = statementFor(state, state.orgs[1], { ...conn, openingCash: 0, recurringMonthlyOut: [] }, '2026-10-01', '2027-02-01')

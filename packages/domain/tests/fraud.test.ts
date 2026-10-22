@@ -8,7 +8,7 @@ const past = (amount: number, i: number, extra: Partial<Receivable> = {}): Recei
 const codes = (xs: { code: string }[]) => xs.map((x) => x.code)
 
 describe('phát hiện bất thường hóa đơn', () => {
-  it('giá trị gấp > 3 lần trung vị lịch sử cùng bên mua', () => {
+  it('giá trị gấp > 3 lần trung vị lịch sử cùng bên nhập khẩu', () => {
     const hist = [100, 120, 110].map((m, i) => past(m * 1_000_000, i))
     expect(codes(invoiceFlags({ ...base, amount: 600_000_000, issueDate: '2026-10-15' }, hist, NOW))).toContain('AMOUNT_ANOMALY')
     expect(codes(invoiceFlags({ ...base, amount: 300_000_000, issueDate: '2026-10-15' }, hist, NOW))).not.toContain('AMOUNT_ANOMALY')
@@ -18,13 +18,13 @@ describe('phát hiện bất thường hóa đơn', () => {
     expect(codes(invoiceFlags({ ...base, amount: 900_000_000, issueDate: '2026-10-15' }, [past(100_000_000, 1)], NOW))).not.toContain('AMOUNT_ANOMALY')
   })
 
-  it('bên mua mới + giá trị lớn; ngày lập tương lai', () => {
+  it('bên nhập khẩu mới + giá trị lớn; ngày lập tương lai', () => {
     expect(codes(invoiceFlags({ ...base, amount: 2_500_000_000, issueDate: '2026-10-15' }, [], NOW))).toContain('NEW_BUYER_LARGE')
     const f = invoiceFlags({ ...base, amount: 100_000_000, issueDate: '2026-11-30' }, [], NOW)
     expect(f.find((x) => x.code === 'FUTURE_ISSUE_DATE')).toMatchObject({ severity: 'high' })
   })
 
-  it('nhiều hóa đơn cùng bên mua trong ngày; nhập tay tròn triệu giá trị lớn; thiếu tệp gốc', () => {
+  it('nhiều hóa đơn cùng bên nhập khẩu trong ngày; nhập tay tròn triệu giá trị lớn; thiếu tệp gốc', () => {
     const today = Array.from({ length: 4 }, (_, i) => past(10_000_000, i, { createdAt: '2026-10-16T01:00:00Z', state: 'DRAFT' }))
     expect(codes(invoiceFlags({ ...base, amount: 10_000_000, issueDate: '2026-10-16' }, today, NOW))).toContain('BURST_SAME_BUYER')
     expect(codes(invoiceFlags({ ...base, source: 'manual', amount: 1_500_000_000, issueDate: '2026-10-15' }, [], NOW))).toContain('ROUND_LARGE_MANUAL')

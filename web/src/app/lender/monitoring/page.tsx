@@ -10,7 +10,7 @@ export default function MonitoringPage() {
       <PageHeader
         eyebrow="Giám sát danh mục · EWS"
         title="Cảnh báo sớm & xử lý quá hạn"
-        sub="Hệ thống theo dõi tình trạng hóa đơn, lịch sử thanh toán của bên mua và mức tập trung rủi ro sau giải ngân. Cảnh báo theo luật, có giải thích và đề xuất — bạn quyết định biện pháp."
+        sub="Hệ thống theo dõi tình trạng hóa đơn, lịch sử thanh toán của bên nhập khẩu và mức tập trung rủi ro sau giải ngân. Cảnh báo theo luật, có giải thích và đề xuất — bạn quyết định biện pháp."
       />
       <LenderMonitoring />
     </>

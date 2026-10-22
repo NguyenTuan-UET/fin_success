@@ -143,7 +143,7 @@ export function createSimBank(cfg: SimConfig, deps: { fetch?: typeof fetch; now?
     const advanceVnd = Math.floor((r.amount * advancePct) / 100 / 1_000_000) * 1_000_000
     const offer = {
       advanceVnd, ratePct: quote.ratePct ?? rate, feesVnd: Math.round((advanceVnd * p.feePct) / 100), tenorDays,
-      conditions: `${p.name}; giải ngân T+1 sau ký hợp đồng; thu hồi từ khoản thanh toán của bên mua`,
+      conditions: `${p.name}; giải ngân T+1 sau ký hợp đồng; thu hồi từ khoản thanh toán của bên nhập khẩu`,
       expiresAt: isoDate(new Date(now().getTime() + 5 * 86_400_000)),
     }
     await api(inst, 'POST', `/v1/partner/applications/${appId}/offer`, offer)
@@ -180,11 +180,11 @@ export function createSimBank(cfg: SimConfig, deps: { fetch?: typeof fetch; now?
     else schedule(run, delay)
   }
 
-  /** Bên mua báo đã thanh toán → ngân hàng đối chiếu tài khoản rồi xác nhận tiền về (có thể một phần hoặc không về theo kịch bản). */
+  /** Bên nhập khẩu báo đã thanh toán → ngân hàng đối chiếu tài khoản rồi xác nhận tiền về (có thể một phần hoặc không về theo kịch bản). */
   function onBuyerPaid(inst: InstitutionConfig, data: Json) {
     const appId = String(data.applicationId)
     const forced = overrides.get(appId)
-    if (forced === 'no_payment' || forced === 'hold') return note(inst.slug, 'payment', `${appId}: bên mua báo đã trả nhưng chưa thấy tiền về (theo kịch bản)`)
+    if (forced === 'no_payment' || forced === 'hold') return note(inst.slug, 'payment', `${appId}: bên nhập khẩu báo đã trả nhưng chưa thấy tiền về (theo kịch bản)`)
     const amount = forced === 'partial_payment' ? Math.floor(Number(data.amount) * 0.6) : Number(data.amount)
     const delay = (cfg.disburseDelaySec ?? profileOf(inst.slug).disburseDelaySec) * 1000
     const run = () => {
@@ -197,13 +197,13 @@ export function createSimBank(cfg: SimConfig, deps: { fetch?: typeof fetch; now?
     else schedule(run, delay)
   }
 
-  /** Tất toán có phần dư → hoàn cho nhà cung cấp rồi báo FCC. */
+  /** Tất toán có phần dư → hoàn cho đơn vị xuất khẩu rồi báo FCC. */
   function onSettled(inst: InstitutionConfig, data: Json) {
     const appId = String(data.applicationId)
     const surplus = Number(data.surplus ?? 0)
     if (!(surplus > 0)) return note(inst.slug, 'settlement', `${appId}: tất toán, không có phần dư`)
     const p = sendEvent(inst, `refund-${appId}`, 'application.refund_paid', { applicationId: appId, amount: surplus, reference: `HOAN-${appId.slice(-6)}` })
-      .then(() => note(inst.slug, 'settlement', `${appId}: đã hoàn phần dư ${surplus.toLocaleString('vi-VN')} ₫ cho nhà cung cấp`))
+      .then(() => note(inst.slug, 'settlement', `${appId}: đã hoàn phần dư ${surplus.toLocaleString('vi-VN')} ₫ cho đơn vị xuất khẩu`))
       .catch((e) => note(inst.slug, 'settlement', `${appId}: lỗi hoàn phần dư — ${(e as Error).message}`, false))
     pending.push(p)
   }

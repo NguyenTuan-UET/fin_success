@@ -77,6 +77,6 @@ export function assertCanAssess(core: Core, orgId: string, kind: Kind, subjectOr
   }
   if (orgId !== subjectOrgId) throw forbidden('Chỉ chấm điểm cho tổ chức của mình')
   const type = viewer?.type
-  if ((kind === 'supplier' || kind === 'application') && type !== 'supplier') throw new HttpError(403, 'Chỉ nhà cung cấp chấm điểm nhà cung cấp và hồ sơ')
-  if (kind === 'buyer' && type !== 'buyer') throw new HttpError(403, 'Chỉ bên mua chấm điểm bên mua')
+  if ((kind === 'supplier' || kind === 'application') && type !== 'supplier') throw new HttpError(403, 'Chỉ đơn vị xuất khẩu chấm điểm đơn vị xuất khẩu và hồ sơ')
+  if (kind === 'buyer' && type !== 'buyer') throw new HttpError(403, 'Chỉ bên nhập khẩu chấm điểm bên nhập khẩu')
 }

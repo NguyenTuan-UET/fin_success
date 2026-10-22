@@ -16,7 +16,7 @@ input,select{padding:6px;border-radius:8px;border:1px solid #bbb}.note{color:#5e
  <button onclick="post('/control/replay',{slug:'${i.slug}',kind:'bad_signature'})">Gửi giải ngân sai chữ ký</button>`).join('<br>')}</div>
 <div class="card"><b>Kịch bản cho một hồ sơ/RFQ</b><br>
 <input id="id" placeholder="Mã hồ sơ hoặc RFQ"> <select id="b"><option value="approve">Duyệt</option><option value="reject">Từ chối</option><option value="decline_quote">Từ chối báo giá</option>
-<option value="delay_disbursement">Trễ giải ngân ×10</option><option value="hold">Giữ lại</option><option value="partial_payment">Bên mua trả một phần (60%)</option><option value="no_payment">Không có tiền về</option><option value="auto">Theo khẩu vị (mặc định)</option></select>
+<option value="delay_disbursement">Trễ giải ngân ×10</option><option value="hold">Giữ lại</option><option value="partial_payment">Bên nhập khẩu trả một phần (60%)</option><option value="no_payment">Không có tiền về</option><option value="auto">Theo khẩu vị (mặc định)</option></select>
 <button onclick="post('/control/scenario',{id:document.getElementById('id').value,behavior:document.getElementById('b').value})">Áp dụng</button>
 <div class="note">Đang ép: ${overrides.length ? overrides.map(([k, v]) => `${esc(k)} → ${esc(v)}`).join(', ') : 'không'}</div></div>
 <table><thead><tr><th>Giờ (UTC)</th><th>Tổ chức</th><th>Loại</th><th>Chi tiết</th></tr></thead><tbody>${rows}</tbody></table>

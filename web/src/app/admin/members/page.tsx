@@ -8,17 +8,17 @@ import { MembersSection } from "@/components/screens/Members";
 type Perm = { what: string; roles: string; mfa: boolean; limit: string };
 const MATRIX: { org: string; perms: Perm[] }[] = [
   {
-    org: "Nhà cung cấp",
+    org: "Đơn vị xuất khẩu",
     perms: [
       { what: "Tạo, sửa, hủy khoản phải thu", roles: "Chủ tổ chức · Người phê duyệt · Người lập hồ sơ", mfa: false, limit: "Chỉ hóa đơn của tổ chức mình; sửa sau xác nhận làm xác nhận cũ mất hiệu lực" },
-      { what: "Gửi yêu cầu báo giá, chọn báo giá, chấp thuận đề nghị", roles: "Chủ tổ chức · Người phê duyệt", mfa: true, limit: "Khoản đã được bên mua xác nhận; người lập hồ sơ không tự duyệt" },
+      { what: "Gửi yêu cầu báo giá, chọn báo giá, chấp thuận đề nghị", roles: "Chủ tổ chức · Người phê duyệt", mfa: true, limit: "Khoản đã được bên nhập khẩu xác nhận; người lập hồ sơ không tự duyệt" },
       { what: "Chia sẻ dữ liệu cho bên nhận", roles: "Chủ tổ chức · Người phê duyệt", mfa: true, limit: "Theo từng bên nhận, mục đích và thời hạn; thu hồi có hiệu lực với truy cập mới" },
     ],
   },
   {
-    org: "Bên mua",
+    org: "Bên nhập khẩu",
     perms: [
-      { what: "Xác nhận hoặc tranh chấp khoản phải thu", roles: "Chủ tổ chức · Người phê duyệt", mfa: true, limit: "Chỉ khoản ghi tên mình là bên mua; bên bán không xác nhận hộ" },
+      { what: "Xác nhận hoặc tranh chấp khoản phải thu", roles: "Chủ tổ chức · Người phê duyệt", mfa: true, limit: "Chỉ khoản ghi tên mình là bên nhập khẩu; đơn vị xuất khẩu không xác nhận hộ" },
       { what: "Báo đã thanh toán, đề nghị thanh toán sớm", roles: "Chủ tổ chức · Người phê duyệt", mfa: true, limit: "Tiền chuyển trực tiếp tới bên tài trợ; FCC không nhận tiền" },
     ],
   },
@@ -70,7 +70,7 @@ export default function AdminMembers() {
               </tr>
             ))])}
           </tbody></table></div>
-        <div className="muted" style={{ padding: "12px 16px" }}>Chủ tổ chức có mọi quyền trong phạm vi loại tổ chức của mình, không có quyền nghiệp vụ của loại tổ chức khác (ví dụ chủ nhà cung cấp không trả báo giá hay giải ngân).</div>
+        <div className="muted" style={{ padding: "12px 16px" }}>Chủ tổ chức có mọi quyền trong phạm vi loại tổ chức của mình, không có quyền nghiệp vụ của loại tổ chức khác (ví dụ chủ đơn vị xuất khẩu không trả báo giá hay giải ngân).</div>
       </section>
     </>
   );

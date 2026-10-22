@@ -37,7 +37,7 @@ describe('chế độ dev: mỗi bên một trang tự vào', () => {
     expect(l.body.state.orgs.find((o: any) => o.type === 'lender').verified).toBe(true)
     expect(on.getState().orgs).toHaveLength(3)
 
-    // luồng ngắn: sản phẩm tự công bố, bên mua xác nhận không cần mật khẩu
+    // luồng ngắn: sản phẩm tự công bố, bên nhập khẩu xác nhận không cần mật khẩu
     const act = (t: string, n: string, ...args: unknown[]) => post(on, `/api/actions/${n}`, { args }, t)
     const p = await act(l.body.token, 'upsertProduct', { name: 'SP', type: 'factoring_recourse', description: '', status: 'pending_review', eligibility: { minAmount: 1, maxAmount: 1e12, maxTenorDays: 365, requireBuyerConfirmation: true }, pricing: { advancePct: 80, rateMin: 8, rateMax: 12, fees: [], latePenaltyPct: 150 }, sla: {}, effectiveFrom: '2020-01-01', effectiveTo: '2099-12-31' })
     expect(p.body.result.status).toBe('published')

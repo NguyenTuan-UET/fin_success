@@ -189,7 +189,7 @@ export interface EvidenceExtraction {
 
 export function classifyEvidence(base64: string | null, fileName: string, catalog: EsgIndicatorDef[], fallback: () => EvidenceExtraction) {
   const list = catalog.map((d) => `${d.code}: ${d.name} — bằng chứng: ${d.evidence}`).join('\n')
-  const prompt = `Bạn là chuyên viên thẩm định ESG cho SME Việt Nam. Tài liệu tên "${fileName}".
+  const prompt = `Bạn là chuyên viên thẩm định ESG cho doanh nghiệp xuất khẩu Việt Nam. Tài liệu tên "${fileName}".
 Danh mục 18 chỉ tiêu:
 ${list}
 Nhiệm vụ: xác định loại chứng từ, kỳ dữ liệu, các chỉ tiêu liên quan và trích số liệu định lượng (ví dụ kWh theo tháng/tổng, m3 nước, số lao động đóng BHXH, khối lượng chất thải, số vụ tai nạn, giờ đào tạo).
@@ -212,7 +212,7 @@ export interface LevelProposal {
 export function proposeLevel(def: EsgIndicatorDef, evidence: { id: string; name: string; docType: string; summary?: string; extracted?: Record<string, string | number> }[], selfDeclared: string | undefined) {
   const rubric = def.rubric.map((r, i) => `Mức ${i}: ${r}`).join('\n')
   const ev = evidence.length ? evidence.map((e) => `- [${e.id}] ${e.name} (${e.docType}): ${e.summary ?? ''} ${e.extracted ? JSON.stringify(e.extracted) : ''}`).join('\n') : '(không có bằng chứng)'
-  const prompt = `Chấm chỉ tiêu ESG ${def.code} "${def.name}" cho SME theo rubric:
+  const prompt = `Chấm chỉ tiêu ESG ${def.code} "${def.name}" cho doanh nghiệp xuất khẩu theo rubric:
 ${rubric}
 Quy tắc bằng chứng: mức 4 cần số liệu kết quả định lượng hoặc đánh giá độc lập; mức 3 cần quy trình và chứng từ thực thi; mức 2 đáp ứng yêu cầu cơ bản; mức 1 chỉ có tuyên bố/hành động rời rạc; mức 0 khi có bằng chứng không tuân thủ rõ ràng.
 Nếu không có bằng chứng đủ kiểm chứng thì level = null ("Chưa xác minh"), KHÔNG cho 0. Không được đề xuất mức ≥ 2 nếu không trích dẫn được tài liệu.

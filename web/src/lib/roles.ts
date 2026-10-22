@@ -33,7 +33,7 @@ export type RoleMeta = {
 export const ROLES: Record<Role, RoleMeta> = {
   supplier: {
     role: "supplier",
-    label: "Nhà cung cấp",
+    label: "Đơn vị xuất khẩu",
     home: "/supplier",
     user: {
       name: "Nguyễn Lan",
@@ -67,7 +67,7 @@ export const ROLES: Record<Role, RoleMeta> = {
   },
   buyer: {
     role: "buyer",
-    label: "Người mua",
+    label: "Bên nhập khẩu",
     home: "/buyer",
     user: {
       name: "Trần Hùng",

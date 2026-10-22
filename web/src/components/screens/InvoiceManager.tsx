@@ -91,7 +91,7 @@ export function InvoiceManager() {
         <div className="card flush grow-3">
           <div className="ch">
             <h2 className="ct">Danh sách hóa đơn</h2>
-            <input className="input" style={{ maxWidth: 260 }} placeholder="Tìm mã, số hóa đơn, người mua…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Tìm hóa đơn" />
+            <input className="input" style={{ maxWidth: 260 }} placeholder="Tìm mã, số hóa đơn, bên nhập khẩu…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Tìm hóa đơn" />
           </div>
           <div className="tw" tabIndex={0} role="region" aria-label="Bảng dữ liệu, cuộn ngang để xem thêm">
             <table>
@@ -99,7 +99,7 @@ export function InvoiceManager() {
                 <tr>
                   <th>Mã</th>
                   <th>Hóa đơn</th>
-                  <th>Người mua</th>
+                  <th>Bên nhập khẩu</th>
                   <th className="r">Số tiền (đ)</th>
                   <th>Hạn thanh toán</th>
                   <th><Term k="riskScore">Xếp hạng</Term></th>
@@ -147,14 +147,14 @@ export function InvoiceManager() {
                 <span className={`chip ${stage.chip}`}>{stage.label}</span>
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "10px 12px", fontSize: 13 }}>
-                <div><div className="muted">Người mua</div><div className="strong wrap">{orgName(data.orgs, s.buyerId)}</div></div>
+                <div><div className="muted">Bên nhập khẩu</div><div className="strong wrap">{orgName(data.orgs, s.buyerId)}</div></div>
                 <div><div className="muted">Số tiền</div><div className="num strong">{vnd(s.amount)} đ</div></div>
                 <div><div className="muted">Hạn thanh toán</div><div className="num">{date(s.dueDate)}{dl !== null && ` (${dl < 0 ? `quá ${-dl}` : `còn ${dl}`} ngày)`}</div></div>
-                <div><div className="muted">Xếp hạng người mua (tham khảo)</div><div className="num">{!buyer.official && buyer.coverage < 0.5 ? "Chưa đủ dữ liệu" : buyer.rating}{buyer.official ? "" : ` · tạm tính (bao phủ ${Math.round(buyer.coverage * 100)}%)`}</div></div>
+                <div><div className="muted">Xếp hạng bên nhập khẩu (tham khảo)</div><div className="num">{!buyer.official && buyer.coverage < 0.5 ? "Chưa đủ dữ liệu" : buyer.rating}{buyer.official ? "" : ` · tạm tính (bao phủ ${Math.round(buyer.coverage * 100)}%)`}</div></div>
                 <div><div className="muted">Hóa đơn</div><div className="num">{s.invoiceSeries}-{s.invoiceNumber}</div></div>
                 <div><div className="muted">Nguồn</div><div>{{ xml: "XML hóa đơn điện tử", ocr: "OCR/AI", manual: "Nhập tay", accounting: "Phần mềm kế toán" }[s.source]}</div></div>
               </div>
-              {s.disputeReason && <div className="err">Bên mua tranh chấp: {s.disputeReason}</div>}
+              {s.disputeReason && <div className="err">Bên nhập khẩu tranh chấp: {s.disputeReason}</div>}
               {s.taxCheck && <div className={s.taxCheck.status === "verified" ? "okmsg" : "err"}>Đối chiếu cơ quan thuế: {{ verified: "hợp lệ", mismatch: "không khớp", cancelled: "hóa đơn đã hủy" }[s.taxCheck.status]}{s.taxCheck.note ? ` — ${s.taxCheck.note}` : ""}</div>}
               {(s.flags ?? []).map((f) => <div key={f.code} className={f.resolvedAt ? "muted" : "err"} style={{ fontSize: 12.5 }}>{f.resolvedAt ? "✓ Đã xem xét" : `⚑ ${flagLabel(f.code)}`}: {f.detail}{f.resolutionNote ? ` — ${f.resolutionNote}` : ""}</div>)}
 
@@ -165,14 +165,14 @@ export function InvoiceManager() {
 
               {s.state === "DRAFT" && (
                 <div className="stack-sm" style={{ gap: 8 }}>
-                  <button className="btn bp" disabled={busy} onClick={() => run(() => act("POST", `/v1/receivables/${s.id}/buyer-invitation`), `Đã gửi ${s.code} cho ${orgName(data.orgs, s.buyerId)} xác nhận`)}>Gửi người mua xác nhận</button>
+                  <button className="btn bp" disabled={busy} onClick={() => run(() => act("POST", `/v1/receivables/${s.id}/buyer-invitation`), `Đã gửi ${s.code} cho ${orgName(data.orgs, s.buyerId)} xác nhận`)}>Gửi bên nhập khẩu xác nhận</button>
                   <button className="btn bs" disabled={busy} onClick={() => run(() => act("POST", `/v1/receivables/${s.id}/cancel`), `Đã hủy ${s.code}`)}>Hủy hóa đơn nháp</button>
                 </div>
               )}
               {s.state === "BUYER_DISPUTED" && (
                 <div className="stack-sm" style={{ gap: 8 }}>
-                  <MoneyInput key={s.id} label="Số tiền sau khi trao đổi với bên mua (đ)" value={reviseTo} onChange={setReviseTo} hint={`Hiện tại ${vnd(s.amount)} đ`} />
-                  <button className="btn bp" disabled={busy || !reviseTo} onClick={() => run(() => act("POST", `/v1/receivables/${s.id}/revise`, { amount: reviseTo, note: "Điều chỉnh sau trao đổi với bên mua" }), "Đã điều chỉnh; bên mua cần xác nhận lại")}>Điều chỉnh & gửi lại</button>
+                  <MoneyInput key={s.id} label="Số tiền sau khi trao đổi với bên nhập khẩu (đ)" value={reviseTo} onChange={setReviseTo} hint={`Hiện tại ${vnd(s.amount)} đ`} />
+                  <button className="btn bp" disabled={busy || !reviseTo} onClick={() => run(() => act("POST", `/v1/receivables/${s.id}/revise`, { amount: reviseTo, note: "Điều chỉnh sau trao đổi với bên nhập khẩu" }), "Đã điều chỉnh; bên nhập khẩu cần xác nhận lại")}>Điều chỉnh & gửi lại</button>
                 </div>
               )}
               {s.state === "BUYER_CONFIRMED" && (
@@ -189,10 +189,10 @@ export function InvoiceManager() {
                     <MoneyInput label="Số tiền mới (đ)" value={amend.amount} onChange={(v) => setAmend({ ...amend, amount: v })} />
                     <DateInput label="Hạn thanh toán mới" value={amend.dueDate} min={s.issueDate} onChange={(v) => setAmend({ ...amend, dueDate: v })} />
                     <label className="field"><span>Lý do (bắt buộc)</span><input className="input" value={amend.note} onChange={(e) => setAmend({ ...amend, note: e.target.value })} /></label>
-                    <div className="muted">Xác nhận cũ của bên mua sẽ mất hiệu lực; RFQ đang mở bị đóng.</div>
+                    <div className="muted">Xác nhận cũ của bên nhập khẩu sẽ mất hiệu lực; RFQ đang mở bị đóng.</div>
                     <div className="row" style={{ gap: 8 }}>
                       <button className="btn bs" onClick={() => setAmend(null)}>Hủy</button>
-                      <button className="btn bp" disabled={busy || !amend.note.trim() || !amend.amount} onClick={() => run(async () => { await act("POST", `/v1/receivables/${s.id}/amendment`, { ...(amend.amount && amend.amount !== s.amount ? { amount: amend.amount } : {}), ...(amend.dueDate && amend.dueDate !== s.dueDate ? { dueDate: amend.dueDate } : {}), note: amend.note }); setAmend(null); }, "Đã điều chỉnh; bên mua cần xác nhận lại")}>Điều chỉnh</button>
+                      <button className="btn bp" disabled={busy || !amend.note.trim() || !amend.amount} onClick={() => run(async () => { await act("POST", `/v1/receivables/${s.id}/amendment`, { ...(amend.amount && amend.amount !== s.amount ? { amount: amend.amount } : {}), ...(amend.dueDate && amend.dueDate !== s.dueDate ? { dueDate: amend.dueDate } : {}), note: amend.note }); setAmend(null); }, "Đã điều chỉnh; bên nhập khẩu cần xác nhận lại")}>Điều chỉnh</button>
                     </div>
                   </div>
                 ) : <button className="btn bs" onClick={() => setAmend({ amount: s.amount, dueDate: s.dueDate, note: "" })}>Điều chỉnh hóa đơn…</button>
@@ -200,7 +200,7 @@ export function InvoiceManager() {
             </div>
             <div className="dark stack-sm">
               <span className="d-title"><Sparkles size={18} color="#DDF1C4" aria-hidden="true" />Chọn hóa đơn nào để tài trợ?</span>
-              <p>Hóa đơn có người mua xếp hạng cao, đã được xác nhận và còn nhiều ngày đến hạn thường có chi phí thấp hơn. Xem so sánh chi phí thật ở Marketplace.</p>
+              <p>Hóa đơn có bên nhập khẩu xếp hạng cao, đã được xác nhận và còn nhiều ngày đến hạn thường có chi phí thấp hơn. Xem so sánh chi phí thật ở Marketplace.</p>
               <AskButton className="btn bl" question="Nên tài trợ hóa đơn nào?">Hỏi thêm trợ lý</AskButton>
             </div>
           </aside>

@@ -12,7 +12,7 @@ export function viewFor(s: State, actorId: string, now = new Date()): State {
   const isFcc = actor.type === 'fcc'
   const can = (ownerId: string, scope: Scope) =>
     ownerId === actorId || s.consents.some((c) => c.ownerId === ownerId && c.recipientId === actorId && !c.revokedAt && c.expiresAt >= today && c.scopes.includes(scope))
-  const isBuyerOrg = (id: string) => s.orgs.find((o) => o.id === id)?.type === 'buyer' // thông tin bên mua là dữ liệu tham chiếu công khai
+  const isBuyerOrg = (id: string) => s.orgs.find((o) => o.id === id)?.type === 'buyer' // thông tin bên nhập khẩu là dữ liệu tham chiếu công khai
 
   // Nhân sự FCC chỉ thấy hồ sơ cần thẩm định (ESG, sản phẩm, tổ chức), không thấy chứng từ/hồ sơ tài trợ
   if (isFcc) {
@@ -27,11 +27,11 @@ export function viewFor(s: State, actorId: string, now = new Date()): State {
     }
   }
 
-  // Khoản phải thu được xem đầy đủ khi là bên bán/bên mua, hoặc là đối tác có hồ sơ/RFQ liên quan
+  // Khoản phải thu được xem đầy đủ khi là đơn vị xuất khẩu/bên nhập khẩu, hoặc là đối tác có hồ sơ/RFQ liên quan
   const myProducts = new Set(s.products.filter((p) => p.lenderId === actorId).map((p) => p.id))
   const lenderRfqRecv = new Set(s.rfqs.filter((q) => ['OPEN', 'RESPONDED'].includes(q.state) && q.productIds.some((p) => myProducts.has(p))).map((q) => q.receivableId))
   const lenderAppRecv = new Set(s.applications.filter((a) => a.lenderId === actorId).map((a) => a.receivableId))
-  // bản nháp (chưa gửi) chỉ bên bán thấy — kể cả bên mua có tên trên hóa đơn
+  // bản nháp (chưa gửi) chỉ đơn vị xuất khẩu thấy — kể cả bên nhập khẩu có tên trên hóa đơn
   const unsent = (r: Receivable) => r.state === 'DRAFT' || (r.state === 'CANCELLED' && !r.sentAt && !r.confirmedAt)
   const shared = s.receivables.filter((r) => r.sellerId === actorId || !unsent(r))
   const fullRecv = new Set(s.receivables.filter((r) => r.sellerId === actorId || r.buyerId === actorId || lenderRfqRecv.has(r.id) || lenderAppRecv.has(r.id)).map((r) => r.id))

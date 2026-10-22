@@ -80,7 +80,7 @@ export function forecastCash(conn: AccountingConnection, items: LedgerItem[], ap
     if (a.state === 'FUNDED' && a.offer && a.fundedAt) {
       const due = dayIdx(a.fundedAt, a.offer.tenorDays)
       const repay = a.offer.advanceVnd + Math.round((a.offer.advanceVnd * a.offer.ratePct * a.offer.tenorDays) / 36500)
-      // khoản phải thu đã tài trợ: tiền bên mua trả đi thẳng để tất toán khoản tài trợ, phần chênh lệch về doanh nghiệp đã nằm trong AR
+      // khoản phải thu đã tài trợ: tiền bên nhập khẩu trả đi thẳng để tất toán khoản tài trợ, phần chênh lệch về doanh nghiệp đã nằm trong AR
       for (const scn of ['base', 'conservative', 'optimistic'] as const) put(scn, due, -repay)
       if (due <= horizon && due >= 0) drivers.push({ date: iso(new Date(start.getTime() + due * DAY)), label: `Tất toán khoản tài trợ ${a.id}`, amount: -repay })
     }
@@ -132,7 +132,7 @@ export function orgForecast(s: Pick<AppData, 'orgs' | 'receivables' | 'ledger' |
   return forecastCash(opening === undefined ? base : { ...base, openingCash: opening }, [...own, ...fcc], s.applications, horizon, now, 0)
 }
 
-/** Độ trễ thanh toán thực tế (ngày) của từng bên mua với nhà cung cấp này, từ lịch sử khoản đã thanh toán trên FCC; theo MST, '*' là chung. */
+/** Độ trễ thanh toán thực tế (ngày) của từng bên nhập khẩu với đơn vị xuất khẩu này, từ lịch sử khoản đã thanh toán trên FCC; theo MST, '*' là chung. */
 export function paymentDelays(receivables: AppData['receivables'], orgs: Org[], sellerId: string): AccountingConnection['buyerDelayDays'] {
   const by = new Map<string, number[]>()
   for (const r of receivables) {

@@ -8,7 +8,7 @@ const DUE = '2027-01-14' // 90 ngày sau
 const ev = (id: string, type: SettlementEvent['type'], amount: number, at: string): SettlementEvent => ({ id, type, amount, at, source: 'lender' })
 
 describe('thu hồi và tất toán', () => {
-  it('trả đủ đúng hạn: phí → lãi → gốc, phần còn lại hoàn cho nhà cung cấp', () => {
+  it('trả đủ đúng hạn: phí → lãi → gốc, phần còn lại hoàn cho đơn vị xuất khẩu', () => {
     const interest = Math.round((1_600_000_000 * 6 * 90) / 36500) // 23.671.233
     const b = balanceAt(offer, FUNDED, DUE, [ev('p1', 'payment_received', 2_000_000_000, '2027-01-14T00:00:00Z')], '2027-01-14T00:00:00Z')
     expect(b.settled).toBe(true)
@@ -52,7 +52,7 @@ describe('thu hồi và tất toán', () => {
     expect(after.outstanding).toBeLessThan(short.outstanding)
   })
 
-  it('đối soát: bên mua báo ↔ tổ chức tài chính xác nhận', () => {
+  it('đối soát: bên nhập khẩu báo ↔ tổ chức tài chính xác nhận', () => {
     const rep = (a: number): SettlementEvent => ({ id: 'r', type: 'buyer_reported', amount: a, at: '2027-01-14T00:00:00Z', source: 'buyer' })
     expect(reconcile([])).toBe('none')
     expect(reconcile([rep(100)])).toBe('pending')

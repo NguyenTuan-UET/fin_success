@@ -63,6 +63,9 @@ async function confirmedReceivable(S: string, B: string, amount = 900_000_000) {
   const r = await call('POST', '/v1/receivables', { buyerId, invoiceSeries: '1C26TSM', invoiceNumber: n, issueDate: new Date().toISOString().slice(0, 10), dueDate: due, amount, description: 'Thép cuộn', fingerprint: `sim-${n}`, source: 'xml', docs: { xml: true, contract: true, delivery: true } }, S)
   expect(r.status, JSON.stringify(r.body)).toBe(200)
   const id = r.body.result.id
+  // bộ chứng từ đủ 4 mục (T1): thêm tờ khai hải quan xuất khẩu đã thông quan
+  const up = await call('POST', '/api/files', { name: 'to-khai.pdf', mime: 'application/pdf', dataBase64: Buffer.from(`%PDF to-khai ${n}`).toString('base64'), kind: 'customs' }, S)
+  expect((await call('POST', `/v1/receivables/${id}/customs-documents`, { files: [{ key: up.body.key, name: 'to-khai.pdf', kind: 'customs_export_declaration' }], info: { declarationNo: `TK${n}00`, clearance: 'cleared' } }, S)).status).toBe(200)
   await call('POST', `/v1/receivables/${id}/buyer-invitation`, {}, S)
   expect((await call('POST', `/v1/receivables/${id}/buyer-decision`, { confirm: true }, B)).status).toBe(200)
   return id as string
@@ -108,7 +111,7 @@ describe('ngân hàng giả lập đi qua đúng API đối tác và webhook c�
     expect(audit?.actorUserId).toMatch(/^key:/)
     expect(sim.log.some((l) => l.kind === 'disbursement' && l.detail.includes('đã giải ngân'))).toBe(true)
 
-    // bên mua thanh toán → ngân hàng giả lập xác nhận tiền về → tất toán → hoàn phần dư
+    // bên nhập khẩu thanh toán → ngân hàng giả lập xác nhận tiền về → tất toán → hoàn phần dư
     expect((await call('POST', `/v1/receivables/${rec}/buyer-payment`, { amount: 900_000_000 }, B)).status).toBe(200)
     await pump()
     const settled = fcc.getState().applications.find((x) => x.id === ap.id)!
@@ -125,7 +128,7 @@ describe('ngân hàng giả lập đi qua đúng API đối tác và webhook c�
     expect(bad.json().status).toBe(401)
   })
 
-  it('kịch bản: bên mua trả một phần → chưa tất toán; thanh lý tài sản bù thiếu hụt thì tất toán', async () => {
+  it('kịch bản: bên nhập khẩu trả một phần → chưa tất toán; thanh lý tài sản bù thiếu hụt thì tất toán', async () => {
     const S = await session('supplier')
     const B = await session('buyer')
     const rec = await confirmedReceivable(S, B, 1_000_000_000)
@@ -168,7 +171,7 @@ describe('ngân hàng giả lập đi qua đúng API đối tác và webhook c�
     await pump()
     expect(fcc.getState().applications.find((a) => a.id === ap.id)!.state).toBe('REJECTED')
 
-    // hạng hồ sơ giờ thấp hơn (tập trung vào cùng bên mua, có hồ sơ bị từ chối) → dùng sản phẩm nhận hạng BB của SimFinance
+    // hạng hồ sơ giờ thấp hơn (tập trung vào cùng bên nhập khẩu, có hồ sơ bị từ chối) → dùng sản phẩm nhận hạng BB của SimFinance
     await sim.app.inject({ method: 'POST', url: '/control/auto', payload: JSON.stringify({ slug: 'binhminh', auto: false }), headers: { 'content-type': 'application/json' } })
     const quick = fcc.getState().products.find((p) => p.name === 'Tài trợ hóa đơn nhanh')!.id
     const rec2 = await confirmedReceivable(S, B, 700_000_000)

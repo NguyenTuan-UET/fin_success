@@ -17,15 +17,15 @@ async function createInvoice(p: Page, no: string, amount: string, send: boolean)
   await p.getByRole("button", { name: "nhập tay" }).click();
   await p.getByLabel("Ký hiệu").fill("1C26TFB");
   await p.getByLabel("Số hóa đơn").fill(no);
-  await p.getByLabel("MST người mua").fill("1000000002");
+  await p.getByLabel("MST bên nhập khẩu").fill("1000000002");
   await p.getByLabel("Tổng thanh toán (đ)").fill(amount);
   await p.getByRole("button", { name: "+60 ngày" }).click();
-  if (!send) await p.getByLabel("Gửi người mua xác nhận ngay").uncheck();
+  if (!send) await p.getByLabel("Gửi bên nhập khẩu xác nhận ngay").uncheck();
   await p.getByRole("button", { name: "Lưu khoản phải thu" }).click();
   await expect(p).toHaveURL(/\/supplier\/invoices$/);
 }
 
-test("F01/F02/F16: bên mua không thấy nháp; thấy điều chỉnh không cần tải lại; xác nhận phiên bản cũ bị chặn", async ({ browser }) => {
+test("F01/F02/F16: bên nhập khẩu không thấy nháp; thấy điều chỉnh không cần tải lại; xác nhận phiên bản cũ bị chặn", async ({ browser }) => {
   const supplier = await as(browser, "supplier");
   const buyer = await as(browser, "buyer");
   await buyer.goto("/buyer/invoices");
@@ -39,7 +39,7 @@ test("F01/F02/F16: bên mua không thấy nháp; thấy điều chỉnh không c
   await expect(buyer.getByText("12.345.678")).toHaveCount(0);
   await buyer.goto("/buyer/invoices");
 
-  // F01: gửi rồi điều chỉnh 10 → 12 triệu; tab bên mua cập nhật không tải lại
+  // F01: gửi rồi điều chỉnh 10 → 12 triệu; tab bên nhập khẩu cập nhật không tải lại
   const no = `V${ts}`;
   await createInvoice(supplier, no, "10000000", true);
   const row = buyer.getByRole("row", { name: new RegExp(no) });
@@ -50,7 +50,7 @@ test("F01/F02/F16: bên mua không thấy nháp; thấy điều chỉnh không c
   await supplier.getByLabel("Số tiền mới (đ)").fill("12000000");
   await supplier.getByLabel("Lý do (bắt buộc)").fill("Sai đơn giá");
   await supplier.getByRole("button", { name: "Điều chỉnh", exact: true }).click();
-  await expect(supplier.getByText("Đã điều chỉnh; bên mua cần xác nhận lại")).toBeVisible();
+  await expect(supplier.getByText("Đã điều chỉnh; bên nhập khẩu cần xác nhận lại")).toBeVisible();
   await expect(row).toContainText("12.000.000", { timeout: 12_000 });
   await expect(row).toContainText("v2");
   await row.click();
@@ -90,7 +90,7 @@ test("F09/F30: FCC xem đầy đủ sản phẩm rồi từ chối bằng hộp 
     const dlg = admin.getByRole("dialog");
     await expect(dlg).toBeVisible();
     await expect(dlg.getByRole("button", { name: "Gửi" })).toBeDisabled();
-    await dlg.getByRole("textbox").fill("Đã kiểm tra chứng từ gốc với nhà cung cấp");
+    await dlg.getByRole("textbox").fill("Đã kiểm tra chứng từ gốc với đơn vị xuất khẩu");
     await dlg.getByRole("button", { name: "Gửi" }).click();
     await expect(admin.getByText("Đã xử lý cờ")).toBeVisible();
   }
@@ -118,14 +118,14 @@ test("F04: MST lệch một chữ số không tự gán, chỉ gợi ý để ng
   const xml = `<HDon><DLHDon><TTChung><KHMSHDon>1</KHMSHDon><KHHDon>C26TQA</KHHDon><SHDon>X${ts}</SHDon><NLap>2026-10-18</NLap></TTChung><NDHDon><NBan><Ten>NCC</Ten><MST></MST></NBan><NMua><Ten>Công ty Bên Mua</Ten><MST>10000000002</MST></NMua><DSHHDVu><HHDVu><THHDVu>Hàng QA</THHDVu></HHDVu></DSHHDVu><TToan><TgTTTBSo>12345678</TgTTTBSo></TToan></NDHDon></DLHDon></HDon>`;
   await p.locator('input[type="file"]').first().setInputFiles({ name: "qa.xml", mimeType: "application/xml", buffer: Buffer.from(xml) });
   await expect(p.getByText(/MST có 11 chữ số/)).toBeVisible();
-  await expect(p.getByText(/Không có người mua nào trên FCC/)).toBeVisible();
+  await expect(p.getByText(/Không có bên nhập khẩu nào trên FCC/)).toBeVisible();
   const suggestion = p.getByRole("button", { name: /MST 1000000002 — MST chỉ khác 1 chữ số/ });
   await expect(suggestion).toBeVisible();
-  await expect(p.getByLabel("MST người mua")).toHaveValue("10000000002"); // chưa tự sửa
+  await expect(p.getByLabel("MST bên nhập khẩu")).toHaveValue("10000000002"); // chưa tự sửa
   await expect(p.getByText("Hạn thanh toán").first()).toBeVisible();
   await expect(p.getByLabel("Hạn thanh toán")).toHaveValue(""); // XML không có hạn: không tự điền
   await suggestion.click();
-  await expect(p.getByText("Người mua trên FCC")).toBeVisible();
+  await expect(p.getByText("Bên nhập khẩu trên FCC")).toBeVisible();
 });
 
 test("F10: menu đóng trên màn hẹp không nhận Tab; mở menu chuyển focus vào trong, Escape trả về nút mở", async ({ browser }) => {

@@ -6,7 +6,7 @@ export const PRODUCT_TYPE_LABEL: Record<ProductType, string> = {
   factoring_recourse: 'Bao thanh toán có truy đòi',
   factoring_nonrecourse: 'Bao thanh toán miễn truy đòi',
   invoice_finance: 'Tài trợ hóa đơn',
-  reverse_factoring: 'SCF do bên mua khởi tạo',
+  reverse_factoring: 'SCF do bên nhập khẩu khởi tạo',
   green_loan: 'Tín dụng xanh vốn lưu động',
 }
 
@@ -105,10 +105,10 @@ export function matchProduct(p: FinancingProduct, ctx: MatchContext): MatchResul
   if (e.industryGroups?.length) check(e.industryGroups.includes(ctx.industryGroup), 'Đúng nhóm ngành', 'Ngành không thuộc phạm vi sản phẩm')
   check(r.amount >= e.minAmount && r.amount <= e.maxAmount, 'Giá trị trong khoảng tài trợ', `Giá trị ngoài khoảng ${fmt(e.minAmount)}–${fmt(e.maxAmount)}`)
   check(tenor <= e.maxTenorDays, `Kỳ hạn ${tenor} ngày ≤ ${e.maxTenorDays}`, `Kỳ hạn ${tenor} ngày vượt tối đa ${e.maxTenorDays} ngày`)
-  if (e.requireBuyerConfirmation) check(r.state === 'BUYER_CONFIRMED', 'Đã được bên mua xác nhận', 'Cần bên mua xác nhận khoản phải thu')
-  if (e.buyerWhitelist?.length) check(e.buyerWhitelist.includes(r.buyerId), 'Bên mua thuộc chương trình', 'Bên mua không thuộc danh sách chương trình')
-  if (e.minSupplierRating) check(ratingAtLeast(ctx.supplierRating, e.minSupplierRating), `Bên bán ${ctx.supplierRating} ≥ ${e.minSupplierRating}`, `Cần xếp hạng bên bán ≥ ${e.minSupplierRating} — hiện tại ${ctx.supplierRating}`)
-  if (e.minBuyerRating) check(ratingAtLeast(ctx.buyerRating, e.minBuyerRating), `Bên mua ${ctx.buyerRating} ≥ ${e.minBuyerRating}`, `Cần xếp hạng bên mua ≥ ${e.minBuyerRating} — hiện tại ${ctx.buyerRating}`)
+  if (e.requireBuyerConfirmation) check(r.state === 'BUYER_CONFIRMED', 'Đã được bên nhập khẩu xác nhận', 'Cần bên nhập khẩu xác nhận khoản phải thu')
+  if (e.buyerWhitelist?.length) check(e.buyerWhitelist.includes(r.buyerId), 'Bên nhập khẩu thuộc chương trình', 'Bên nhập khẩu không thuộc danh sách chương trình')
+  if (e.minSupplierRating) check(ratingAtLeast(ctx.supplierRating, e.minSupplierRating), `Đơn vị xuất khẩu ${ctx.supplierRating} ≥ ${e.minSupplierRating}`, `Cần xếp hạng đơn vị xuất khẩu ≥ ${e.minSupplierRating} — hiện tại ${ctx.supplierRating}`)
+  if (e.minBuyerRating) check(ratingAtLeast(ctx.buyerRating, e.minBuyerRating), `Bên nhập khẩu ${ctx.buyerRating} ≥ ${e.minBuyerRating}`, `Cần xếp hạng bên nhập khẩu ≥ ${e.minBuyerRating} — hiện tại ${ctx.buyerRating}`)
   if (e.minApplicationRating) check(ratingAtLeast(ctx.applicationRating, e.minApplicationRating), `Hồ sơ ${ctx.applicationRating} ≥ ${e.minApplicationRating}`, `Cần xếp hạng hồ sơ ≥ ${e.minApplicationRating} — hiện tại ${ctx.applicationRating}`)
   if (e.minEsg !== undefined) {
     const ok = !!ctx.esg?.official && ctx.esg.score >= e.minEsg

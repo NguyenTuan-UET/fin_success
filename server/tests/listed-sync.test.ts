@@ -87,7 +87,7 @@ describe('tự động lấy dữ liệu niêm yết (vnstock)', () => {
     const st = await call('GET', '/v1/operations/listed-sync', undefined, F)
     expect(st.body).toMatchObject({ enabled: true, symbols: { HPG: { ok: false, error: 'Rate limit exceeded' } } })
 
-    // bên mua bấm làm mới khi vnstock lỗi: báo lỗi rõ ràng
+    // bên nhập khẩu bấm làm mới khi vnstock lỗi: báo lỗi rõ ràng
     const r = await post('/v1/listed/HPG/refresh', {}, B)
     expect(r.status).toBe(422)
     expect(r.body.error ?? r.body.message).toContain('vnstock')

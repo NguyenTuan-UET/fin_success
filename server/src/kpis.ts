@@ -24,7 +24,7 @@ export function operationsKpis(s: State, users: number) {
     approval: { approved: approved.length, decided: decided.length },
     dispute: { disputed: everDisputed, sent: confirmable },
     approvalRate: decided.length ? Math.round((approved.length / decided.length) * 1000) / 10 : null, // % hồ sơ đã quyết định mà không bị từ chối
-    disputeRate: confirmable ? Math.round((everDisputed / confirmable) * 1000) / 10 : null, // % khoản đã gửi bên mua từng bị tranh chấp
+    disputeRate: confirmable ? Math.round((everDisputed / confirmable) * 1000) / 10 : null, // % khoản đã gửi bên nhập khẩu từng bị tranh chấp
     stepTimes: {
       createdToBuyerConfirmed: avg(s.receivables.map((r) => days(r.createdAt, r.confirmedAt))),
       submittedToDecision: avg(decided.map((a) => days(a.submittedAt, a.decidedAt))),

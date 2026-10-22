@@ -22,7 +22,7 @@ export function BuyerProgram() {
     <>
       <section className="grid-kpi">
         <Kpi label="Xếp hạng của bạn (tham khảo)" value={!rating.official && rating.coverage < 0.5 ? "Chưa đủ dữ liệu" : rating.rating} note={rating.official ? "Điểm chính thức" : `Tạm tính, chỉ để tham khảo · độ bao phủ dữ liệu ${Math.round(rating.coverage * 100)}% (cần ≥ 50% để hiển thị hạng)`} />
-        <Kpi label="Nhà cung cấp đã gửi hóa đơn" value={String(suppliers.length)} note={`${mine.length} hóa đơn tới bạn`} />
+        <Kpi label="Đơn vị xuất khẩu đã gửi hóa đơn" value={String(suppliers.length)} note={`${mine.length} hóa đơn tới bạn`} />
         <Kpi label="Đang được tài trợ" value={money(fundedVnd)} note={`${funded.length} hồ sơ đã chấp thuận/giải ngân`} />
         <Kpi label="Lãi suất sàn thấp nhất đang công bố" value={rates.length ? `${dec(Math.min(...rates))}%` : "—"} note={`${products.length} gói đang công bố`} />
       </section>
@@ -43,7 +43,7 @@ export function BuyerProgram() {
             </tbody>
           </table>
         </div>
-        <p className="muted" style={{ padding: "12px 16px", borderTop: "1px solid var(--line-2)" }}>Giá và điều kiện do tổ chức tài chính công bố; FCC không cam kết giá. Muốn nhà cung cấp hưởng lãi thấp hơn, hãy xác nhận hóa đơn nhanh và thanh toán đúng hạn — lịch sử đó được dùng để chấm điểm hồ sơ. <Link href="/buyer/invoices">Tới xác nhận hóa đơn</Link></p>
+        <p className="muted" style={{ padding: "12px 16px", borderTop: "1px solid var(--line-2)" }}>Giá và điều kiện do tổ chức tài chính công bố; FCC không cam kết giá. Muốn đơn vị xuất khẩu hưởng lãi thấp hơn, hãy xác nhận hóa đơn nhanh và thanh toán đúng hạn — lịch sử đó được dùng để chấm điểm hồ sơ. <Link href="/buyer/invoices">Tới xác nhận hóa đơn</Link></p>
       </section>
     </>
   );

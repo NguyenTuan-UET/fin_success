@@ -111,7 +111,7 @@ export function Accounting({ role }: { role: Role }) {
   return (
     <>
       <PageHeader
-        eyebrow={`Kế toán · ${role === "supplier" ? "Nhà cung cấp" : "Người mua"}`}
+        eyebrow={`Kế toán · ${role === "supplier" ? "Đơn vị xuất khẩu" : "Bên nhập khẩu"}`}
         title="Công nợ & dòng tiền"
         sub="Số dư tiền và chi định kỳ do bạn khai; công nợ nhập từ file (CSV từ phần mềm kế toán) cộng hóa đơn trên FCC. FCC chỉ đọc dữ liệu, không ghi vào sổ kế toán của bạn."
         actions={<><button className="btn bs" onClick={() => setManual({ kind: "AR", name: "", tax: "", doc: "", amount: null, paid: 0, due: "" })}><Plus size={16} aria-hidden="true" /> Thêm từng khoản</button>
@@ -134,7 +134,7 @@ export function Accounting({ role }: { role: Role }) {
               </label>
             ))}
             <label className="field"><span>Khi tệp không ghi loại, các dòng là</span>
-              <select className="select" value={imp.kind} onChange={(e) => setImp({ ...imp, kind: e.target.value as "AR" | "AP" | "" })}><option value="">— Theo cột Loại —</option><option value="AR">Phải thu (khách hàng nợ bạn)</option><option value="AP">Phải trả (bạn nợ nhà cung cấp)</option></select>
+              <select className="select" value={imp.kind} onChange={(e) => setImp({ ...imp, kind: e.target.value as "AR" | "AP" | "" })}><option value="">— Theo cột Loại —</option><option value="AR">Phải thu (khách hàng nợ bạn)</option><option value="AP">Phải trả (bạn nợ đơn vị xuất khẩu)</option></select>
             </label>
           </div>
           {missing.length > 0 && <div className="err">Chưa ghép cột: {missing.map((f) => f.label).join(", ")}.</div>}
@@ -159,7 +159,7 @@ export function Accounting({ role }: { role: Role }) {
         <section className="card stack" aria-label="Thêm khoản công nợ">
           <h2 className="ct">Thêm khoản công nợ</h2>
           <div className="grid-fields">
-            <label className="field"><span>Loại</span><select className="select" value={manual.kind} onChange={(e) => setManual({ ...manual, kind: e.target.value as "AR" | "AP" })}><option value="AR">Phải thu (khách hàng nợ bạn)</option><option value="AP">Phải trả (bạn nợ nhà cung cấp)</option></select></label>
+            <label className="field"><span>Loại</span><select className="select" value={manual.kind} onChange={(e) => setManual({ ...manual, kind: e.target.value as "AR" | "AP" })}><option value="AR">Phải thu (khách hàng nợ bạn)</option><option value="AP">Phải trả (bạn nợ đơn vị xuất khẩu)</option></select></label>
             <label className="field"><span>Đối tác</span><input className="input" value={manual.name} onChange={(e) => setManual({ ...manual, name: e.target.value })} /></label>
             <label className="field"><span>MST đối tác (nếu có)</span><input className="input num" value={manual.tax} onChange={(e) => setManual({ ...manual, tax: e.target.value })} /></label>
             <label className="field"><span>Số chứng từ</span><input className="input num" value={manual.doc} onChange={(e) => setManual({ ...manual, doc: e.target.value })} /></label>

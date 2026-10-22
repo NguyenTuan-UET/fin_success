@@ -1,4 +1,4 @@
-// Thu hồi theo thứ tự phí → lãi → gốc; phần thừa hoàn cho nhà cung cấp (hồ sơ dự án mục 3.3.b, lớp 1–2).
+// Thu hồi theo thứ tự phí → lãi → gốc; phần thừa hoàn cho đơn vị xuất khẩu (hồ sơ dự án mục 3.3.b, lớp 1–2).
 // Lãi tính theo ngày trên dư nợ gốc: lãi suất đề nghị đến hạn thanh toán của hóa đơn, sau đó lãi quá hạn = lãi suất × latePenaltyPct%.
 // Hàm thuần, xác định: cùng chuỗi sự kiện → cùng kết quả. Số tiền do tổ chức tài chính xác nhận là nguồn sự thật.
 import type { FundingApplication } from './types'
@@ -25,7 +25,7 @@ export interface Balance {
   outstanding: number
   /** Tổng đã thu (thanh toán + thanh lý tài sản) */
   received: number
-  /** Phần thừa phải hoàn cho nhà cung cấp */
+  /** Phần thừa phải hoàn cho đơn vị xuất khẩu */
   surplus: number
   settled: boolean
 }
@@ -91,11 +91,11 @@ export function allocationOf(offer: Offer, fundedAt: string, dueDate: string, pr
 export const payoffAt = (offer: Offer, fundedAt: string, dueDate: string, events: SettlementEvent[], asOf: string, latePenaltyPct = 150) =>
   balanceAt(offer, fundedAt, dueDate, events, asOf, latePenaltyPct).outstanding
 
-/** Tổng tiền bên mua tự ghi nhận đã trả (để đối soát với tiền tổ chức tài chính xác nhận). */
+/** Tổng tiền bên nhập khẩu tự ghi nhận đã trả (để đối soát với tiền tổ chức tài chính xác nhận). */
 export const reportedByBuyer = (events: SettlementEvent[]) => events.filter((e) => e.type === 'buyer_reported').reduce((a, e) => a + e.amount, 0)
 
 export type Reconciliation = 'none' | 'pending' | 'matched' | 'mismatch'
-/** Đối soát: bên mua báo đã trả ↔ tổ chức tài chính xác nhận đã nhận (chỉ tính thanh toán, không tính thanh lý tài sản). */
+/** Đối soát: bên nhập khẩu báo đã trả ↔ tổ chức tài chính xác nhận đã nhận (chỉ tính thanh toán, không tính thanh lý tài sản). */
 export function reconcile(events: SettlementEvent[]): Reconciliation {
   const reported = reportedByBuyer(events)
   const confirmed = events.filter((e) => e.type === 'payment_received').reduce((a, e) => a + e.amount, 0)

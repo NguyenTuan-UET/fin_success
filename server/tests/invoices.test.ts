@@ -18,7 +18,7 @@ const today = new Date().toISOString().slice(0, 10)
 const due = new Date(Date.now() + 60 * 86_400_000).toISOString().slice(0, 10)
 
 describe('hóa đơn: cờ bất thường, điều chỉnh, đối chiếu thuế', () => {
-  it('hóa đơn lớn cho bên mua mới bị gắn cờ, báo FCC; FCC thấy bản rút gọn và xử lý cờ', async () => {
+  it('hóa đơn lớn cho bên nhập khẩu mới bị gắn cờ, báo FCC; FCC thấy bản rút gọn và xử lý cờ', async () => {
     const S = await session('supplier')
     const B = await session('buyer')
     const F = await session('fcc')
@@ -34,7 +34,7 @@ describe('hóa đơn: cờ bất thường, điều chỉnh, đối chiếu thu�
 
     expect((await act(S, 'resolveFlag', r.body.result.id, 'NEW_BUYER_LARGE', 'ok')).status).toBe(403) // chỉ FCC
     expect((await act(F, 'resolveFlag', r.body.result.id, 'NEW_BUYER_LARGE', '')).status).toBe(400)
-    expect((await act(F, 'resolveFlag', r.body.result.id, 'NEW_BUYER_LARGE', 'Đã gọi xác nhận với bên mua, có hợp đồng khung')).status).toBe(200)
+    expect((await act(F, 'resolveFlag', r.body.result.id, 'NEW_BUYER_LARGE', 'Đã gọi xác nhận với bên nhập khẩu, có hợp đồng khung')).status).toBe(200)
     expect((await act(F, 'resolveFlag', r.body.result.id, 'NEW_BUYER_LARGE', 'lần hai')).status).toBe(404) // đã xử lý
     const flags = app.getState().receivables.find((x) => x.id === r.body.result.id)!.flags!
     expect(flags.find((f) => f.code === 'NEW_BUYER_LARGE')).toMatchObject({ resolvedBy: expect.any(String), resolutionNote: expect.stringContaining('hợp đồng khung') })
@@ -62,13 +62,13 @@ describe('hóa đơn: cờ bất thường, điều chỉnh, đối chiếu thu�
     expect(r).toMatchObject({ amount: 700_000_000, version: 2, state: 'BUYER_PENDING' })
     expect(r.confirmedAt).toBeUndefined()
     expect(app.getState().rfqs.find((x) => x.id === q.body.result.id)!.state).toBe('CANCELLED')
-    // không điều chỉnh khi đã được tài trợ/đang có hồ sơ; bên mua phải xác nhận lại phiên bản mới
+    // không điều chỉnh khi đã được tài trợ/đang có hồ sơ; bên nhập khẩu phải xác nhận lại phiên bản mới
     expect((await act(B, 'reviseReceivable', id, { amount: 1, note: 'x' })).status).toBe(403)
     expect((await act(B, 'buyerDecision', id, true)).status).toBe(200)
     expect(app.getState().receivables.find((x) => x.id === id)!.state).toBe('BUYER_CONFIRMED')
   })
 
-  it('đối chiếu thuế: chỉ vận hành FCC ghi nhận; không khớp/đã hủy cần ghi chú và báo nhà cung cấp', async () => {
+  it('đối chiếu thuế: chỉ vận hành FCC ghi nhận; không khớp/đã hủy cần ghi chú và báo đơn vị xuất khẩu', async () => {
     const S = await session('supplier')
     const F = await session('fcc')
     const rid = app.getState().receivables[0].id

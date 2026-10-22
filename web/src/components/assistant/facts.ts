@@ -13,14 +13,14 @@ import { ROLES, type Role } from "@/lib/roles";
 const name = (d: FccState, id: string) => d.orgs.find((o) => o.id === id)?.shortName ?? id;
 const ACTIVE_APP = (s: string) => !["REJECTED", "WITHDRAWN"].includes(s);
 
-/** Điều kiện gửi tài trợ — cùng quy tắc với nút "So sánh gói & yêu cầu tài trợ": bên mua đã xác nhận, chưa có hồ sơ đang hoạt động. */
+/** Điều kiện gửi tài trợ — cùng quy tắc với nút "So sánh gói & yêu cầu tài trợ": bên nhập khẩu đã xác nhận, chưa có hồ sơ đang hoạt động. */
 export function fundingStatus(d: FccState, r: Receivable): { ok: boolean; reason: string } {
   if (d.applications.some((a) => a.receivableId === r.id && ACTIVE_APP(a.state))) return { ok: false, reason: "đã có hồ sơ tài trợ" };
   switch (r.state) {
-    case "BUYER_CONFIRMED": return { ok: true, reason: "người mua đã xác nhận" };
-    case "DRAFT": return { ok: false, reason: "còn là nháp — chưa gửi người mua xác nhận" };
-    case "BUYER_PENDING": return { ok: false, reason: "đang chờ người mua xác nhận" };
-    case "BUYER_DISPUTED": return { ok: false, reason: "người mua đang hỏi lại — cần điều chỉnh hoặc giải trình" };
+    case "BUYER_CONFIRMED": return { ok: true, reason: "bên nhập khẩu đã xác nhận" };
+    case "DRAFT": return { ok: false, reason: "còn là nháp — chưa gửi bên nhập khẩu xác nhận" };
+    case "BUYER_PENDING": return { ok: false, reason: "đang chờ bên nhập khẩu xác nhận" };
+    case "BUYER_DISPUTED": return { ok: false, reason: "bên nhập khẩu đang hỏi lại — cần điều chỉnh hoặc giải trình" };
     case "SETTLED": case "EARLY_PAID": return { ok: false, reason: "đã thanh toán" };
     case "OVERDUE": return { ok: false, reason: "đã quá hạn" };
     case "CANCELLED": return { ok: false, reason: "đã hủy" };
@@ -30,7 +30,7 @@ export function fundingStatus(d: FccState, r: Receivable): { ok: boolean; reason
 
 /**
  * Trả lời "nên tài trợ hóa đơn nào" bằng quy tắc, không qua mô hình: lọc tập đủ điều kiện trước rồi mới xếp ưu tiên
- * (người mua xếp hạng cao, còn nhiều ngày đến hạn). Bảo đảm cùng câu trả lời với Marketplace dù hỏi theo cách nào.
+ * (bên nhập khẩu xếp hạng cao, còn nhiều ngày đến hạn). Bảo đảm cùng câu trả lời với Marketplace dù hỏi theo cách nào.
  */
 export function fundingAdvice(d: FccState, org: Org) {
   const mine = d.receivables.filter((r) => r.sellerId === org.id && r.state !== "CANCELLED");
@@ -39,13 +39,13 @@ export function fundingAdvice(d: FccState, org: Org) {
   if (!ok.length) {
     const lines = mine.slice(0, 6).map((r) => `• ${r.code} (${vnd(r.amount)} đ): chưa tài trợ được vì ${fundingStatus(d, r).reason}.`);
     return {
-      text: [`Hiện chưa có hóa đơn nào đủ điều kiện tài trợ — chỉ hóa đơn đã được người mua xác nhận mới gửi tổ chức tài chính được.`, ...lines, mine.some((r) => r.state === "DRAFT") ? "Bước tiếp theo: gửi hóa đơn nháp cho người mua xác nhận." : mine.some((r) => r.state === "BUYER_PENDING") ? "Bước tiếp theo: nhắc người mua xác nhận hóa đơn đang chờ." : ""].filter(Boolean).join("\n"),
+      text: [`Hiện chưa có hóa đơn nào đủ điều kiện tài trợ — chỉ hóa đơn đã được bên nhập khẩu xác nhận mới gửi tổ chức tài chính được.`, ...lines, mine.some((r) => r.state === "DRAFT") ? "Bước tiếp theo: gửi hóa đơn nháp cho bên nhập khẩu xác nhận." : mine.some((r) => r.state === "BUYER_PENDING") ? "Bước tiếp theo: nhắc bên nhập khẩu xác nhận hóa đơn đang chờ." : ""].filter(Boolean).join("\n"),
       links: [{ href: "/supplier/invoices", label: "Hóa đơn" }],
     };
   }
-  const top = ok.slice(0, 3).map((r, i) => { const b = rated(r.buyerId); return `${i + 1}. ${r.code} — ${name(d, r.buyerId)}, ${vnd(r.amount)} đ, hạn ${date(r.dueDate)}${b ? `, người mua xếp hạng tham khảo ${b.rating}` : ", xếp hạng người mua chưa đủ dữ liệu"}.`; });
+  const top = ok.slice(0, 3).map((r, i) => { const b = rated(r.buyerId); return `${i + 1}. ${r.code} — ${name(d, r.buyerId)}, ${vnd(r.amount)} đ, hạn ${date(r.dueDate)}${b ? `, bên nhập khẩu xếp hạng tham khảo ${b.rating}` : ", xếp hạng bên nhập khẩu chưa đủ dữ liệu"}.`; });
   return {
-    text: [`Có ${ok.length} hóa đơn đủ điều kiện tài trợ (người mua đã xác nhận, chưa có hồ sơ). Thứ tự gợi ý theo xếp hạng người mua và số ngày còn lại:`, ...top, "Chi phí thực tế phụ thuộc gói của từng tổ chức tài chính — so sánh ở Marketplace trước khi gửi."].join("\n"),
+    text: [`Có ${ok.length} hóa đơn đủ điều kiện tài trợ (bên nhập khẩu đã xác nhận, chưa có hồ sơ). Thứ tự gợi ý theo xếp hạng bên nhập khẩu và số ngày còn lại:`, ...top, "Chi phí thực tế phụ thuộc gói của từng tổ chức tài chính — so sánh ở Marketplace trước khi gửi."].join("\n"),
     links: [{ href: "/supplier/marketplace", label: "Marketplace" }],
   };
 }

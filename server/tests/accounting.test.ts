@@ -83,7 +83,7 @@ describe('kế toán: sao kê giả lập, bút toán đề xuất, dự báo l�
     expect((await post('/v1/cashflow-forecasts', {}, S)).body).toMatchObject({ stored: false, inputsHash: f1.body.inputsHash }) // cùng đầu vào cùng ngày
     expect((await call('GET', '/v1/cashflow-forecasts/latest', undefined, S)).body.expectedAr).toHaveLength(1)
 
-    // bên mua trả đúng hạn dự kiến+3 ngày; tổ chức tài chính xác nhận → đo sai số
+    // bên nhập khẩu trả đúng hạn dự kiến+3 ngày; tổ chức tài chính xác nhận → đo sai số
     const due = app.getState().receivables.find((r) => r.id === recId)!.dueDate
     const paidAt = iso(new Date(new Date(due).getTime() + 3 * 86_400_000))
     await act(B, 'markBuyerPaid', recId, { amount: 2_000_000_000, paidAt: iso(new Date()) })

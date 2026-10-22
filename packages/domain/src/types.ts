@@ -34,9 +34,9 @@ export interface Org {
   verified?: boolean
   /** Website của doanh nghiệp (do doanh nghiệp khai, đồng ý cho FCC đọc công khai để gợi ý bằng chứng ESG) */
   website?: string
-  /** FCC đã xác minh ánh xạ MST ↔ mã chứng khoán của bên mua niêm yết (lần đầu bằng tay) */
+  /** FCC đã xác minh ánh xạ MST ↔ mã chứng khoán của bên nhập khẩu niêm yết (lần đầu bằng tay) */
   listedVerified?: { symbol: string; by: string; at: string; note?: string }
-  /** Xác minh danh tính người đại diện (eKYC qua nhà cung cấp, hoặc FCC đối chiếu giấy tờ) */
+  /** Xác minh danh tính người đại diện (eKYC qua đơn vị xuất khẩu, hoặc FCC đối chiếu giấy tờ) */
   kyc?: OrgKyc
   /** Tổ chức tài chính giả lập (sim-bank) — phase hiện tại chưa kết nối ngân hàng thật */
   simulated?: boolean
@@ -58,7 +58,7 @@ export interface OrgKyc {
 
 /** Bằng chứng ký khi doanh nghiệp đồng ý chia sẻ dữ liệu hoặc chấp thuận đề nghị. */
 export interface SignatureEvidence {
-  /** digital_signature: ký số từ xa qua nhà cung cấp chứng thực; mfa_snapshot: xác thực MFA + băm nội dung đã đồng ý */
+  /** digital_signature: ký số từ xa qua đơn vị xuất khẩu chứng thực; mfa_snapshot: xác thực MFA + băm nội dung đã đồng ý */
   method: 'digital_signature' | 'mfa_snapshot' | 'dev_session'
   provider?: string
   /** SHA-256 của nội dung đã ký (chuẩn hóa) */
@@ -103,7 +103,7 @@ export interface CollateralItem {
   declaredValue: number
 }
 
-/** Hồ sơ đầu vào chấm điểm cho một doanh nghiệp (chủ yếu bên bán/bên mua chưa niêm yết). */
+/** Hồ sơ đầu vào chấm điểm cho một doanh nghiệp (chủ yếu đơn vị xuất khẩu/bên nhập khẩu chưa niêm yết). */
 export interface CreditProfile {
   orgId: string
   financials: FinancialYear[]
@@ -122,7 +122,7 @@ export interface CreditProfile {
   vatDeclaredRevenue?: number
 }
 
-/** Snapshot dữ liệu thị trường của bên mua niêm yết, cùng cấu trúc với dữ liệu lấy qua vnstock. */
+/** Snapshot dữ liệu thị trường của bên nhập khẩu niêm yết, cùng cấu trúc với dữ liệu lấy qua vnstock. */
 export interface ListedSnapshot {
   orgId: string
   symbol: string
@@ -167,7 +167,7 @@ export interface ReceivableRevision {
   note: string
   before: { amount: number; dueDate: string }
   after: { amount: number; dueDate: string }
-  /** Phiên bản trước đã được bên mua xác nhận và nay mất hiệu lực */
+  /** Phiên bản trước đã được bên nhập khẩu xác nhận và nay mất hiệu lực */
   voidedConfirmation: boolean
 }
 
@@ -198,7 +198,7 @@ export interface Receivable {
   /** Thông tin tờ khai hải quan do từng phía khai (xem customs.ts) */
   customsInfo?: CustomsInfo
   disputeReason?: string
-  /** Thời điểm gửi bên mua lần đầu; trước đó (bản nháp) chỉ bên bán thấy */
+  /** Thời điểm gửi bên nhập khẩu lần đầu; trước đó (bản nháp) chỉ đơn vị xuất khẩu thấy */
   sentAt?: string
   /** Lịch sử điều chỉnh: giá trị trước/sau, người sửa, lý do; xác nhận của phiên bản cũ mất hiệu lực */
   revisions?: ReceivableRevision[]
@@ -335,11 +335,11 @@ export interface FundingApplication {
   fundedAt?: string
   fundedAmount?: number
   settledAt?: string
-  /** Sự kiện tiền (chỉ thêm): bên mua báo đã trả, tổ chức tài chính xác nhận đã nhận, thanh lý tài sản, hoàn phần dư */
+  /** Sự kiện tiền (chỉ thêm): bên nhập khẩu báo đã trả, tổ chức tài chính xác nhận đã nhận, thanh lý tài sản, hoàn phần dư */
   settlements?: SettlementEvent[]
   /** Dư nợ còn phải thu hồi sau các khoản đã xác nhận (VND) */
   outstanding?: number
-  /** Phần thừa phải hoàn cho nhà cung cấp, và phần đã hoàn */
+  /** Phần thừa phải hoàn cho đơn vị xuất khẩu, và phần đã hoàn */
   refundDue?: number
   refundPaid?: number
   submittedAt: string

@@ -35,27 +35,27 @@ test("hóa đơn → xác nhận → RFQ → báo giá → thẩm định → đ
   await expect(lender.getByText("Đã gửi FCC duyệt")).toBeVisible();
   await expect(lender.getByText("Đang công bố").first()).toBeVisible();
 
-  // Nhà cung cấp tạo hóa đơn nhập tay cho bên mua (MST dev của bên mua: 1000000002) và gửi xác nhận
+  // Đơn vị xuất khẩu tạo hóa đơn nhập tay cho bên nhập khẩu (MST dev của bên nhập khẩu: 1000000002) và gửi xác nhận
   await supplier.goto("/supplier/invoices/upload");
   await supplier.getByRole("button", { name: "nhập tay" }).click();
   await supplier.getByLabel("Ký hiệu").fill("1C26TE2E");
   await supplier.getByLabel("Số hóa đơn").fill(INVOICE_NO);
-  await supplier.getByLabel("MST người mua").fill("1000000002");
+  await supplier.getByLabel("MST bên nhập khẩu").fill("1000000002");
   await supplier.getByLabel("Tổng thanh toán (đ)").fill("900000000");
   const due = new Date(Date.now() + 60 * 86_400_000).toISOString().slice(0, 10);
   await supplier.getByLabel("Hạn thanh toán").fill(due);
-  await expect(supplier.getByText("Người mua trên FCC")).toBeVisible();
+  await expect(supplier.getByText("Bên nhập khẩu trên FCC")).toBeVisible();
   await supplier.getByRole("button", { name: "Lưu khoản phải thu" }).click();
   await expect(supplier).toHaveURL(/\/supplier\/invoices$/);
   await expect(supplier.getByRole("cell", { name: new RegExp(INVOICE_NO) })).toBeVisible();
 
-  // Bên mua xác nhận
+  // Bên nhập khẩu xác nhận
   await buyer.goto("/buyer/invoices");
   await expect(buyer.getByRole("row", { name: new RegExp(INVOICE_NO) }).first()).toBeVisible({ timeout: 15_000 });
   await buyer.getByRole("button", { name: /^Xác nhận v\d+$/ }).first().click();
   await expect(buyer.getByText(/Đã xác nhận/).first()).toBeVisible();
 
-  // Nhà cung cấp so sánh gói, gửi RFQ
+  // Đơn vị xuất khẩu so sánh gói, gửi RFQ
   await supplier.goto("/supplier/marketplace");
   await expect(supplier.getByText(`Gói e2e ${ts}`)).toBeVisible({ timeout: 15_000 });
   await supplier.getByLabel(`Chọn Gói e2e ${ts}`).check();
@@ -68,7 +68,7 @@ test("hóa đơn → xác nhận → RFQ → báo giá → thẩm định → đ
   await lender.getByRole("button", { name: "Gửi báo giá" }).first().click();
   await expect(lender.getByText("Đã gửi báo giá")).toBeVisible();
 
-  // Nhà cung cấp thấy báo giá ngay (SSE) và chọn
+  // Đơn vị xuất khẩu thấy báo giá ngay (SSE) và chọn
   await supplier.goto("/supplier/marketplace");
   await expect(supplier.getByRole("button", { name: /Chọn & gửi hồ sơ/ })).toBeVisible({ timeout: 15_000 });
   await supplier.getByRole("button", { name: /Chọn & gửi hồ sơ/ }).click();
@@ -91,12 +91,12 @@ test("hóa đơn → xác nhận → RFQ → báo giá → thẩm định → đ
   await lender.getByRole("button", { name: "Ghi nhận giải ngân" }).click();
   await expect(lender.getByText("Đã ghi nhận giải ngân")).toBeVisible();
 
-  // Bên mua ghi nhận thanh toán → tất toán
+  // Bên nhập khẩu ghi nhận thanh toán → tất toán
   await buyer.goto("/buyer/invoices");
   await buyer.getByRole("button", { name: "Ghi nhận đã thanh toán" }).first().click();
   await buyer.getByRole("button", { name: "Ghi nhận", exact: true }).click();
   await expect(buyer.getByText(/Đã ghi nhận thanh toán/)).toBeVisible();
-  // Tiền về tài khoản tổ chức tài chính: bên mua tự báo chưa đủ để tất toán — tổ chức tài chính xác nhận đúng số còn phải thu
+  // Tiền về tài khoản tổ chức tài chính: bên nhập khẩu tự báo chưa đủ để tất toán — tổ chức tài chính xác nhận đúng số còn phải thu
   await lender.goto("/lender/appraisal");
   const owed = await lender.getByLabel("Số tiền về (đ)").getAttribute("placeholder");
   expect(Number(owed)).toBeGreaterThan(0);

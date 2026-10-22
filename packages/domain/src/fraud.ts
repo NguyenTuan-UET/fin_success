@@ -21,18 +21,18 @@ export function invoiceFlags(r: Draft, existing: Receivable[], now = new Date())
   if (pair.length >= FRAUD_PARAMS.minHistory) {
     const med = median(pair.map((x) => x.amount))
     if (med > 0 && r.amount > med * FRAUD_PARAMS.anomalyMultiple) {
-      out.push({ code: 'AMOUNT_ANOMALY', severity: 'medium', detail: `Giá trị ${r.amount.toLocaleString('vi-VN')} ₫ gấp ${(r.amount / med).toFixed(1)} lần trung vị ${Math.round(med).toLocaleString('vi-VN')} ₫ của ${pair.length} hóa đơn trước với cùng bên mua.` })
+      out.push({ code: 'AMOUNT_ANOMALY', severity: 'medium', detail: `Giá trị ${r.amount.toLocaleString('vi-VN')} ₫ gấp ${(r.amount / med).toFixed(1)} lần trung vị ${Math.round(med).toLocaleString('vi-VN')} ₫ của ${pair.length} hóa đơn trước với cùng bên nhập khẩu.` })
     }
   }
   if (pair.length === 0 && r.amount >= FRAUD_PARAMS.newBuyerLarge) {
-    out.push({ code: 'NEW_BUYER_LARGE', severity: 'medium', detail: `Bên mua mới (chưa có hóa đơn nào với nhà cung cấp này) và giá trị từ ${FRAUD_PARAMS.newBuyerLarge.toLocaleString('vi-VN')} ₫.` })
+    out.push({ code: 'NEW_BUYER_LARGE', severity: 'medium', detail: `Bên nhập khẩu mới (chưa có hóa đơn nào với đơn vị xuất khẩu này) và giá trị từ ${FRAUD_PARAMS.newBuyerLarge.toLocaleString('vi-VN')} ₫.` })
   }
   if (new Date(r.issueDate).getTime() > now.getTime() + FRAUD_PARAMS.futureDays * DAY) {
     out.push({ code: 'FUTURE_ISSUE_DATE', severity: 'high', detail: `Ngày lập ${r.issueDate} ở tương lai.` })
   }
   const sameDay = existing.filter((x) => x.sellerId === r.sellerId && x.buyerId === r.buyerId && x.createdAt.slice(0, 10) === iso(now) && x.state !== 'CANCELLED').length
   if (sameDay + 1 >= FRAUD_PARAMS.burstCount) {
-    out.push({ code: 'BURST_SAME_BUYER', severity: 'low', detail: `${sameDay + 1} hóa đơn cho cùng bên mua trong một ngày.` })
+    out.push({ code: 'BURST_SAME_BUYER', severity: 'low', detail: `${sameDay + 1} hóa đơn cho cùng bên nhập khẩu trong một ngày.` })
   }
   if (r.source === 'manual' && r.amount >= FRAUD_PARAMS.roundLarge && r.amount % 1_000_000 === 0) {
     out.push({ code: 'ROUND_LARGE_MANUAL', severity: 'low', detail: 'Nhập tay, giá trị lớn và tròn triệu — nên đối chiếu chứng từ gốc.' })

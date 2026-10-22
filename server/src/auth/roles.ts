@@ -3,7 +3,7 @@
 import type { OrgType } from '@fcc/domain/types'
 
 export type MemberRole =
-  | 'owner' | 'approver' | 'operator' // bên bán, bên mua
+  | 'owner' | 'approver' | 'operator' // đơn vị xuất khẩu, bên nhập khẩu
   | 'analyst' | 'product_manager' // tổ chức tài chính (cùng owner)
   | 'fcc_admin' | 'fcc_reviewer' | 'fcc_operations' | 'fcc_model_owner' | 'fcc_auditor' // FCC
 
@@ -62,7 +62,7 @@ export const STEP_UP_ACTIONS = new Set([
 export const STEP_UP_MS = 10 * 60_000
 
 export function canDo(role: MemberRole, action: string): boolean {
-  // loại tổ chức được phép (bên bán, FCC…) do từng hành động tự kiểm tra trong service
+  // loại tổ chức được phép (đơn vị xuất khẩu, FCC…) do từng hành động tự kiểm tra trong service
   if (isAdminRole(role)) return true
   return (PERMISSIONS[action] ?? []).includes(role)
 }

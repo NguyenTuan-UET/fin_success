@@ -56,7 +56,7 @@ export function FundingRequest() {
       <section className="row top">
         <div className="card grow-2 stack-sm">
           <div className="between">
-            <h2 className="ct"><Term k="fiveC">Điểm nhà cung cấp (5C)</Term></h2>
+            <h2 className="ct"><Term k="fiveC">Điểm đơn vị xuất khẩu (5C)</Term></h2>
             <span className={`chip ${ratingTone(score.rating)}`}>{score.rating} · {dec(score.score, 0)}/100{score.official ? "" : " · tạm tính"}</span>
           </div>
           <div className="muted">Độ bao phủ dữ liệu {Math.round(score.coverage * 100)}% · khoảng điểm {dec(score.min, 0)}–{dec(score.max, 0)}. Cần bao phủ đủ ngưỡng mới là điểm chính thức.</div>
@@ -82,7 +82,7 @@ export function FundingRequest() {
               {app && cls && (
                 <>
                   <div className="between"><span>Điểm hồ sơ (tham khảo)</span><span className={`chip ${ratingTone(app.rating)}`}>{app.rating} · {dec(app.score, 0)}</span></div>
-                  <div className="between"><span>Bên mua</span><span className={`chip ${ratingTone(scores.buyer(t.buyerId).rating)}`}>{scores.buyer(t.buyerId).rating}</span></div>
+                  <div className="between"><span>Bên nhập khẩu</span><span className={`chip ${ratingTone(scores.buyer(t.buyerId).rating)}`}>{scores.buyer(t.buyerId).rating}</span></div>
                   <div className={`soft ${cls.case === 3 ? "err" : "okmsg"}`}><strong>{cls.label}</strong>{cls.reasons.map((r) => <div key={r}>{r}</div>)}</div>
                   {!cls.suggestProducts && <div className="muted">FCC không gợi ý sản phẩm cho nhóm này. Bạn vẫn có thể bổ sung dữ liệu để cải thiện điểm.</div>}
                 </>

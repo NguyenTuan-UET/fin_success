@@ -1,4 +1,4 @@
-// Tự động lấy dữ liệu niêm yết từ vnstock: chạy scripts/fetch_listed.py (Python, venv có vnstock) cho từng bên mua đã được FCC xác minh mã,
+// Tự động lấy dữ liệu niêm yết từ vnstock: chạy scripts/fetch_listed.py (Python, venv có vnstock) cho từng bên nhập khẩu đã được FCC xác minh mã,
 // ghi JSON vào listedDir rồi nạp vào hệ thống bằng đúng hành động refreshListed. Server vẫn chỉ đọc file, không nhận dữ liệu từ trình duyệt.
 import { execFile } from 'node:child_process'
 import { statSync } from 'node:fs'
@@ -67,11 +67,11 @@ export function fetchListedFile(f: ListedFetcher, org: Org, listedDir: string): 
   return p
 }
 
-/** Bên mua niêm yết đã được FCC xác minh ánh xạ MST ↔ mã (điều kiện của refreshListed). */
+/** Bên nhập khẩu niêm yết đã được FCC xác minh ánh xạ MST ↔ mã (điều kiện của refreshListed). */
 export const syncTargets = (core: Core) =>
   core.getState().orgs.filter((o) => o.type === 'buyer' && o.listedSymbol && o.listedVerified?.symbol === o.listedSymbol)
 
-/** Làm mới dữ liệu cho mọi bên mua đủ điều kiện; mã còn mới (theo giờ giao dịch) thì bỏ qua trừ khi force. Lỗi một mã không chặn mã khác.
+/** Làm mới dữ liệu cho mọi bên nhập khẩu đủ điều kiện; mã còn mới (theo giờ giao dịch) thì bỏ qua trừ khi force. Lỗi một mã không chặn mã khác.
  *  Chỉ một lượt đồng bộ chạy tại một thời điểm; gọi trong lúc đang chạy thì nhận kết quả của lượt đó. */
 export function syncListed(core: Core, f: ListedFetcher, opt: { force?: boolean; log?: (m: string) => void } = {}): Promise<SyncResult[]> {
   syncing ??= runSync(core, f, opt).finally(() => (syncing = undefined))

@@ -48,7 +48,7 @@ export function CashForecast({ forecast, openingCash, safeBalance, orgId, recurr
   // Số dư đầu + thu − chi = số dư cuối kỳ (khớp với chuỗi dự báo).
   const flows = {
     inn: (n === 7 ? forecast.inflow.d7 : forecast.inflow.d30) / 1e6,
-    innNote: "phải thu theo độ trễ từng người mua",
+    innNote: "phải thu theo độ trễ từng bên nhập khẩu",
     out: (n === 7 ? forecast.outflow.d7 : forecast.outflow.d30) / 1e6,
     outNote: "phải trả và chi định kỳ",
   };
@@ -62,7 +62,7 @@ export function CashForecast({ forecast, openingCash, safeBalance, orgId, recurr
       <div className="ch">
         <div>
           <h2 className="ct">Dự báo số dư tiền mặt</h2>
-          <p className="muted">Triệu đồng · tính từ lịch phải thu/phải trả và độ trễ thanh toán của từng người mua</p>
+          <p className="muted">Triệu đồng · tính từ lịch phải thu/phải trả và độ trễ thanh toán của từng bên nhập khẩu</p>
         </div>
         <div className="seg" role="group" aria-label="Khoảng dự báo">
           {([7, 30] as const).map((r) => (

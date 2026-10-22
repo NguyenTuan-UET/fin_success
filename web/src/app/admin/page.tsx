@@ -124,11 +124,11 @@ export default function AdminPage() {
             <Kpi label="Khoản phải thu trên nền tảng" value={String(kpis.receivables.total)} note={`${money(kpis.receivables.totalAmount)} tổng giá trị`} />
             <Kpi label="Giá trị bên tài trợ đã giải ngân" value={money(kpis.financed.amount)} note={`${kpis.financed.count} hồ sơ · tiền đi trực tiếp, không qua FCC`} />
             <Kpi label="Tỷ lệ phê duyệt" value={ratio(kpis.approval.approved, kpis.approval.decided)} note={`${sample(kpis.approval.decided)}${kpis.approval.approved}/${kpis.approval.decided} hồ sơ đã quyết định không bị từ chối`} />
-            <Kpi label="Tỷ lệ tranh chấp" value={ratio(kpis.dispute.disputed, kpis.dispute.sent)} tone={kpis.dispute.sent >= MIN_SAMPLES && kpis.dispute.disputed / kpis.dispute.sent > 0.1 ? "bad" : undefined} note={`${sample(kpis.dispute.sent)}${kpis.dispute.disputed}/${kpis.dispute.sent} khoản đã gửi bên mua từng bị tranh chấp`} />
+            <Kpi label="Tỷ lệ tranh chấp" value={ratio(kpis.dispute.disputed, kpis.dispute.sent)} tone={kpis.dispute.sent >= MIN_SAMPLES && kpis.dispute.disputed / kpis.dispute.sent > 0.1 ? "bad" : undefined} note={`${sample(kpis.dispute.sent)}${kpis.dispute.disputed}/${kpis.dispute.sent} khoản đã gửi bên nhập khẩu từng bị tranh chấp`} />
           </div>
           <b>Thời gian trung bình từng bước (ngày)</b>
           <div className="grid-fields" style={{ fontSize: 13 }}>
-            {([["createdToBuyerConfirmed", "Tạo hóa đơn → bên mua xác nhận"], ["submittedToDecision", "Nộp hồ sơ → quyết định"], ["decisionToFunded", "Quyết định → giải ngân"], ["fundedToSettled", "Giải ngân → tất toán"]] as const).map(([k, label]) => (
+            {([["createdToBuyerConfirmed", "Tạo hóa đơn → bên nhập khẩu xác nhận"], ["submittedToDecision", "Nộp hồ sơ → quyết định"], ["decisionToFunded", "Quyết định → giải ngân"], ["fundedToSettled", "Giải ngân → tất toán"]] as const).map(([k, label]) => (
               <div key={k}><div className="muted">{label}</div><div className="num strong">{kpis.stepTimes[k].samples < MIN_SAMPLES ? "Không đủ dữ liệu" : kpis.stepTimes[k].avgDays}<span className="muted"> ({kpis.stepTimes[k].samples} mẫu)</span></div></div>
             ))}
           </div>
@@ -145,7 +145,7 @@ export default function AdminPage() {
               <tr><th>Tỷ lệ ứng trước</th><td className="num">{review.pricing.advancePct}%</td></tr>
               <tr><th>Lãi suất</th><td className="num">{review.pricing.rateMin}–{review.pricing.rateMax}%/năm · phạt quá hạn {review.pricing.latePenaltyPct}% lãi</td></tr>
               <tr><th>Phí</th><td className="wrap">{review.pricing.fees.length ? review.pricing.fees.map((f) => `${f.name}: ${f.kind === "fixed" ? `${vnd(f.value)} đ` : `${f.value}%`}${f.upfront ? " (trả trước)" : ""}`).join("; ") : "Không có phí"}</td></tr>
-              <tr><th>Hạn mức mỗi hồ sơ</th><td className="num">{vnd(review.eligibility.minAmount)} – {vnd(review.eligibility.maxAmount)} đ · kỳ hạn tối đa {review.eligibility.maxTenorDays} ngày{review.eligibility.requireBuyerConfirmation ? " · cần bên mua xác nhận" : ""}</td></tr>
+              <tr><th>Hạn mức mỗi hồ sơ</th><td className="num">{vnd(review.eligibility.minAmount)} – {vnd(review.eligibility.maxAmount)} đ · kỳ hạn tối đa {review.eligibility.maxTenorDays} ngày{review.eligibility.requireBuyerConfirmation ? " · cần bên nhập khẩu xác nhận" : ""}</td></tr>
               <tr><th>Cam kết thời gian</th><td>{review.sla.quoteHours ? `báo giá ${review.sla.quoteHours} giờ` : "—"}{review.sla.reviewHours ? ` · thẩm định ${review.sla.reviewHours} giờ` : ""}</td></tr>
               <tr><th>Ưu đãi xanh</th><td>{review.greenRule ? `ESG ≥ ${review.greenRule.minEsg}: giảm ${review.greenRule.discountPct} điểm %` : "Không"}</td></tr>
               <tr><th>Hiệu lực</th><td className="num">{date(review.effectiveFrom)} → {date(review.effectiveTo)}</td></tr>

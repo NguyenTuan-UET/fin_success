@@ -1,5 +1,5 @@
 /**
- * Từ điển thuật ngữ: giải thích ngắn bằng lời thường cho kế toán/CFO SME.
+ * Từ điển thuật ngữ: giải thích ngắn bằng lời thường cho kế toán/CFO doanh nghiệp xuất khẩu.
  * Dùng chung cho <Term> và Trợ lý FCC.
  */
 export const GLOSSARY = {
@@ -16,7 +16,7 @@ export const GLOSSARY = {
   dpo: {
     term: "DPO",
     full: "Số ngày trả tiền bình quân",
-    text: "Trung bình doanh nghiệp mất bao nhiêu ngày để trả tiền cho nhà cung cấp.",
+    text: "Trung bình doanh nghiệp mất bao nhiêu ngày để trả tiền cho đơn vị xuất khẩu.",
   },
   ccc: {
     term: "Chu kỳ chuyển đổi tiền mặt",
@@ -61,7 +61,7 @@ export const GLOSSARY = {
   ews: {
     term: "EWS",
     full: "Hệ thống cảnh báo sớm",
-    text: "Theo dõi liên tục sau giải ngân: người mua trả chậm, doanh thu giảm, dữ liệu bất thường… để xử lý trước khi thành nợ xấu.",
+    text: "Theo dõi liên tục sau giải ngân: bên nhập khẩu trả chậm, doanh thu giảm, dữ liệu bất thường… để xử lý trước khi thành nợ xấu.",
   },
   tPlus: {
     term: "T+1 / T+2",
@@ -81,7 +81,7 @@ export const GLOSSARY = {
   earlyPay: {
     term: "Chiết khấu thanh toán sớm",
     full: "Dynamic discounting",
-    text: "Người mua trả tiền sớm hơn hạn, nhà cung cấp giảm một ít giá trị hóa đơn. Cả hai cùng có lợi.",
+    text: "Bên nhập khẩu trả tiền sớm hơn hạn, đơn vị xuất khẩu giảm một ít giá trị hóa đơn. Cả hai cùng có lợi.",
   },
   annualYield: {
     term: "Lợi suất quy năm",
@@ -90,7 +90,7 @@ export const GLOSSARY = {
   },
   threeWay: {
     term: "Đối chiếu 3 chiều",
-    full: "Hóa đơn · Đơn mua hàng · Biên bản giao hàng",
+    full: "Hóa đơn · Đơn đặt hàng · Chứng từ giao hàng",
     text: "Ba chứng từ phải khớp nhau về số lượng, đơn giá, giá trị trước khi xác nhận khoản phải trả.",
   },
   ocr: {

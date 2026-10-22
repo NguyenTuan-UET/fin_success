@@ -26,14 +26,14 @@ describe('EWS — cảnh báo sớm theo luật', () => {
     expect(a.some((x) => x.applicationId === 'a2' && x.code === 'DUE_SOON')).toBe(false)
   })
 
-  it('tập trung rủi ro: một bên mua quá 40% dư nợ (chỉ khi có từ hai bên mua)', () => {
+  it('tập trung rủi ro: một bên nhập khẩu quá 40% dư nợ (chỉ khi có từ hai bên nhập khẩu)', () => {
     const big = S([rec('r1', 'b1', '2026-12-01'), rec('r2', 'b2', '2026-12-01')], [app('a1', 'r1', 'FUNDED', 900_000_000), app('a2', 'r2', 'FUNDED', 100_000_000)])
     expect(ewsAlerts(big, big.applications, NOW).filter((x) => x.code === 'CONCENTRATION').map((x) => x.buyerId)).toEqual(['b1'])
     const one = S([rec('r1', 'b1', '2026-12-01')], [app('a1', 'r1')])
     expect(ewsAlerts(one, one.applications, NOW).some((x) => x.code === 'CONCENTRATION')).toBe(false)
   })
 
-  it('bên mua tranh chấp sau giải ngân là mức cao; đề nghị sắp hết hạn là mức thấp', () => {
+  it('bên nhập khẩu tranh chấp sau giải ngân là mức cao; đề nghị sắp hết hạn là mức thấp', () => {
     const s = S([rec('r1', 'b1', '2026-12-01', 'BUYER_DISPUTED', { disputeReason: 'Giao thiếu' }), rec('r2', 'b2', '2026-12-01', 'OFFERED')], [app('a1', 'r1'), app('a2', 'r2', 'OFFERED')])
     const a = ewsAlerts(s, s.applications, NOW)
     expect(a.find((x) => x.code === 'DISPUTE_ON_FUNDED')).toMatchObject({ severity: 'high', applicationId: 'a1' })

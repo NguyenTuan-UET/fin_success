@@ -58,7 +58,7 @@ export function BuyerConfirm() {
           <div className="tw" tabIndex={0} role="region" aria-label="Bảng dữ liệu, cuộn ngang để xem thêm">
             <table className="cards">
               <thead>
-                <tr><th>Hóa đơn</th><th>Nhà cung cấp</th><th className="r">Số tiền (đ)</th><th>Hạn thanh toán</th><th><Term k="threeWay">Chứng từ</Term></th><th>Quyết định</th></tr>
+                <tr><th>Hóa đơn</th><th>Đơn vị xuất khẩu</th><th className="r">Số tiền (đ)</th><th>Hạn thanh toán</th><th><Term k="threeWay">Chứng từ</Term></th><th>Quyết định</th></tr>
               </thead>
               <tbody>
                 {pending.map((p) => {
@@ -66,7 +66,7 @@ export function BuyerConfirm() {
                   return (
                     <tr key={p.id} className={cx("clickable", s?.id === p.id && "sel")} onClick={() => setSel(p.id)}>
                       <td data-label="Hóa đơn"><button className="link-btn num" onClick={() => setSel(p.id)}>{p.code}</button> <span className="muted">v{p.version}</span>{p.version > 1 && <span className="chip c-warn" style={{ marginLeft: 6 }}>Đã điều chỉnh</span>}<div className="muted num">{p.invoiceSeries}-{p.invoiceNumber}</div></td>
-                      <td data-label="Nhà cung cấp" className="wrap" style={{ minWidth: 110 }}>{orgName(data.orgs, p.sellerId)}</td>
+                      <td data-label="Đơn vị xuất khẩu" className="wrap" style={{ minWidth: 110 }}>{orgName(data.orgs, p.sellerId)}</td>
                       <td data-label="Số tiền (đ)" className="r num">{vnd(p.amount)}</td>
                       <td data-label="Hạn thanh toán" className="num">{date(p.dueDate)}</td>
                       <td data-label="Chứng từ"><span className={`chip ${warn ? "c-warn" : "c-info"}`}>{warn ? `Có ${3 - warn}/3` : "Đã tải đủ 3/3"}</span></td>
@@ -92,14 +92,14 @@ export function BuyerConfirm() {
               <h2 className="num" style={{ fontSize: 20, fontWeight: 600 }}>{s.code} <span className="muted" style={{ fontSize: 13, fontWeight: 500 }}>phiên bản v{s.version}</span></h2>
               <span style={{ fontSize: 13 }}>{orgName(data.orgs, s.sellerId)} · <span className="num">{vnd(s.amount)} đ</span> · hạn {date(s.dueDate)}</span>
               {updatedAt(s) && <span className="muted">Cập nhật lần cuối {dateTime(updatedAt(s))}</span>}
-              <span className="muted">Xếp hạng nhà cung cấp (tham khảo): {(() => { const x = scores.supplier(s.sellerId); return !x.official && x.coverage < 0.5 ? "chưa đủ dữ liệu" : `${x.rating}${x.official ? "" : " · tạm tính"}`; })()}</span>
+              <span className="muted">Xếp hạng đơn vị xuất khẩu (tham khảo): {(() => { const x = scores.supplier(s.sellerId); return !x.official && x.coverage < 0.5 ? "chưa đủ dữ liệu" : `${x.rating}${x.official ? "" : " · tạm tính"}`; })()}</span>
               <RevisionHistory r={s} />
               <InvoiceDocuments r={s} />
               <CustomsDocuments r={s} />
-              <div className="muted" style={{ fontSize: 12.5 }}>FCC lưu chứng từ nhà cung cấp tải lên nhưng chưa tự đối chiếu nội dung với đơn hàng hay biên bản của bạn — hãy kiểm tra trước khi xác nhận.</div>
+              <div className="muted" style={{ fontSize: 12.5 }}>FCC lưu chứng từ đơn vị xuất khẩu tải lên nhưng chưa tự đối chiếu nội dung với đơn hàng hay biên bản của bạn — hãy kiểm tra trước khi xác nhận.</div>
               {s.state === "BUYER_PENDING" && <div className="row" style={{ gap: 8 }}><button className="btn bp" disabled={busy} onClick={() => confirm(s)}>Xác nhận phiên bản v{s.version}</button><button className="btn bs" disabled={busy} onClick={() => setDispute({ id: s.id, reason: "" })}>Hỏi lại</button></div>}
               <div style={{ fontSize: 12.5, color: "var(--ink-2)", background: "var(--info-bg)", padding: "10px 12px", borderRadius: 10 }}>
-                Xác nhận là khẳng định khoản phải trả là thật và đúng hạn (cần xác thực MFA). Nếu nhà cung cấp tài trợ hóa đơn này, bạn thanh toán đúng hạn — không phát sinh nghĩa vụ mới.
+                Xác nhận là khẳng định khoản phải trả là thật và đúng hạn (cần xác thực MFA). Nếu đơn vị xuất khẩu tài trợ hóa đơn này, bạn thanh toán đúng hạn — không phát sinh nghĩa vụ mới.
               </div>
             </>
           ) : <div className="empty">Chọn một hóa đơn để xem đối chiếu.</div>}
@@ -110,7 +110,7 @@ export function BuyerConfirm() {
         <div className="ch"><h2 className="ct">Hóa đơn đã xác nhận</h2><span className="muted">Ghi nhận thanh toán khi bạn đã chuyển tiền</span></div>
         <div className="tw" tabIndex={0} role="region" aria-label="Bảng dữ liệu, cuộn ngang để xem thêm">
           <table className="cards">
-            <thead><tr><th>Hóa đơn</th><th>Nhà cung cấp</th><th className="r">Số tiền (đ)</th><th>Hạn</th><th>Trạng thái</th><th></th></tr></thead>
+            <thead><tr><th>Hóa đơn</th><th>Đơn vị xuất khẩu</th><th className="r">Số tiền (đ)</th><th>Hạn</th><th>Trạng thái</th><th></th></tr></thead>
             <tbody>
               {confirmed.map((r) => {
                 const d = daysFromNow(r.dueDate);
@@ -118,7 +118,7 @@ export function BuyerConfirm() {
                 return (
                   <tr key={r.id}>
                     <td data-label="Hóa đơn" className="num strong">{r.code}</td>
-                    <td data-label="Nhà cung cấp">{orgName(data.orgs, r.sellerId)}</td>
+                    <td data-label="Đơn vị xuất khẩu">{orgName(data.orgs, r.sellerId)}</td>
                     <td data-label="Số tiền (đ)" className="r num">{vnd(r.amount)}</td>
                     <td data-label="Hạn"><div className="num">{date(r.dueDate)}</div><div className={cx("muted", d < 0 && "t-bad")}>{d < 0 ? `quá hạn ${-d} ngày` : `còn ${d} ngày`}</div></td>
                     <td data-label="Trạng thái"><span className={`chip ${RECEIVABLE_STAGE[r.state].chip}`}>{RECEIVABLE_STAGE[r.state].short}</span></td>
@@ -138,10 +138,10 @@ export function BuyerConfirm() {
       </section>
 
       <section className="card flush">
-        <div className="ch"><div><h2 className="ct"><Term k="earlyPay">Chiết khấu thanh toán sớm</Term></h2><p className="muted">Bạn đề nghị trả trước hạn để được chiết khấu; nhà cung cấp đồng ý rồi bạn tự chuyển tiền, FCC chỉ ghi nhận.</p></div></div>
+        <div className="ch"><div><h2 className="ct"><Term k="earlyPay">Chiết khấu thanh toán sớm</Term></h2><p className="muted">Bạn đề nghị trả trước hạn để được chiết khấu; đơn vị xuất khẩu đồng ý rồi bạn tự chuyển tiền, FCC chỉ ghi nhận.</p></div></div>
         <div className="tw" tabIndex={0} role="region" aria-label="Bảng dữ liệu, cuộn ngang để xem thêm">
           <table>
-            <thead><tr><th>Hóa đơn</th><th>Nhà cung cấp</th><th className="r">Số tiền (đ)</th><th className="r">Chiết khấu</th><th>Trả trước</th><th className="r"><Term k="annualYield">Lợi suất quy năm</Term></th><th>Trạng thái</th><th></th></tr></thead>
+            <thead><tr><th>Hóa đơn</th><th>Đơn vị xuất khẩu</th><th className="r">Số tiền (đ)</th><th className="r">Chiết khấu</th><th>Trả trước</th><th className="r"><Term k="annualYield">Lợi suất quy năm</Term></th><th>Trạng thái</th><th></th></tr></thead>
             <tbody>
               {offers.map((o) => {
                 const r = data.receivables.find((x) => x.id === o.receivableId);
@@ -157,7 +157,7 @@ export function BuyerConfirm() {
                     <td className="r num">{o.discountPct}% → trả {vnd(pay)} đ</td>
                     <td className="num">{date(o.payBy)}</td>
                     <td className={cx("r num", y > HURDLE ? "t-ok strong" : "t-bad")}>{(y * 100).toLocaleString("vi-VN", { maximumFractionDigits: 1 })}%</td>
-                    <td><span className={`chip ${o.state === "PAID" ? "c-ok" : o.state === "ACCEPTED" ? "c-info" : "c-neu"}`}>{{ OPEN: "Chờ nhà cung cấp", ACCEPTED: "Nhà cung cấp đồng ý", PAID: "Đã trả", EXPIRED: "Hết hạn", CANCELLED: "Đã hủy" }[o.state]}</span></td>
+                    <td><span className={`chip ${o.state === "PAID" ? "c-ok" : o.state === "ACCEPTED" ? "c-info" : "c-neu"}`}>{{ OPEN: "Chờ đơn vị xuất khẩu", ACCEPTED: "Đơn vị xuất khẩu đồng ý", PAID: "Đã trả", EXPIRED: "Hết hạn", CANCELLED: "Đã hủy" }[o.state]}</span></td>
                     <td>{o.state === "ACCEPTED" && <button className="btn bp sm" disabled={busy} onClick={() => run(() => act("POST", `/v1/early-payment-offers/${o.id}/paid`), `Đã ghi nhận trả sớm ${r.code}`)}>Ghi nhận đã trả</button>}</td>
                   </tr>
                 );
@@ -172,7 +172,7 @@ export function BuyerConfirm() {
       {dispute && (
         <div className="modal-scrim" role="dialog" aria-modal="true">
           <div className="card modal">
-            <h2 className="ct">Yêu cầu nhà cung cấp giải trình</h2>
+            <h2 className="ct">Yêu cầu đơn vị xuất khẩu giải trình</h2>
             <label className="field"><span>Lý do (bắt buộc)</span><textarea className="input" rows={3} value={dispute.reason} onChange={(e) => setDispute({ ...dispute, reason: e.target.value })} placeholder="VD: giao thiếu số lượng, sai đơn giá…" /></label>
             <div className="row" style={{ justifyContent: "flex-end", gap: 8 }}>
               <button className="btn bs" onClick={() => setDispute(null)}>Hủy</button>
@@ -185,7 +185,7 @@ export function BuyerConfirm() {
         <div className="modal-scrim" role="dialog" aria-modal="true">
           <div className="card modal">
             <h2 className="ct">Ghi nhận thanh toán {payFor.r.code}</h2>
-            <div className="muted">{payFor.r.state === "BUYER_CONFIRMED" ? "Khoản chưa tài trợ: thanh toán trực tiếp cho nhà cung cấp, FCC chỉ ghi nhận." : "Khoản đã tài trợ: tiền chuyển cho tổ chức tài chính; họ xác nhận tiền về thì mới tất toán và đối soát với số bạn báo."}</div>
+            <div className="muted">{payFor.r.state === "BUYER_CONFIRMED" ? "Khoản chưa tài trợ: thanh toán trực tiếp cho đơn vị xuất khẩu, FCC chỉ ghi nhận." : "Khoản đã tài trợ: tiền chuyển cho tổ chức tài chính; họ xác nhận tiền về thì mới tất toán và đối soát với số bạn báo."}</div>
             <MoneyInput label="Số tiền đã trả (đ)" value={payFor.amount} onChange={(v) => setPayFor({ ...payFor, amount: v })} />
             <DateInput label="Ngày trả" max={today()} value={payFor.paidAt} onChange={(v) => setPayFor({ ...payFor, paidAt: v })} />
             <label className="field"><span>Số chứng từ chuyển khoản</span><input className="input" value={payFor.reference} onChange={(e) => setPayFor({ ...payFor, reference: e.target.value })} /></label>
@@ -204,7 +204,7 @@ export function BuyerConfirm() {
             <DateInput label="Ngày trả" min={today()} max={offerFor.dueDate} value={payBy} onChange={setPayBy} />
             <div className="row" style={{ justifyContent: "flex-end", gap: 8 }}>
               <button className="btn bs" onClick={() => setOfferFor(null)}>Hủy</button>
-              <button className="btn bp" disabled={busy || !(Number(disc) > 0) || !payBy} onClick={() => run(async () => { await act("POST", "/v1/early-payment-offers", { receivableId: offerFor.id, discountPct: Number(disc), payBy }); setOfferFor(null); }, "Đã gửi đề nghị tới nhà cung cấp")}>Gửi đề nghị</button>
+              <button className="btn bp" disabled={busy || !(Number(disc) > 0) || !payBy} onClick={() => run(async () => { await act("POST", "/v1/early-payment-offers", { receivableId: offerFor.id, discountPct: Number(disc), payBy }); setOfferFor(null); }, "Đã gửi đề nghị tới đơn vị xuất khẩu")}>Gửi đề nghị</button>
             </div>
           </div>
         </div>

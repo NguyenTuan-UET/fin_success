@@ -212,7 +212,7 @@ export function EsgReview() {
   );
 }
 
-/** Bên mua / tổ chức tài chính: ESG của các doanh nghiệp đã đồng ý chia sẻ. */
+/** Bên nhập khẩu / tổ chức tài chính: ESG của các doanh nghiệp đã đồng ý chia sẻ. */
 export function EsgPortfolio({ kind }: { kind: "buyer" | "lender" }) {
   const { data, org } = useData();
   const rows = useMemo(() => {
@@ -227,7 +227,7 @@ export function EsgPortfolio({ kind }: { kind: "buyer" | "lender" }) {
   return (
     <>
       <section className="grid-kpi">
-        <Kpi label="Doanh nghiệp chia sẻ ESG" value={String(rows.length)} note={kind === "buyer" ? "nhà cung cấp của bạn" : "doanh nghiệp trong hồ sơ của bạn"} />
+        <Kpi label="Doanh nghiệp chia sẻ ESG" value={String(rows.length)} note={kind === "buyer" ? "đơn vị xuất khẩu của bạn" : "doanh nghiệp trong hồ sơ của bạn"} />
         <Kpi label="Đạt ngưỡng xanh" value={`${green.length}/${rows.length}`} note="ESG chính thức ≥ 65, còn hiệu lực, không cờ trọng yếu" />
         <Kpi label="Có cờ trọng yếu" value={String(rows.filter((x) => x.r.flags.length).length)} tone={rows.some((x) => x.r.flags.length) ? "bad" : "ok"} />
       </section>
