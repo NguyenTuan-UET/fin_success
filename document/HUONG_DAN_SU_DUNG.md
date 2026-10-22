@@ -20,6 +20,7 @@ Phase này **không kết nối ngân hàng thật**. Phía ngân hàng và tổ
 
 ### Nghiệp vụ
 - **Hóa đơn / khoản phải thu:** nhập XML, ảnh/PDF qua AI OCR (người dùng xác nhận trước khi lưu) hoặc nhập tay; phát hiện bất thường (số tiền lạ, bên nhập khẩu mới số tiền lớn, ngày phát hành tương lai, dồn dập…); hóa đơn điều chỉnh; hàng đợi cờ do FCC xử lý; đối chiếu thuế do FCC nhập kết quả tra cứu.
+- **Chứng từ hải quan:** đơn vị xuất khẩu và bên nhập khẩu cùng thêm tờ khai, vận đơn… vào hóa đơn (`POST /v1/receivables/{id}/customs-documents`); cờ trùng tờ khai / sai MST do FCC xử lý; cổng `CUSTOMS_GATE` trước RFQ; điểm T1 tính 4 loại chứng từ (bộ chấm `application-v1.1`: điểm hồ sơ của khoản cũ thấp hơn vì thiếu tờ khai).
 - **Chấm điểm:** điểm đơn vị xuất khẩu theo 5C, điểm bên nhập khẩu, điểm hồ sơ tài trợ. Tính ở máy chủ, lưu bất biến, cùng đầu vào cho cùng kết quả. Có xem xét lại (appeal). Phiên bản bộ chấm điểm cần hai người duyệt.
 - **ESG:** hồ sơ và bằng chứng, AI đề xuất mức kèm trích dẫn, luật kiểm tra ở máy chủ; FCC phát hành điểm chính thức (cần MFA).
 - **Marketplace và tài trợ:** sản phẩm của tổ chức tài chính, khớp và chi phí ước tính, RFQ (tối đa 3 sản phẩm), báo giá, thẩm định, đề nghị chính thức, chấp thuận (MFA), giải ngân.
